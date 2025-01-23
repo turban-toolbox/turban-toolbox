@@ -1,0 +1,194 @@
+{
+    "sensors": {
+        "COUNT": {
+            "name": "COUNT",
+            "coefficients": [
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 0,
+            "calibration_type": "N"
+        },
+        "TEMP_EMPH": {
+            "name": "TEMP_EMPH",
+            "coefficients": [
+                8.09572e-4,
+                2.55667e-4,
+                3.67476e-4,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 1,
+            "calibration_type": "SHH"
+        },
+        "PRESSURE": {
+            "name": "PRESSURE",
+            "coefficients": [
+                -1.21416e2,
+                1.77409e-2,
+                7.04693e-11,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 2,
+            "calibration_type": "P"
+        },
+        "SHEAR_1": {
+            "name": "SHEAR_1",
+            "coefficients": [
+                0.0037343401015228427,
+                0.007468680203045685,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 3,
+            "calibration_type": "N",
+            "sensitivity": 3.94e-4,
+            "serial_number": "116",
+            "reference_temperature": 21.0,
+            "calibration_date": "2024-06-05"
+        },
+        "TEMP": {
+            "name": "TEMP",
+            "coefficients": [
+                -2.52438,
+                0.000590649,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 4,
+            "calibration_type": "N"
+        },
+        "SHEAR_2": {
+            "name": "SHEAR_2",
+            "coefficients": [
+                0.0040421153846153845,
+                0.008084230769230769,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 5,
+            "calibration_type": "N",
+            "sensitivity": 3.64e-4,
+            "serial_number": "149",
+            "reference_temperature": 21.0,
+            "calibration_date": "2024-06-05"
+        },
+        "COND": {
+            "name": "COND",
+            "coefficients": [
+                -3.18169e-1,
+                1.20253e-3,
+                7.56871e-11,
+                -6.15942e-16,
+                0.0,
+                0.0
+            ],
+            "channel": 6,
+            "calibration_type": "N"
+        },
+        "ACCEL": {
+            "name": "ACCEL",
+            "coefficients": [
+                -22.4276,
+                0.00068649,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 7,
+            "calibration_type": "N"
+        },
+        "TEMP_FAST": {
+            "name": "TEMP_FAST",
+            "coefficients": [
+                8.57086e-4,
+                2.47319e-4,
+                7.29889e-7,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 8,
+            "calibration_type": "SHH"
+        },
+        "ACCEL_X": {
+            "name": "ACCEL_X",
+            "coefficients": [
+                -1.37559,
+                3.9507e-05,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 9,
+            "calibration_type": "N"
+        },
+        "ACCEL_Y": {
+            "name": "ACCEL_Y",
+            "coefficients": [
+                -1.37098,
+                3.91988e-05,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 10,
+            "calibration_type": "N"
+        },
+        "Cmdc": {
+            "name": "Cmdc",
+            "coefficients": [
+                -3.03657,
+                0.00113127,
+                1.0188e-09,
+                -1.02873e-14,
+                0.0,
+                0.0
+            ],
+            "channel": 11,
+            "calibration_type": "N"
+        },
+        "Cmac": {
+            "name": "Cmac",
+            "coefficients": [
+                -36.91,
+                0.00113172,
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "channel": 12,
+            "calibration_type": "N"
+        },
+        "Chl_A": {
+            "name": "Chl_A",
+            "coefficients": [
+                -0.178896,
+                8.21826e-05,
+                0.0,
+                0.0,
+                -0.11,
+                1.0
+            ],
+            "channel": 13,
+            "calibration_type": "NFC"
+        }
+    }
+}
