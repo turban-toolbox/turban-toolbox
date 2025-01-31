@@ -2,11 +2,10 @@
 
 import sys, os
 
-sys.path.insert(0, os.getcwd().join("atomixpy"))
+sys.path.insert(0, os.getcwd().join("turban"))
 sys.path.insert(0, os.getcwd())
 
 import json
-import atomixpy.atomixrs as mx
 import pandas as pd
 from io import StringIO
 

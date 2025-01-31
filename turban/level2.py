@@ -1,9 +1,9 @@
 import numpy as np
 from .util import butterfilt
-from atomixpy.atomixrs import replace_spikes
 from jaxtyping import Float, Num, Bool, Int
 from beartype.typing import Tuple, Dict, List
 from numpy import ndarray
+import warnings
 
 
 data_and_bounds_type = List[
@@ -184,14 +184,16 @@ def clean_shear(
     while np.any(spikes) and (ctr < max_tries):
         ctr += 1
         spike_sections = boolarr_to_sections(spikes)
-        sh = np.array(
-            replace_spikes(
-                sh,
-                spike_sections,
-                spike_replace_before=spike_replace_before,
-                spike_replace_after=spike_replace_after,
-            )
-        )
+
+        # sh = np.array(
+        #     replace_spikes(
+        #         sh,
+        #         spike_sections,
+        #         spike_replace_before=spike_replace_before,
+        #         spike_replace_after=spike_replace_after,
+        #     )
+        # )
+        warnings.warn("replace_spikes not implemented in python", UserWarning)
         spikes = detect_shear_spikes(
             sh,
             sampling_freq,

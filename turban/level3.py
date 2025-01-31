@@ -36,8 +36,9 @@ def process_level3(
         data_vars={
             "k": (["time_slow", "wavenumber"], k),
             "Pk": (["nshear", "time_slow", "wavenumber"], Pk),
-            "Pf": (["nshear", "time_slow", "freq"], Pf),
-            "freq": (["freq"], freq),
+            "Pf": (["nshear", "time_slow", "wavenumber"], Pf),
+            "freq": (["wavenumber"], freq),
+            "platform_speed": (["time_slow"], pspda),
         }
     )
 

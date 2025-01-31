@@ -3,7 +3,7 @@ import numpy as np
 from .level2 import (
     boolarr_to_sections,
     detect_shear_spikes,
-    replace_spikes,
+    # replace_spikes,
     rollpad1,
     enlarge_bool,
 )

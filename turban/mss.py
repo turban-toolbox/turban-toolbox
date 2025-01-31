@@ -7,11 +7,10 @@ from jaxtyping import Num
 from numpy import ndarray
 import pandas as pd
 
-import atomixpy.atomixrs as mx
-from atomixpy.ctd import *
-from atomixpy.level1 import *
-from atomixpy.temperature import *
-from atomixpy.util import channel_mapping
+from turban.ctd import *
+from turban.level1 import *
+from turban.temperature import *
+from turban.util import channel_mapping
 
 os.environ["RUST_BACKTRACE"] = "1"
 

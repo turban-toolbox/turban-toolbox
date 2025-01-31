@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from atomixpy.level3 import spectra
-from atomixpy.util import average_fast_to_slow
+from turban.level3 import spectra
+from turban.util import average_fast_to_slow
 
 
 def test_spectra_arr_shape():

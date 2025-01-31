@@ -16,6 +16,7 @@ mrd-format-info/
 *.m
 *.mat
 *.so
+*.png
 
 __pycache__
 

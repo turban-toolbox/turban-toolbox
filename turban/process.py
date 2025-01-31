@@ -8,20 +8,19 @@ import numpy as np
 from jaxtyping import Float
 from netCDF4 import Dataset
 
-from atomixpy.util import average_fast_to_slow, binned_gradient_halfoverlap
-from atomixpy.level1 import get_vsink, fft_grad, process_level1
-from atomixpy.level2 import (
+from turban.util import average_fast_to_slow, binned_gradient_halfoverlap
+from turban.level1 import get_vsink, fft_grad, process_level1
+from turban.level2 import (
     split_data,
     process_level2,
     data_and_bounds_type,
     select_sections,
 )
-from atomixpy.level3 import (
+from turban.level3 import (
     process_level3,
 )
-from atomixpy.level4 import process_level4
-import atomixpy.atomixrs as mx
-from atomixpy.temperature import (
+from turban.level4 import process_level4
+from turban.temperature import (
     temperature_dissipation,
     diffusivity_temp,
     viscosity_kinematic,
@@ -402,76 +401,3 @@ def shear(
 
     return ds3["k"].values, ds3["Pk"].values, ds4["eps"].values
 
-
-def _mx_shear(
-    pressure: Float[ndarray, "time_fast"],
-    shear: Float[ndarray, "n_shear time_fast"],
-    accel_x: Float[ndarray, "time_fast"],
-    accel_y: Float[ndarray, "time_fast"],
-    fftlen: int,  # length of single FFT segment to estimate periodogram
-    sampling_freq: float,  # Hz
-    k0: float = 50.0,
-    freq_highpass: float = 0.15,
-    diss_length: int = None,  # length of data segment to estimate dissipation. default: 2.5 x FFT segment
-    diss_length_overlap: int = None,  # length of overlap between consecutive dissipation segments
-) -> Tuple[
-    Float[ndarray, "wavenum"],
-    # spectra - one dict entry per shear channel
-    List[Dict[str, Float[ndarray, "time_slow wavenum"]]],
-    # dissipation - one dict entry per shear channel
-    List[Dict[str, Float[ndarray, "time_slow"]]],
-]:
-    if diss_length is None:
-        diss_length = 3 * fftlen
-
-    if diss_length_overlap is None:
-        diss_length_overlap = int(1.5 * fftlen)
-
-    (pressure_lp, vsink, pitch, roll, shear) = process_level1(
-        pressure, shear, accel_x, accel_y
-    )
-
-    pspd = np.nanmedian(vsink)
-    section_select_criteria = {
-        (5.0, None): pressure_lp,
-        (0.9 * pspd, 1.1 * pspd): vsink,
-        (-20.0, 20.0): pitch,
-        (-20.0, 20.0): roll,
-    }
-
-    shear_segments_cleaned = process_level2(
-        shear, section_select_criteria, 1024.0, 2048
-    )
-    data_segments, _ = split_data(
-        {"vsink": vsink, "p": pressure}, *section_select_criteria
-    )
-
-    spectra_segments = []
-    epsilon_segments = []
-    wavenumbers = []
-
-    for data_seg, shear_seg in zip(data_segments, shear_segments_cleaned):
-        spectra = {}
-        epsilon = {}
-        for sh_channel, (sh, _, _) in shear_seg.items():
-            res = mx.process_shear_timeseries(
-                sh,
-                data_seg["vsink"],
-                agg_data=(),
-                fft_length=fftlen,
-                sampling_freq=sampling_freq,  # Hz
-                k0=k0,
-                freq_highpass=freq_highpass,
-                diss_length=diss_length,
-                diss_length_overlap=diss_length_overlap,
-            )
-            k, psi, eps, _agg = zip(*res)
-            spectra[sh_channel] = np.array(psi)
-            epsilon[sh_channel] = np.array(eps)
-            if k:
-                wavenumbers = np.array(k[0])
-
-        spectra_segments.append(spectra)
-        epsilon_segments.append(epsilon)
-
-    return wavenumbers, spectra_segments, epsilon_segments

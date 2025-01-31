@@ -2,7 +2,6 @@
 import os
 
 os.environ["RUST_BACKTRACE"] = "1"
-import atomixpy.atomixrs as mx
 
 import xarray as xr
 

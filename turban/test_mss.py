@@ -7,11 +7,11 @@ from beartype.typing import Dict
 import pandas as pd
 
 
-from atomixpy.ctd import *
-from atomixpy.level1 import *
-from atomixpy.temperature import *
+from turban.ctd import *
+from turban.level1 import *
+from turban.temperature import *
 from numpy import ndarray
-from atomixpy.mss import convert_mrd_to_parquet
+from turban.mss import convert_mrd_to_parquet
 
 
 def test_convert_mrd():
