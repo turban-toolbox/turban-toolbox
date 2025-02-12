@@ -34,6 +34,10 @@ def fast_to_slow_grad_by_segment(
     fftlen: int,
     sampling_freq: float,
 ) -> Float[ndarray, "... time_slow"]:
+    """
+    Calculate the gradient of `x` with respect to depth, averaged over each segment.
+    This is done by using pspd, the platform speed, to convert between time and depth.
+    """
     x_segments = [x[..., inds] for inds in section_select_idx]
     pspd_segments = [pspd[..., inds] for inds in section_select_idx]
     dxdz_segments = []
