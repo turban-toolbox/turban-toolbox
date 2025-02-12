@@ -166,7 +166,9 @@ def test_baltic_benchmark():
     )
     level4['PRES'] = level3['PRES']
 
+    _plot_level3(ds3, level3)
 
+def _plot_level3(ds3, level3):
     level3["k"].loc[
         {
             "wavenumber": 0,
