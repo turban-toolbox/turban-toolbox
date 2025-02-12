@@ -158,11 +158,14 @@ def test_baltic_benchmark():
         freq_highpass=0.15,
         chunklen=5,
         chunkoverlap=2,
+        ancillary={"PRES": ds1.PRES.values},
     )
 
     level4 = process_level4(
         level3.Pk.values, level3.k.values, level3.platform_speed.values
     )
+    level4['PRES'] = level3['PRES']
+
 
     level3["k"].loc[
         {

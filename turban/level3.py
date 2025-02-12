@@ -1,4 +1,4 @@
-from beartype.typing import Tuple
+from beartype.typing import Tuple, Dict
 
 from numpy import ndarray, newaxis
 import numpy as np
@@ -17,10 +17,19 @@ def process_level3(
     freq_highpass: float,
     chunklen: int,
     chunkoverlap: int,
+    ancillary: Dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
 ):  # -> xr.Dataset: # beartype complains with BeartypeCallHintForwardRefException
     Pf, freq = spectra(shear_segment, fftlen, sampling_freq, chunklen, chunkoverlap)
+
+    # Average to time_slow
+    data_fast: Float[ndarray, "variable time_fast"] = (
+        pspd_segment[:, newaxis]  # add dimension
+        if ancillary is None
+        else np.stack((pspd_segment, *(arr for k, arr in ancillary.items())), axis=0)
+    )
     # platform speed
-    pspda = average_fast_to_slow(pspd_segment, fftlen, chunklen, chunkoverlap)
+    data_slow = average_fast_to_slow(data_fast, fftlen, chunklen, chunkoverlap)
+    pspda = data_slow[0, :]
 
     # to wavenumber domain
     Pk = Pf * pspda[newaxis, :, newaxis] / fftlen / (sampling_freq / 2)
@@ -32,15 +41,23 @@ def process_level3(
     # apply_removal_coherent_vibrations(P)
     # get_uncertainty_estimates(P)
 
-    return xr.Dataset(
-        data_vars={
-            "k": (["time_slow", "wavenumber"], k),
-            "Pk": (["nshear", "time_slow", "wavenumber"], Pk),
-            "Pf": (["nshear", "time_slow", "wavenumber"], Pf),
-            "freq": (["wavenumber"], freq),
-            "platform_speed": (["time_slow"], pspda),
+    data_vars = {
+        "k": (["time_slow", "wavenumber"], k),
+        "Pk": (["nshear", "time_slow", "wavenumber"], Pk),
+        "Pf": (["nshear", "time_slow", "wavenumber"], Pf),
+        "freq": (["wavenumber"], freq),
+        "platform_speed": (["time_slow"], pspda),
+    }
+    data_vars.update(
+        {
+            name: (["time_slow"], data_slow[ind, :])
+            for ind, name in enumerate(ancillary.keys())
         }
+        if ancillary is not None
+        else {}
     )
+
+    return xr.Dataset(data_vars=data_vars)
 
 
 def spectra(
