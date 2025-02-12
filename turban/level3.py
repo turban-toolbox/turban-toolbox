@@ -28,7 +28,9 @@ def process_level3(
         else np.stack((pspd_segment, *(arr for k, arr in ancillary.items())), axis=0)
     )
     # platform speed
-    data_slow = average_fast_to_slow(data_fast, fftlen, chunklen, chunkoverlap)
+    data_slow: Float[ndarray, "variable time_slow"] = average_fast_to_slow(
+        data_fast, fftlen, chunklen, chunkoverlap
+    )
     pspda = data_slow[0, :]
 
     # to wavenumber domain
@@ -50,7 +52,7 @@ def process_level3(
     }
     data_vars.update(
         {
-            name: (["time_slow"], data_slow[ind, :])
+            name: (["time_slow"], data_slow[ind+1, :])
             for ind, name in enumerate(ancillary.keys())
         }
         if ancillary is not None
