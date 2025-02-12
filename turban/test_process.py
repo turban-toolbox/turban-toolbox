@@ -93,25 +93,20 @@ def test_shear():
     )
 
 
-def plot_spectra(ds, canvas_kwarg, shade_kwarg):
+def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
     import datashader as dsh
 
-    level3 = ds.copy()
-    level3["k"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-    level3["Pk"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-    df = level3.to_dataframe()
+    df = pd.concat(
+        ds.to_dataframe().reset_index().assign(source=source)
+        for source, ds in datasets.items()
+    )
+    df["source"] = df["source"].astype("category")
+    df = df.drop(df[df.Pk.isna() & df.k > 0].index)
+
     cvs = dsh.Canvas(**canvas_kwarg)
 
-    agg = cvs.line(source=df, x="k", y="Pk", agg=dsh.count())
+    agg = cvs.line(source=df, x="k", y="Pk", agg=dsh.by("source"))
     im = dsh.transfer_functions.shade(agg, how="eq_hist", **shade_kwarg)
 
     return im
@@ -129,7 +124,14 @@ def test_baltic_benchmark():
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
-    ds3 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra")
+    ds3 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra").rename(
+        {
+            "N_SHEAR_SENSORS": "nshear",
+            "SH_SPEC": "Pk",
+            "KCYC": "k",
+            "WAVENUMBER": "wavenumber",
+        }
+    )  # for consistency with turban level 3
     ds4 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L4_dissipation")
 
     (idx,) = np.where(ds2.SECTION_NUMBER == 1)
@@ -162,6 +164,27 @@ def test_baltic_benchmark():
         level3.Pk.values, level3.k.values, level3.platform_speed.values
     )
 
+    level3["k"].loc[
+        {
+            "wavenumber": 0,
+        }
+    ] = np.nan
+    level3["Pk"].loc[
+        {
+            "wavenumber": 0,
+        }
+    ] = np.nan
+    ds3["k"].loc[
+        {
+            "wavenumber": 0,
+        }
+    ] = np.nan
+    ds3["Pk"].loc[
+        {
+            "wavenumber": 0,
+        }
+    ] = np.nan
+
     # comparison plots
     import datashader as dsh
 
@@ -173,6 +196,7 @@ def test_baltic_benchmark():
         x_axis_type="log",
         y_axis_type="log",
     )
+    shade_kwarg = dict(color_key={"benchmark": "violet", "turban": "green"})
     xticks, xticklabels = zip(
         *[
             (
@@ -203,24 +227,14 @@ def test_baltic_benchmark():
     )
 
     for nshear in [0, 1]:
-        im = dsh.transfer_functions.stack(
-            plot_spectra(
-                ds3.rename(
-                    {
-                        "N_SHEAR_SENSORS": "nshear",
-                        "SH_SPEC": "Pk",
-                        "KCYC": "k",
-                        "WAVENUMBER": "wavenumber",
-                    }
-                ).isel(nshear=nshear),
-                canvas_kwarg=canvas_kwarg,
-                shade_kwarg=dict(cmap="black"),
-            ),
-            plot_spectra(
-                level3.isel(nshear=nshear),
-                canvas_kwarg=canvas_kwarg,
-                shade_kwarg=dict(cmap="red"),
-            ),
+
+        im = plot_spectra(
+            {
+                "benchmark": ds3.isel(nshear=nshear, N_SH_VIB_SPEC=nshear),
+                "turban": level3.isel(nshear=nshear),
+            },
+            canvas_kwarg=canvas_kwarg,
+            shade_kwarg=shade_kwarg,
         )
         fig = plt.figure(figsize=(9, 9))
         ax = fig.subplots()
@@ -228,5 +242,6 @@ def test_baltic_benchmark():
         ax.set_xticks(xticks, xticklabels)
         ax.set_yticks(yticks, yticklabels)
         ax.set_xlabel("wavenumber")
-        ax.set_ylabel("Power spectral density (s^-2) / (m^-1)")
-        fig.savefig(f"baltic-level3-shear-{nshear}.png")
+        ax.set_ylabel("Power spectral density")
+        ax.set_title(f"{shade_kwarg['color_key']}")
+        fig.savefig(f"out/tests/baltic-level3-shear-{nshear}.png")
