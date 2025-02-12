@@ -1,4 +1,4 @@
-# These are the current dependencies/versions
+# These are the current dependencies/versions for debugging purposes
 
 name: turban
 channels:
@@ -18,4 +18,5 @@ dependencies:
   - pytest-cov=6.0.0
   - cf_xarray=0.8.0
   - xarray=2024.3.0
-  - xarray-spatial=0.3.7
+  - jaxtyping=0.2.30
+  - beartype=0.18.5
