@@ -167,6 +167,9 @@ def test_baltic_benchmark():
     level4['PRES'] = level3['PRES']
 
     _plot_level3(ds3, level3)
+    _plot_level4(ds4, level4)
+
+    return ds1, ds2, ds3, ds4, level2, level3, level4
 
 def _plot_level3(ds3, level3):
     level3["k"].loc[
@@ -232,7 +235,6 @@ def _plot_level3(ds3, level3):
     )
 
     for nshear in [0, 1]:
-
         im = plot_spectra(
             {
                 "benchmark": ds3.isel(nshear=nshear, N_SH_VIB_SPEC=nshear),
@@ -250,3 +252,15 @@ def _plot_level3(ds3, level3):
         ax.set_ylabel("Power spectral density")
         ax.set_title(f"{shade_kwarg['color_key']}")
         fig.savefig(f"out/tests/baltic-level3-shear-{nshear}.png")
+
+def _plot_level4(ds4, level4):
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 9))
+    ax.plot(ds4.PRES, ds4.EPSI_FINAL, 'k', label="benchmark", marker='o')
+    ax.plot(level4.PRES, level4.eps.mean('nshear'), 'r', label="turban", marker='o')
+    ax.set_xlabel("Pressure (dbar)")
+    ax.set_ylabel("Dissipation rate (W/kg)")
+    ax.set_yscale("log")
+    ax.legend()
+    fig.savefig("out/tests/baltic-level4-eps.png")
