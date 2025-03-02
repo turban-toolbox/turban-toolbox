@@ -88,7 +88,7 @@ def select_sections(
     return sections
 
 
-def boolarr_to_sections(bools):
+def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> List[List[int]]:
     """Separate a list of bools into contiguous chunks"""
     bools_as_ints = list(map(int, bools))
     sections = []
@@ -110,6 +110,15 @@ def boolarr_to_sections(bools):
         sections.append(list(range(ic0 + 1 - offset, ic1 + 1 - offset)))
 
     return sections
+
+
+def sections_to_marker(sections: List[List[int]]) -> Int[ndarray, "time"]:
+    """Convert a list of sections to a marker array.
+    0 means no section, 1 means first section, etc."""
+    marker = np.zeros(len(sections), dtype=int)
+    for i, sec in enumerate(sections):
+        marker[sec] = i
+    return marker
 
 
 from functools import reduce
