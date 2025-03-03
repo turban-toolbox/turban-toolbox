@@ -9,8 +9,8 @@ from .util import reshape_any_nextlast, reshape_halfoverlap_last, average_fast_t
 
 
 def process_level3(
-    shear_segment: Float[ndarray, "n_shear time_fast"],
-    pspd_segment: Float[ndarray, "time_fast"],
+    shear: Float[ndarray, "n_shear time_fast"],
+    pspd: Float[ndarray, "time_fast"],
     fftlen: int,
     sampling_freq: float,
     spatial_response_wavenum: float,
@@ -18,14 +18,21 @@ def process_level3(
     chunklen: int,
     chunkoverlap: int,
     ancillary: Dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
-):  # -> xr.Dataset: # beartype complains with BeartypeCallHintForwardRefException
-    Pf, freq = spectra(shear_segment, fftlen, sampling_freq, chunklen, chunkoverlap)
+) -> Tuple[
+    Float[ndarray, "time_slow k"],  # k
+    Float[ndarray, "n_shear time_slow wavenumber"],  # Pk
+    Float[ndarray, "n_shear time_slow wavenumber"],  # Pf
+    Float[ndarray, "wavenumber"],  # freq
+    Float[ndarray, "time_slow"],  # pspda
+    Dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
+]:
+    Pf, freq = spectra(shear, fftlen, sampling_freq, chunklen, chunkoverlap)
 
     # Average to time_slow
     data_fast: Float[ndarray, "variable time_fast"] = (
         pspd[newaxis, :]  # add dimension
         if ancillary is None
-        else np.stack((pspd_segment, *(arr for k, arr in ancillary.items())), axis=0)
+        else np.stack((pspd, *(arr for k, arr in ancillary.items())), axis=0)
     )
     # platform speed
     data_slow: Float[ndarray, "variable time_slow"] = average_fast_to_slow(
@@ -38,28 +45,26 @@ def process_level3(
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
 
     # apply corrections
-    Pk = apply_compensation_spatial_response(Pk, k, spatial_response_wavenum)
-    Pk = apply_compensation_highpass(Pk, freq, freq_highpass)
+    correction_factor_spatial = apply_compensation_spatial_response(
+        Pk, k, spatial_response_wavenum
+    )
+    _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
     # get_uncertainty_estimates(P)
 
-    data_vars = {
-        "k": (["time_slow", "wavenumber"], k),
-        "Pk": (["nshear", "time_slow", "wavenumber"], Pk),
-        "Pf": (["nshear", "time_slow", "wavenumber"], Pf),
-        "freq": (["wavenumber"], freq),
-        "platform_speed": (["time_slow"], pspda),
-    }
-    data_vars.update(
+    print(correction_factor_spatial)
+    # raise ValueError(correction_factor_spatial)
+
+    ancillary_out = (
         {
-            name: (["time_slow"], data_slow[ind+1, :])
+            name: (["time_slow"], data_slow[ind + 1, :])
             for ind, name in enumerate(ancillary.keys())
         }
         if ancillary is not None
         else {}
     )
 
-    return xr.Dataset(data_vars=data_vars)
+    return k, Pk, Pf, freq, pspda, ancillary_out
 
 
 def spectra(
