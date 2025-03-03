@@ -9,17 +9,10 @@ from jaxtyping import Float
 from netCDF4 import Dataset
 
 from turban.util import average_fast_to_slow, binned_gradient_halfoverlap
-from turban.level1 import get_vsink, fft_grad, process_level1
-from turban.level2 import (
-    split_data,
-    process_level2,
-    data_and_bounds_type,
-    select_sections,
-)
-from turban.level3 import (
-    process_level3,
-)
-from turban.level4 import process_level4
+from turban.level1 import get_vsink, fft_grad, ShearLevel1
+from turban.level2 import ShearLevel2, select_sections
+from turban.level3 import ShearLevel3
+from turban.level4 import ShearLevel4
 from turban.temperature import (
     temperature_dissipation,
     diffusivity_temp,
@@ -358,6 +351,7 @@ def shear(
     Float[ndarray, "nshear time_slow"],
 ]:
 
+    raise NotImplementedError("Deprecated?")
     shear = process_level1(pspd, shear)
 
     shear_segments_cleaned = process_level2(
@@ -404,4 +398,3 @@ def shear(
         ds4.to_netcdf(outfile, mode="a", group="level4")
 
     return ds3["k"].values, ds3["Pk"].values, ds4["eps"].values
-

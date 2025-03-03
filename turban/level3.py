@@ -1,16 +1,72 @@
+from dataclasses import dataclass
+
 from beartype.typing import Tuple, Dict
 
 from numpy import ndarray, newaxis
 import numpy as np
-from jaxtyping import Float
+from jaxtyping import Float, Int
 import xarray as xr
+from netCDF4 import Dataset
 
-from .util import reshape_any_nextlast, reshape_halfoverlap_last, average_fast_to_slow
+from turban.util import reshape_any_nextlast, reshape_halfoverlap_last, average_fast_to_slow
+from turban.level1 import ShearLevel1
+from turban.level2 import ShearLevel2, split_data
+from turban.config import ShearConfig
+
+
+@dataclass
+class ShearLevel3:
+    Pk: Float[ndarray, "nshear time wavenumber"]
+    k: Float[ndarray, "time wavenumber"]
+    Pf: Float[ndarray, "nshear time wavenumber"]
+    freq: Float[ndarray, "wavenumber"]
+    platform_speed: Float[ndarray, "time"]
+    cfg: ShearConfig
+
+    @classmethod
+    def from_level2(
+        cls,
+        level2: ShearLevel2,
+    ) -> "ShearLevel3":
+        k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
+            shear=level2.shear,
+            pspd=level2.pspd,
+            section_marker=level2.section_marker,
+            fftlen=level2.cfg.fftlen,
+            sampling_freq=level2.cfg.sampling_freq,
+            spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
+            freq_highpass=level2.cfg.freq_highpass,
+            chunklen=level2.cfg.chunklen,
+            chunkoverlap=level2.cfg.chunkoverlap,
+        )
+
+        return cls(
+            Pk=Pk,
+            k=k,
+            Pf=Pf,
+            freq=freq,
+            platform_speed=platform_speed,
+            cfg=level2.cfg,
+        )
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str):
+        ds = xr.load_dataset(
+            "MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra"
+        ).transpose(..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "WAVENUMBER")
+
+        return cls(
+            Pk=ds["SH_SPEC"].values,
+            k=ds["KCYC"].values,
+            platform_speed=ds["PSPD_REL"].values,
+            cfg=ShearConfig.from_atomix_netcdf(fname),
+        )
 
 
 def process_level3(
     shear: Float[ndarray, "n_shear time_fast"],
     pspd: Float[ndarray, "time_fast"],
+    section_marker: Int[ndarray, "time_fast"],
     fftlen: int,
     sampling_freq: float,
     spatial_response_wavenum: float,
@@ -26,6 +82,9 @@ def process_level3(
     Float[ndarray, "time_slow"],  # pspda
     Dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
 ]:
+    # segments = split_data(shear, section_marker)
+    # for marker, data in segments.items(): # TODO
+
     Pf, freq = spectra(shear, fftlen, sampling_freq, chunklen, chunkoverlap)
 
     # Average to time_slow
@@ -101,15 +160,19 @@ def apply_compensation_spatial_response(
     x: Float[ndarray, "n_shear time_slow k"],
     k: Float[ndarray, "time_slow k"],
     k0: float,
-) -> Float[ndarray, "n_shear time_slow k"]:
+) -> Float[ndarray, "time_slow k"]:
     correction_factor = 1.0 + (k / k0) ** 2
-    return x * correction_factor[newaxis, :, :]
+    # TODO Eqn. 18 text: Do not use spectra where correction exceeds 10
+    correction_factor[correction_factor > 10.0] = 10.0  # dirty hack
+    x *= correction_factor[newaxis, :, :]
+    return correction_factor
 
 
 def apply_compensation_highpass(
     x: Float[ndarray, "n_shear time_slow f"],
     freq: Float[ndarray, "f"],
     freq_highpass: float,
-) -> Float[ndarray, "n_shear time_slow f"]:
-    correction_factor = 1.0 + (freq_highpass / freq**2) ** 2.0
-    return x * correction_factor[newaxis, ...]
+) -> Float[ndarray, "f"]:
+    correction_factor = (1.0 + (freq_highpass / freq) ** 2.0) ** 2.0
+    x /= correction_factor[newaxis, :]
+    return correction_factor

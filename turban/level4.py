@@ -1,20 +1,58 @@
+from dataclasses import dataclass
 from beartype.typing import Tuple
 
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float
 import xarray as xr
+from netCDF4 import Dataset
 
-from .util import (
-    integrate,
-)
+from turban.util import integrate
+from turban.level3 import ShearLevel3
+from turban.config import ShearConfig
+
+
+@dataclass
+class ShearLevel4:
+    eps: Float[ndarray, "nshear time"]
+    cfg: ShearConfig
+
+    @classmethod
+    def from_level3(
+        cls,
+        level3: ShearLevel3,
+    ) -> "ShearLevel4":
+        eps, _, _ = process_level4(
+            psi=level3.Pk,
+            wavenumber=level3.k,
+            platform_speed=level3.platform_speed,
+            waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
+            freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
+            freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+        )
+        return cls(eps=eps, cfg=level3.cfg)
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
+        with xr.open_dataset(fname) as ds:
+            return cls(
+                eps=ds["eps"].values,
+                cfg=ShearConfig.from_atomix_netcdf(fname),
+            )
 
 
 def process_level4(
     psi: Float[ndarray, "nshear time wavenumber"],
     wavenumber: Float[ndarray, "time wavenumber"],
     platform_speed: Float[ndarray, "time"],
-):  # -> xr.Dataset: # beartype complains with BeartypeCallHintForwardRefException
+    waveno_cutoff_spatial_corr: float,
+    freq_cutoff_antialias: float,
+    freq_cutoff_corrupt: float,
+) -> Tuple[
+    Float[ndarray, "nshear time"],  # eps estimate
+    Float[ndarray, "nshear time"],  # eps_specint
+    Float[ndarray, "nshear time"],  # eps_isrfit
+]:
     """
     Produce epsilon estimates from shear power spectra.
     """
@@ -27,9 +65,6 @@ def process_level4(
     eps1 = get_eps_first_estimate(psi, wavenumber, nu)
 
     # Inertial subrange integration
-    waveno_cutoff_spatial_corr = 999.0
-    freq_cutoff_antialias = 999.0
-    freq_cutoff_corrupt = 999.0
     eps_specint = spectrum_integration(
         psi,
         wavenumber,
@@ -46,13 +81,7 @@ def process_level4(
 
     eps = np.where(eps1 < 1e-5, eps_specint, eps_isrfit)
 
-    return xr.Dataset(
-        data_vars={
-            "eps": (["nshear", "time_slow"], eps),
-            "eps_specint": (["nshear", "time_slow"], eps),
-            "eps_isrfit": (["nshear", "time_slow"], eps),
-        }
-    )
+    return eps, eps_specint, eps_isrfit
 
 
 def inertial_range_fit(

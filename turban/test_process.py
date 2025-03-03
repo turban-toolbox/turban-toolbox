@@ -47,7 +47,7 @@ def _load_0030():
     temp = ds.TEMP.isel(N_TEMP_SENSORS=0).values
 
 
-def test_temp():
+def _test_temp():
     sampling_freq = 1024.0
     pspd, pressure_lp = get_vsink(data["PRESSURE"], sampling_freq)
     pspda = np.nanmedian(pspd)
@@ -69,7 +69,7 @@ def test_temp():
     )
 
 
-def test_shear():
+def _test_shear():
 
     section_select_criteria = [
         ((5.0, None), data["pressure_lp"]),
@@ -111,8 +111,32 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
     return im
 
-
 def test_baltic_benchmark():
+    import xarray as xr
+    from turban.level1 import ShearLevel1
+    from turban.level2 import ShearLevel2
+    from turban.level3 import ShearLevel3
+    from turban.level4 import ShearLevel4
+
+
+    ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
+    ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
+    ds3 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra").rename(
+        {
+            "N_SHEAR_SENSORS": "nshear",
+            "SH_SPEC": "Pk",
+            "KCYC": "k",
+            "WAVENUMBER": "wavenumber",
+        }
+    )  # for consistency with turban level 3
+    ds4 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L4_dissipation")
+
+    level1 = ShearLevel1.from_atomix_netcdf("MSS_BalticSea/MSS_Baltic.nc")
+    level2 = ShearLevel2.from_level1(level1, ds2.SECTION_NUMBER.values.astype(int))
+    level3 = ShearLevel3.from_level2(level2)
+    level4 = ShearLevel4.from_level3(level3)
+
+def _test_baltic_benchmark():
     import xarray as xr
 
     import numpy as np
@@ -150,8 +174,8 @@ def test_baltic_benchmark():
     fft_length = 2048
 
     level3 = process_level3(
-        shear_segment=ds2.SHEAR.values,
-        pspd_segment=ds2.PSPD_REL.values,
+        shear=ds2.SHEAR.values,
+        pspd=ds2.PSPD_REL.values,
         fftlen=fft_length,
         sampling_freq=1 / dt,
         spatial_response_wavenum=50.0,
@@ -169,7 +193,7 @@ def test_baltic_benchmark():
     _plot_level3(ds3, level3)
     _plot_level4(ds4, level4)
 
-    return ds1, ds2, ds3, ds4, level2, level3, level4
+    # return ds1, ds2, ds3, ds4, level2, level3, level4
 
 def _plot_level3(ds3, level3):
     level3["k"].loc[

@@ -1,9 +1,61 @@
+from dataclasses import dataclass
 import numpy as np
+
+try:
+    import xarray as xr
+except ImportError:
+    xr = None
 from .util import butterfilt
 from jaxtyping import Float, Num, Bool, Int
 from beartype.typing import Tuple, Dict, List
+from netCDF4 import Dataset
 from numpy import ndarray
 import warnings
+
+from turban.level1 import ShearLevel1
+from turban.instrument import Instrument
+from turban.config import ShearConfig
+
+
+@dataclass
+class ShearLevel2:
+    cfg: ShearConfig
+    shear: Float[ndarray, "n_shear time"]
+    pspd: Float[ndarray, "time"]
+    section_marker: Int[ndarray, "time"]
+    n_despiked: Int[ndarray, "n_shear time"] = None
+
+    @classmethod
+    def from_level1(
+        cls,
+        level1: ShearLevel1,
+        section_marker: Int[ndarray, "time"],
+    ):
+        sh_cleaned, n_despiked = process_level2(
+            level1.shear,
+            section_marker,  # TODO: from own utility or user-supplied
+            level1.cfg.sampling_freq,
+            level1.cfg.fftlen,  # TODO ditto
+        )
+
+        return cls(
+            shear=sh_cleaned,
+            pspd=level1.pspd,
+            n_despiked=n_despiked,
+            section_marker=section_marker,
+            cfg=level1.cfg,
+        )
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str):
+        ds = xr.load_dataset(fname, group="L2_cleaned")
+        return cls(
+            shear=ds.shear.values,
+            is_despiked=ds.is_despiked.values,
+            n_despiked=ds.n_despiked.values,
+            segment_marker=ds["SECTION_NUMBER"].values.astype(int),
+            cfg=ShearConfig.from_atomix_netcdf(fname),
+        )
 
 
 data_and_bounds_type = List[
@@ -19,27 +71,23 @@ data_and_bounds_type = List[
 
 def process_level2(
     shear: Float[ndarray, "n_shear time"],
-    section_select_idx: List[List[int]],
-    sampling_freq_Hz: float,
+    section_markers: Int[ndarray, "time"],
+    sampling_freq: float,
     fftlen: int,
-) -> List[
-    Tuple[
-        Float[ndarray, "n_shear time"],  # despiked shear
-        Bool[ndarray, "n_shear time"],  # boolean flag: is despiked?
-        Int[ndarray, "n_shear"],  # number of despike iterations
-    ]
+) -> Tuple[
+    Float[ndarray, "n_shear time"],  # despiked shear
+    Int[ndarray, "n_shear time"],  # number of despike iterations
 ]:
-    out_segments = []
-    segments = [shear[..., inds] for inds in section_select_idx]
+    segments = split_data(shear, section_markers)
+    sh_clean_agg = np.nan * np.zeros_like(shear)
+    ctr_agg = np.zeros_like(shear, dtype=int)
 
-    for data in segments:
-        sh_clean = np.nan * np.zeros_like(data)
-        flag1 = np.zeros_like(data).astype(bool)
+    for marker, data in segments.items():
         flag2 = -999 * np.zeros(data.shape[0], dtype=int)
         for k, sh in enumerate(data):
-            sh, flag1[k, :], flag2[k] = clean_shear(
+            sh, ctr = clean_shear(
                 sh,
-                sampling_freq=sampling_freq_Hz,
+                sampling_freq=sampling_freq,
                 spike_threshold=8.0,
                 max_tries=8,
                 spike_replace_before=512,
@@ -50,15 +98,16 @@ def process_level2(
 
             # after removal of spikes, can high-pass filter
             # Eq. 17
-            sh_clean[k, :] = butterfilt(
+            sh_clean = butterfilt(
                 signal=sh,
                 cutoff_freq_Hz=0.5 / (fftlen / sampling_freq),
                 sampling_freq=sampling_freq,
                 btype="high",
             )
-        out_segments.append((sh_clean, flag1, flag2))
+            ctr_agg[k, section_markers == marker] = ctr
+            sh_clean_agg[k, section_markers == marker] = sh_clean
 
-    return out_segments
+    return sh_clean_agg, ctr_agg
 
 
 def select_sections(
@@ -83,7 +132,7 @@ def select_sections(
     sections = boolarr_to_sections(inds)
 
     if segment_min_len is not None:
-        sections = [sec for sec in sections if len(sec)>= segment_min_len]
+        sections = [sec for sec in sections if len(sec) >= segment_min_len]
 
     return sections
 
@@ -180,8 +229,7 @@ def clean_shear(
     spike_include_after: int = 20,
 ) -> Tuple[
     Float[ndarray, "time"],  # despiked shear
-    Bool[ndarray, "time"],  # boolean flag: is despiked?
-    int,  # number of despike iterations
+    Int[ndarray, "time"],  # number of despike iterations on each sample
 ]:
     """Section 3.2.2"""
     N = len(sh)
@@ -193,21 +241,20 @@ def clean_shear(
         spike_include_before=spike_include_before,
         spike_include_after=spike_include_after,
     )
-    ctr = np.zeros_like(sh, dtype=bool)
-    while np.any(spikes) and (ctr < max_tries):
+    ctr = np.zeros_like(sh, dtype=int)
+    while np.any(spikes) and np.all(ctr <= max_tries):
         sh_previous = sh.copy()
         spike_sections = boolarr_to_sections(spikes)
         spike_markers = sections_to_marker(spike_sections, N)
-        sh = np.array(
-            replace_spikes(
-                sh,
-                spike_markers,
-                spike_replace_before=spike_replace_before,
-                spike_replace_after=spike_replace_after,
-            )
+
+        replace_spikes(
+            sh,
+            spike_markers,
+            spike_replace_before=spike_replace_before,
+            spike_replace_after=spike_replace_after,
         )
+
         ctr[sh != sh_previous] += 1
-        warnings.warn("replace_spikes not implemented in python", UserWarning)
         spikes = detect_shear_spikes(
             sh,
             sampling_freq,
@@ -216,15 +263,69 @@ def clean_shear(
             spike_include_after=spike_include_after,
         )
 
-    altered = sh != sh_raw
-
-    return sh, altered, ctr
+    return sh, ctr
 
 
 def split_data(
     data: Num[ndarray, "... time"],
+    section_markers: Int[ndarray, "... time"],
+) -> Dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
+    """Split array of data into segments based on section markers.
+    section marker "0" is neglected and not included in the output."""
 
-from numba import jit
+    markers = set(section_markers)
+    # sections = select_sections(data_and_bounds)
+    sections = {
+        marker: data[..., section_markers == marker]
+        for marker in markers
+        if marker != 0
+    }
+    return sections
+
+
+from numba import jit, float64, int32
+from numpy import isnan, nan
+
+
+@jit(float64(float64[:]))
+def nanmean_empty(x):
+    """Circumvent https://github.com/numba/numba/issues/5502"""
+    if len(x) == 0:
+        return np.nan
+    else:
+        return np.nanmean(x)
+
+
+@jit(float64(float64, float64))
+def nanmean_two(a, b):
+    a_nnan = ~isnan(a)
+    b_nnan = ~isnan(b)
+    if a_nnan and b_nnan:
+        return (a + b) / 2
+    elif a_nnan:
+        return a
+    elif b_nnan:
+        return b
+    else:
+        return nan
+
+
+@jit  # ((float64[:], int32, int32, int32, int32))
+def replace_spike(
+    sh,  #: Float[ndarray, "time"],
+    start,
+    stop,
+    spike_replace_before,  #: int,
+    spike_replace_after,  #: int,
+):
+    context_mean_before = nanmean_empty(
+        sh[max(start - spike_replace_before, 0) : start]
+    )
+    context_mean_after = nanmean_empty(
+        sh[stop + 1 : min(len(sh), stop + spike_replace_after + 1)]
+    )
+
+    sh[start:stop] = nanmean_two(context_mean_before, context_mean_after)
 
 
 @jit
@@ -237,19 +338,3 @@ def replace_spikes(sh, spike_markers, spike_replace_before, spike_replace_after)
         start = min(spike)
         stop = max(spike)
         replace_spike(sh, start, stop, spike_replace_before, spike_replace_after)
-
-
-@jit
-def replace_spike(
-    sh,  #: Float[ndarray, "time"],
-    start,
-    stop,
-    spike_replace_before,  #: int,
-    spike_replace_after,  #: int,
-):  # -> Float[ndarray, "time"]:
-    context_mean_before = np.mean(sh[max(start - spike_replace_before, 0) : start])
-    context_mean_after = np.mean(
-        sh[stop + 1 : min(len(sh), stop + spike_replace_after + 1)]
-    )
-
-    sh[start:stop] = (context_mean_before + context_mean_after) / 2

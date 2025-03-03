@@ -7,6 +7,14 @@ from jaxtyping import Float
 from beartype.typing import Tuple
 
 
+def is_valid_turban_netcdf(fname: str):
+    raise NotImplementedError
+
+
+def convert_atomix_benchmark_to_turban_netcdf(fname: str):
+    raise NotImplementedError
+
+
 def fft_grad(
     signal: Float[ndarray, "... time"],
     dt: float,
@@ -176,15 +184,17 @@ def reshape_halfoverlap_last(
 
 
 def average_fast_to_slow(
-    x: Float[ndarray, "... time_fast"],
+    x: Float[ndarray, "*any time_fast"],
     window: int,
     chunklen: int,
     chunkoverlap: int,
-) -> Float[ndarray, "... time_slow"]:
+) -> Float[ndarray, "*any time_slow"]:
     """
     TODO: docstring
     """
+    # average in half-overlapping windows
     halfoverlapping = reshape_halfoverlap_last(x, window).mean(axis=-1)
+    # average in chunks
     x_slow = reshape_any_last(
         halfoverlapping,
         chunklen,
@@ -215,6 +225,7 @@ def integrate(
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
     return np.trapz(y_zero, x=x, axis=-1)
+
 
 def binned_gradient_halfoverlap(
     x: Float[ndarray, "time"],  # time series
