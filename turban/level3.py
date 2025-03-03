@@ -23,7 +23,7 @@ def process_level3(
 
     # Average to time_slow
     data_fast: Float[ndarray, "variable time_fast"] = (
-        pspd_segment[:, newaxis]  # add dimension
+        pspd[newaxis, :]  # add dimension
         if ancillary is None
         else np.stack((pspd_segment, *(arr for k, arr in ancillary.items())), axis=0)
     )
