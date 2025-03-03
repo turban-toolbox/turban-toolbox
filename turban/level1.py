@@ -18,16 +18,16 @@ def process_level1(
     return shear_phys
 
 
-def get_vsink(pressure_raw, sampling_freq_Hz=1024.0):
+def get_vsink(pressure_raw, sampling_freq=1024.0):
     # lowpass filter pressure
     pressure_lp = butterfilt(
         signal=pressure_raw,
         cutoff_freq_Hz=0.5,
-        sampling_freq_Hz=sampling_freq_Hz,
+        sampling_freq=sampling_freq,
         btype="low",
     )
     # sinking speed
-    vsink = fft_grad(pressure_lp, 1 / sampling_freq_Hz)
+    vsink = fft_grad(pressure_lp, 1 / sampling_freq)
     return vsink, pressure_lp
 
 

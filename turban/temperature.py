@@ -362,12 +362,12 @@ def get_noise(
 def deconvolute_mss_ntchp(
     x: Int[ndarray, "time"],
     x_emph: Int[ndarray, "time"],
-    sampling_freq_Hz: float,
+    sampling_freq: float,
     gain: float = 1.5,
 ):
     cutoff_freq_Hz = 1 / (2 * np.pi * gain)
     # cutoff_freq_Hz = 0.5
-    cutoff_nondim = cutoff_freq_Hz / (sampling_freq_Hz / 2)
+    cutoff_nondim = cutoff_freq_Hz / (sampling_freq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, btype="low")
     zi = lfiltic(b, a, x[:1], x_emph[:1])  # initial conditions
     x_d, _ = lfilter(b, a, x_emph, zi=zi)  # deconvoluted

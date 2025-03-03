@@ -28,10 +28,10 @@ def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: Tuple[int, ...
     return arr
 
 
-def butterfilt(signal, cutoff_freq_Hz, sampling_freq_Hz, **kwarg):
+def butterfilt(signal, cutoff_freq_Hz, sampling_freq, **kwarg):
     """Apply first oder Butterworth filter. kwarg are passed into `butter`"""
     # nondimensionalize using Nyquist freq
-    cutoff_nondim = cutoff_freq_Hz / (sampling_freq_Hz / 2)
+    cutoff_nondim = cutoff_freq_Hz / (sampling_freq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, **kwarg)
     return filtfilt(b, a, signal)
 

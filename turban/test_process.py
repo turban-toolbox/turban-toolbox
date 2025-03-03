@@ -138,7 +138,7 @@ def test_baltic_benchmark():
     level2 = process_level2(
         shear=ds1.SHEAR.values,
         section_select_idx=[idx.tolist()],
-        sampling_freq_Hz=1024.0,
+        sampling_freq=1024.0,
         fftlen=2048,
     )
 

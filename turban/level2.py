@@ -52,8 +52,8 @@ def process_level2(
             # Eq. 17
             sh_clean[k, :] = butterfilt(
                 signal=sh,
-                cutoff_freq_Hz=0.5 / (fftlen / sampling_freq_Hz),
-                sampling_freq_Hz=sampling_freq_Hz,
+                cutoff_freq_Hz=0.5 / (fftlen / sampling_freq),
+                sampling_freq=sampling_freq,
                 btype="high",
             )
         out_segments.append((sh_clean, flag1, flag2))
@@ -154,14 +154,14 @@ def detect_shear_spikes(
     sh_hp = butterfilt(
         signal=sh,
         cutoff_freq_Hz=0.1,
-        sampling_freq_Hz=sampling_freq,
+        sampling_freq=sampling_freq,
         btype="high",
     )
     sh_abs = np.abs(sh_hp)
     sh_lp = butterfilt(
         signal=sh_abs,
         cutoff_freq_Hz=1,
-        sampling_freq_Hz=sampling_freq,
+        sampling_freq=sampling_freq,
         btype="lp",
     )
     spikes = (sh_abs / sh_lp) > spike_threshold  # boolean array

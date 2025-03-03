@@ -48,7 +48,7 @@ def level1(
     x_emph = raw[:, temp_emph_channel]
 
     raw[:, temp_emph_channel] = deconvolute_mss_ntchp(
-        x, x_emph, sampling_freq_Hz=sampling_freq
+        x, x_emph, sampling_freq=sampling_freq
     )
     data_lists = mx.convert_raw_mrd(raw, probeconf_fname)
 
