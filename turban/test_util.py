@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from .util import (
     fft_grad,
-    _reshape_any_inds,
+    reshape_overlap_index,
     reshape_any_first,
     reshape_any_nextlast,
     reshape_any_last,
@@ -57,13 +57,30 @@ def test_reshape_halfoverlap_last():
         reshape_halfoverlap_last(x, 5)
 
 
+def test_reshape_any_inds():
+    assert np.all(
+        reshape_overlap_index(4, 2, 10)
+        == np.array(
+            [
+                [0, 1, 2, 3],
+                [2, 3, 4, 5],
+                [4, 5, 6, 7],
+                [6, 7, 8, 9],
+            ]
+        )
+    )
+    assert np.all(
+        reshape_overlap_index(6, 3, 10) == reshape_halfoverlap_last(np.arange(10.0), 6)
+    )
+    assert np.all(reshape_overlap_index(20, 1, 10) == np.zeros((0, 20), dtype=int))
+
+
 def test_reshape_too_short():
     x = np.arange(10, dtype=float)
     w = 20
     assert reshape_halfoverlap_first(x, w).shape == (0, w)
     assert reshape_halfoverlap_last(x, w).shape == (0, w)
 
-    assert _reshape_any_inds(w, 1, 10) == []
     assert reshape_any_first(x, w, 1).shape == (0, w)
     assert reshape_any_nextlast(np.ones((4, 10, 3)), w, 1).shape == (4, 0, w, 3)
     assert reshape_any_last(x, w, 1).shape == (0, w)

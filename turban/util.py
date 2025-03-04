@@ -3,7 +3,7 @@ import numpy as np
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
-from jaxtyping import Float
+from jaxtyping import Float, Int
 from beartype.typing import Tuple
 
 
@@ -56,15 +56,23 @@ def channel_mapping(json_fname, *channel_names):
     return channels
 
 
-def _reshape_any_inds(chunklen, chunkoverlap, n):
+def reshape_overlap_index(w: int, overlap: int, N: int) -> Int[ndarray, "segment w"]:
     """
-    TODO: lose the while loop
+    Expand dimension into two dimensions of overlapping intervals.
+    Returns the index that expands a dimension of length N.
+
+    N: length of dimension to be expanded (positive integer)
+    w: window length (positive integer)
+    overlap: overlap length (positive integer)
     """
-    i = 0
-    ii = []
-    while i + chunklen <= n:
-        ii.append(list(range(i, i + chunklen)))
-        i += chunklen - chunkoverlap
+    assert w > overlap
+    # assert N >= w
+    stepsize = w - overlap  # increase for each window
+    row_to_row_offset = np.arange(0, N - w + 1, stepsize)  # start of each window
+    nrows = len(row_to_row_offset)
+    ii = (
+        np.zeros((nrows, w)) + np.arange(w)[newaxis, :] + row_to_row_offset[:, newaxis]
+    ).astype(int)
     return ii
 
 
@@ -78,7 +86,7 @@ def reshape_any_first(
     """
     n = P.shape[0]
     if n >= chunklen:
-        ii = _reshape_any_inds(chunklen, chunkoverlap, n)
+        ii = reshape_overlap_index(chunklen, chunkoverlap, n)
         return P[np.array(ii), ...]
     else:
         return np.zeros((0, chunklen) + P.shape[1:], dtype=float)
@@ -94,7 +102,7 @@ def reshape_any_nextlast(
     """
     n = P.shape[-2]
     if n >= chunklen:
-        ii = _reshape_any_inds(chunklen, chunkoverlap, n)
+        ii = reshape_overlap_index(chunklen, chunkoverlap, n)
         return P[..., np.array(ii), :]
     else:
         return np.zeros(P.shape[:-2] + (0, chunklen, P.shape[-1]), dtype=float)
@@ -110,7 +118,7 @@ def reshape_any_last(
     """
     n = P.shape[-1]
     if n >= chunklen:
-        ii = _reshape_any_inds(chunklen, chunkoverlap, n)
+        ii = reshape_overlap_index(chunklen, chunkoverlap, n)
         return P[..., np.array(ii)]
     else:
         return np.zeros(P.shape[:-1] + (0, chunklen), dtype=float)
@@ -123,30 +131,8 @@ def reshape_halfoverlap_first(
     Expand the first dimension into two dimensions of half-overlapping intervals
     w: window length (even integer)
     """
-    if y.shape[0] >= w:
-        assert (
-            w % 2 == 0
-        )  # function would work for uneven w but results may be unintuitive
-        N = y.shape[0]
-        w2 = w // 2  # half-window
-        Nw = N // w  # number of whole segments
-        # based on number of half-segments, decide whether last full segment has even or odd index
-        if (N // w2) % 2 == 0:  # even
-            nrows = 2 * Nw - 1
-            sign = -1
-        else:  # odd
-            nrows = 2 * Nw
-            sign = +1
-
-        yr = np.nan * np.zeros((nrows, w) + y.shape[1:])
-
-        yr[::2, ...] = y[: Nw * w, ...].reshape((Nw, w) + y.shape[1:])
-        yr[1::2, ...] = y[w2 : Nw * w + sign * w2, ...].reshape(
-            (nrows - Nw, w) + y.shape[1:]
-        )
-    else:
-        yr = np.zeros((0, w) + y.shape[1:])
-    return yr
+    assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
+    return y[reshape_overlap_index(w, w // 2, y.shape[0]), ...]
 
 
 def reshape_halfoverlap_last(
@@ -156,31 +142,8 @@ def reshape_halfoverlap_last(
     Expand the last dimension into two dimensions of half-overlapping intervals
     w: window length (even integer)
     """
-    if y.shape[-1] >= w:
-        assert (
-            w % 2 == 0
-        )  # function would work for uneven w but results may be unintuitive
-        # (alternating between overlapping unevenly)
-        N = y.shape[-1]
-        w2 = w // 2  # half-window
-        Nw = N // w  # number of whole segments
-        # based on number of half-segments, decide whether last full segment has even or odd index
-        if (N // w2) % 2 == 0:  # even
-            nrows = 2 * Nw - 1
-            sign = -1
-        else:  # odd
-            nrows = 2 * Nw
-            sign = +1
-
-        yr = np.nan * np.zeros(y.shape[:-1] + (nrows, w))
-
-        yr[..., ::2, :] = y[..., : Nw * w].reshape(y.shape[:-1] + (Nw, w))
-        yr[..., 1::2, :] = y[..., w2 : Nw * w + sign * w2].reshape(
-            y.shape[:-1] + (nrows - Nw, w)
-        )
-    else:
-        yr = np.zeros(y.shape[:-1] + (0, w))
-    return yr
+    assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
+    return y[..., reshape_overlap_index(w, w // 2, y.shape[-1])]
 
 
 def average_fast_to_slow(
