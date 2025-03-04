@@ -40,6 +40,15 @@ class ShearLevel4:
                 cfg=ShearConfig.from_atomix_netcdf(fname),
             )
 
+    def to_xarray(self):
+        return xr.Dataset(
+            data_vars={
+                "eps": (["nshear", "time_slow"], self.eps),
+                # "eps_specint": (["nshear", "time_slow"], eps),
+                # "eps_isrfit": (["nshear", "time_slow"], eps),
+            }
+        )
+
 
 def process_level4(
     psi: Float[ndarray, "nshear time wavenumber"],

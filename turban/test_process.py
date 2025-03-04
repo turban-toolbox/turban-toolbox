@@ -111,13 +111,13 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
     return im
 
+
 def test_baltic_benchmark():
     import xarray as xr
     from turban.level1 import ShearLevel1
     from turban.level2 import ShearLevel2
     from turban.level3 import ShearLevel3
     from turban.level4 import ShearLevel4
-
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
@@ -135,6 +135,12 @@ def test_baltic_benchmark():
     level2 = ShearLevel2.from_level1(level1, ds2.SECTION_NUMBER.values.astype(int))
     level3 = ShearLevel3.from_level2(level2)
     level4 = ShearLevel4.from_level3(level3)
+    ds3_turban = level3.to_xarray()
+    ds4_turban = level4.to_xarray()
+
+    _plot_level3(ds3, ds3_turban)
+    _plot_level4(ds4, ds4_turban)
+
 
 def _test_baltic_benchmark():
     import xarray as xr
@@ -188,12 +194,13 @@ def _test_baltic_benchmark():
     level4 = process_level4(
         level3.Pk.values, level3.k.values, level3.platform_speed.values
     )
-    level4['PRES'] = level3['PRES']
+    level4["PRES"] = level3["PRES"]
 
     _plot_level3(ds3, level3)
     _plot_level4(ds4, level4)
 
     # return ds1, ds2, ds3, ds4, level2, level3, level4
+
 
 def _plot_level3(ds3, level3):
     level3["k"].loc[
@@ -277,12 +284,13 @@ def _plot_level3(ds3, level3):
         ax.set_title(f"{shade_kwarg['color_key']}")
         fig.savefig(f"out/tests/baltic-level3-shear-{nshear}.png")
 
+
 def _plot_level4(ds4, level4):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 9))
-    ax.plot(ds4.PRES, ds4.EPSI_FINAL, 'k', label="benchmark", marker='o')
-    ax.plot(level4.PRES, level4.eps.mean('nshear'), 'r', label="turban", marker='o')
+    ax.plot(ds4.PRES, ds4.EPSI_FINAL, "k", label="benchmark", marker="o")
+    ax.plot(level4.PRES, level4.eps.mean("nshear"), "r", label="turban", marker="o")
     ax.set_xlabel("Pressure (dbar)")
     ax.set_ylabel("Dissipation rate (W/kg)")
     ax.set_yscale("log")

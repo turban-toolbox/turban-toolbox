@@ -68,6 +68,17 @@ class ShearLevel3:
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
+    def to_xarray(self):
+        return xr.Dataset(
+            {
+                "k": (["time_slow", "wavenumber"], self.k),
+                "Pk": (["nshear", "time_slow", "wavenumber"], self.Pk),
+                "Pf": (["nshear", "time_slow", "wavenumber"], self.Pf),
+                "freq": (["wavenumber"], self.freq),
+                "platform_speed": (["time_slow"], self.platform_speed),
+            }
+        )
+
 
 def process_level3(
     shear: Float[ndarray, "n_shear time_fast"],
