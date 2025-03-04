@@ -35,7 +35,7 @@ class ShearLevel2:
             level1.shear,
             section_marker,  # TODO: from own utility or user-supplied
             level1.cfg.sampling_freq,
-            level1.cfg.fftlen,  # TODO ditto
+            level1.cfg.fft_length,  # TODO ditto
         )
 
         return cls(
@@ -73,7 +73,7 @@ def process_level2(
     shear: Float[ndarray, "n_shear time"],
     section_markers: Int[ndarray, "time"],
     sampling_freq: float,
-    fftlen: int,
+    fft_length: int,
 ) -> Tuple[
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
@@ -100,7 +100,7 @@ def process_level2(
             # Eq. 17
             sh_clean = butterfilt(
                 signal=sh,
-                cutoff_freq_Hz=0.5 / (fftlen / sampling_freq),
+                cutoff_freq_Hz=0.5 / (fft_length / sampling_freq),
                 sampling_freq=sampling_freq,
                 btype="high",
             )

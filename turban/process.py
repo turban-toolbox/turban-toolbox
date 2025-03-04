@@ -24,7 +24,7 @@ def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
     pspd: Float[ndarray, "... time_fast"],
     section_select_idx: List[List[int]],
-    fftlen: int,
+    fft_length: int,
     sampling_freq: float,
 ) -> Float[ndarray, "... time_slow"]:
     """
@@ -35,9 +35,9 @@ def fast_to_slow_grad_by_segment(
     pspd_segments = [pspd[..., inds] for inds in section_select_idx]
     dxdz_segments = []
     for x_seg, pspd_seg in zip(x_segments, pspd_segments):
-        # TODO: 3 * fftlen is valid for chunklen=5, chunkoverlap=2
+        # TODO: 3 * fft_length is valid for chunklen=5, chunkoverlap=2
         dxdz_segments.append(
-            binned_gradient_halfoverlap(x_seg, pspd_seg, 3 * fftlen, sampling_freq)
+            binned_gradient_halfoverlap(x_seg, pspd_seg, 3 * fft_length, sampling_freq)
         )
     return np.concatenate([xx for xx in dxdz_segments], axis=-1)
 
@@ -76,8 +76,8 @@ def load(fname):
 def process(
     data: Dict[str, Float[ndarray, "time"]],
     sampling_freq: float,
-    fftlen_microtemp: int,
-    fftlen_shear: int,
+    fft_length_microtemp: int,
+    fft_length_shear: int,
     chunklen_microtemp: int = 5,
     chunklen_shear: int = 5,
     chunkoverlap_microtemp: int = 2,
@@ -124,7 +124,7 @@ def process(
     ]
 
     section_select_idx = select_sections(
-        section_select_criteria, segment_min_len=fftlen_microtemp * 3
+        section_select_criteria, segment_min_len=fft_length_microtemp * 3
     )
 
     chi, k_batchelor = microtemp(
@@ -132,7 +132,7 @@ def process(
         data["pspd"],
         section_select_idx,
         sampling_freq=sampling_freq,
-        fftlen=fftlen_microtemp,
+        fft_length=fft_length_microtemp,
         chunklen=5,
         chunkoverlap=2,
         outfile=outfile,
@@ -146,7 +146,7 @@ def process(
         data["pspd"],
         section_select_idx,
         sampling_freq,
-        fftlen_microtemp,
+        fft_length_microtemp,
     )
     pressure = microtemp_averaged[0]
 
@@ -187,14 +187,14 @@ def process(
     ]
 
     section_select_idx = select_sections(
-        section_select_criteria, segment_min_len=fftlen_shear * 3
+        section_select_criteria, segment_min_len=fft_length_shear * 3
     )
 
     wavenumber, spectra, epsilon = shear(
         np.array([data[k] for k in ["SHEAR_1", "SHEAR_2"]]),
         data["pspd"],
         section_select_idx,
-        fftlen=fftlen_shear,
+        fft_length=fft_length_shear,
         sampling_freq=sampling_freq,
         chunklen=chunklen_shear,
         chunkoverlap=chunkoverlap_shear,
@@ -210,7 +210,7 @@ def process(
         None,
         section_select_idx,
         sampling_freq,
-        fftlen_shear,
+        fft_length_shear,
     )
     pressure = level4_averaged[0]
 
@@ -232,7 +232,7 @@ def aggregate(
     pspd: Float[ndarray, "time_fast"] | None,
     section_select_idx: List[List[int]],
     sampling_freq: float,
-    fftlen: int,
+    fft_length: int,
     chunklen: int = 5,
     chunkoverlap: int = 2,
 ) -> Tuple[
@@ -247,7 +247,7 @@ def aggregate(
             for segment in segments:
                 segments_out.append(
                     average_fast_to_slow(
-                        segment, fftlen, chunklen=chunklen, chunkoverlap=chunkoverlap
+                        segment, fft_length, chunklen=chunklen, chunkoverlap=chunkoverlap
                     )
                 )
             average.append(np.concatenate(segments_out, axis=-1))
@@ -261,7 +261,7 @@ def aggregate(
             for segment, pspd_segment in zip(segments, pspd_segments):
                 segments_out.append(
                     binned_gradient_halfoverlap(
-                        segment, pspd_segment, 3 * fftlen, sampling_freq
+                        segment, pspd_segment, 3 * fft_length, sampling_freq
                     )
                 )
             gradient.append(np.concatenate(segments_out, axis=-1))
@@ -274,7 +274,7 @@ def microtemp(
     pspd: Float[ndarray, "time_fast"],
     section_select_idx: List[List[int]],
     sampling_freq: float,
-    fftlen: int,
+    fft_length: int,
     chunklen: int = 5,
     chunkoverlap: int = 2,
     outfile: str | None = None,
@@ -304,7 +304,7 @@ def microtemp(
             pspd=pspd_segment,
             chunklen=chunklen,
             chunkoverlap=chunkoverlap,
-            fftlen=fftlen,
+            fft_length=fft_length,
             sampling_freq=sampling_freq,
         )
 
@@ -334,7 +334,7 @@ def shear(
     shear: Float[ndarray, "n_shear time_fast"],
     pspd: Float[ndarray, "time_fast"],
     section_select_idx: List[List[int]],
-    fftlen: int,  # length of single FFT segment to estimate periodogram
+    fft_length: int,  # length of single FFT segment to estimate periodogram
     sampling_freq: float,  # Hz
     spatial_response_wavenum: float = 50.0,
     freq_highpass: float = 0.15,
@@ -355,12 +355,12 @@ def shear(
     shear = process_level1(pspd, shear)
 
     shear_segments_cleaned = process_level2(
-        shear, section_select_idx, sampling_freq, fftlen
+        shear, section_select_idx, sampling_freq, fft_length
     )
     pspd_segments = [pspd[..., inds] for inds in section_select_idx]
 
     nshear = shear.shape[0]
-    nfreq = int(fftlen / 2 + 1)
+    nfreq = int(fft_length / 2 + 1)
     ks = np.zeros((0, nfreq))
     Pks = np.zeros((nshear, 0, nfreq))
     epsilons = np.zeros((nshear, 0))
@@ -372,13 +372,13 @@ def shear(
     ):
 
         pspda = average_fast_to_slow(
-            pspd_segment, fftlen, chunklen=chunklen, chunkoverlap=chunkoverlap
+            pspd_segment, fft_length, chunklen=chunklen, chunkoverlap=chunkoverlap
         )
 
         ds3 = process_level3(
             shear_segment,
             pspd_segment,
-            fftlen=fftlen,
+            fft_length=fft_length,
             sampling_freq=sampling_freq,
             spatial_response_wavenum=spatial_response_wavenum,
             freq_highpass=freq_highpass,

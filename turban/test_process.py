@@ -63,7 +63,7 @@ def _test_temp():
         pspd,
         section_select_idx,
         sampling_freq=sampling_freq,
-        fftlen=2048,
+        fft_length=2048,
         chunklen=5,
         chunkoverlap=2,
     )
@@ -86,7 +86,7 @@ def _test_shear():
         np.array([data[k] for k in ["SHEAR_1", "SHEAR_2"]]),
         data["pspd"],
         section_select_idx,
-        fftlen=2048,
+        fft_length=2048,
         sampling_freq=1024.0,
         chunklen=5,
         chunkoverlap=2,
@@ -163,7 +163,7 @@ def _test_baltic_benchmark():
         shear=ds1.SHEAR.values,
         section_select_idx=[idx.tolist()],
         sampling_freq=1024.0,
-        fftlen=2048,
+        fft_length=2048,
     )
 
     assert len(level2) == 1
@@ -176,7 +176,7 @@ def _test_baltic_benchmark():
     level3 = process_level3(
         shear=ds2.SHEAR.values,
         pspd=ds2.PSPD_REL.values,
-        fftlen=fft_length,
+        fft_length=fft_length,
         sampling_freq=1 / dt,
         spatial_response_wavenum=50.0,
         freq_highpass=0.15,

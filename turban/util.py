@@ -148,22 +148,23 @@ def reshape_halfoverlap_last(
 
 def average_fast_to_slow(
     x: Float[ndarray, "*any time_fast"],
-    window: int,
-    chunklen: int,
-    chunkoverlap: int,
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Float[ndarray, "*any time_slow"]:
     """
-    TODO: docstring
+    Average any quantities from fast sampling rate (e.g., shear timeseries)
+    to slow sampling rate (e.g, spectra).
+    If reshape_index is not supplied, calculate it.
     """
-    # average in half-overlapping windows
-    halfoverlapping = reshape_halfoverlap_last(x, window).mean(axis=-1)
-    # average in chunks
-    x_slow = reshape_any_last(
-        halfoverlapping,
-        chunklen,
-        chunkoverlap,
-    ).mean(axis=-1)
-    return x_slow
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+        )
+    # average out the two overlapping dimensions
+    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
 
 
 def _integrate_simple(

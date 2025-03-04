@@ -8,7 +8,12 @@ from jaxtyping import Float, Int
 import xarray as xr
 from netCDF4 import Dataset
 
-from turban.util import reshape_any_nextlast, reshape_halfoverlap_last, average_fast_to_slow
+from turban.util import (
+    reshape_overlap_index,
+    reshape_any_nextlast,
+    reshape_halfoverlap_last,
+    average_fast_to_slow,
+)
 from turban.level1 import ShearLevel1
 from turban.level2 import ShearLevel2, split_data
 from turban.config import ShearConfig
@@ -32,12 +37,13 @@ class ShearLevel3:
             shear=level2.shear,
             pspd=level2.pspd,
             section_marker=level2.section_marker,
-            fftlen=level2.cfg.fftlen,
+            fft_length=level2.cfg.fft_length,
             sampling_freq=level2.cfg.sampling_freq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
-            chunklen=level2.cfg.chunklen,
-            chunkoverlap=level2.cfg.chunkoverlap,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
         )
 
         return cls(
@@ -67,12 +73,13 @@ def process_level3(
     shear: Float[ndarray, "n_shear time_fast"],
     pspd: Float[ndarray, "time_fast"],
     section_marker: Int[ndarray, "time_fast"],
-    fftlen: int,
+    fft_length: int,
+    fft_overlap: int,
+    diss_length: int,
+    diss_overlap: int,
     sampling_freq: float,
     spatial_response_wavenum: float,
     freq_highpass: float,
-    chunklen: int,
-    chunkoverlap: int,
     ancillary: Dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
 ) -> Tuple[
     Float[ndarray, "time_slow k"],  # k
@@ -84,8 +91,11 @@ def process_level3(
 ]:
     # segments = split_data(shear, section_marker)
     # for marker, data in segments.items(): # TODO
+    ii = fast_to_slow_reshape_index(
+        shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+    )
 
-    Pf, freq = spectra(shear, fftlen, sampling_freq, chunklen, chunkoverlap)
+    Pf, freq = spectra(shear, sampling_freq, reshape_index=ii)
 
     # Average to time_slow
     data_fast: Float[ndarray, "variable time_fast"] = (
@@ -95,12 +105,12 @@ def process_level3(
     )
     # platform speed
     data_slow: Float[ndarray, "variable time_slow"] = average_fast_to_slow(
-        data_fast, fftlen, chunklen, chunkoverlap
+        data_fast, reshape_index=ii
     )
     pspda = data_slow[0, :]
 
     # to wavenumber domain
-    Pk = Pf * pspda[newaxis, :, newaxis] / fftlen / (sampling_freq / 2)
+    Pk = Pf * pspda[newaxis, :, newaxis] / fft_length / (sampling_freq / 2)
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
 
     # apply corrections
@@ -128,32 +138,59 @@ def process_level3(
 
 def spectra(
     shear: Float[ndarray, "n_shear time_fast"],
-    fftlen: int,
     sampling_freq: float,
-    chunklen: int,
-    chunkoverlap: int,
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Tuple[
-    Float[ndarray, "n_shear segment freq"],
+    Float[ndarray, "n_shear chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:
     """
-    Produce spectra from cleaned shear time series"""
-    # reshape
-    # reshuffle time dimension into segments of length fftlen
-    yr = reshape_halfoverlap_last(shear, fftlen)
+    Produce spectra from cleaned shear time series.
+    If reshape_index is not supplied, calculate it.
+    """
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+        )
+    else:
+        fft_length = reshape_index.shape[-1]
+        
+    # reshape to fft length windows
+    yr = shear[..., reshape_index]
     # subtract mean
     yr -= yr.mean(axis=-1)[..., newaxis]
     # hanning window
-    yr *= np.hanning(fftlen)[newaxis, :]
+    yr *= np.hanning(fft_length)[newaxis, newaxis, :]
 
     # periodograms
-    freq = np.fft.rfftfreq(fftlen, d=1 / sampling_freq)
+    freq = np.fft.rfftfreq(fft_length, d=1 / sampling_freq)
     Fyr = np.fft.rfft(yr)[:, :]
     Pf = (Fyr.conj() * Fyr).real
     # average spectra by chunks (reshape the segments)
-    Pf = reshape_any_nextlast(Pf, chunklen, chunkoverlap).mean(axis=-2)
-
+    Pf = Pf.mean(axis=-2)
     return Pf, freq
+
+
+def fast_to_slow_reshape_index(
+    N: int,
+    fft_length: int,
+    fft_overlap: int,
+    diss_length: int,
+    diss_overlap: int,
+) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
+    # reshape time dimension into chunks of length diss_length
+    ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
+        diss_length, diss_overlap, N
+    )
+    # reshape fft dimension into chunks of length fft_length
+    ii_fft: Int[ndarray, "fft_chunk fft_length"] = reshape_overlap_index(
+        fft_length, fft_overlap, ii_diss.shape[-1]
+    )
+    return ii_diss[:, ii_fft]
 
 
 def apply_compensation_spatial_response(
