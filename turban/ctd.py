@@ -6,7 +6,6 @@ from numpy import ndarray
 from jaxtyping import Float, Int
 
 from .temperature import *
-from turban.util import binned_gradient_halfoverlap
 
 
 def calc_ctd(

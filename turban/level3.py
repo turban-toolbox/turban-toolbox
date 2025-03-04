@@ -72,7 +72,6 @@ class ShearLevel3:
 def process_level3(
     shear: Float[ndarray, "n_shear time_fast"],
     pspd: Float[ndarray, "time_fast"],
-    section_marker: Int[ndarray, "time_fast"],
     fft_length: int,
     fft_overlap: int,
     diss_length: int,
@@ -80,6 +79,7 @@ def process_level3(
     sampling_freq: float,
     spatial_response_wavenum: float,
     freq_highpass: float,
+    section_marker: Int[ndarray, "time_fast"],
     ancillary: Dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
 ) -> Tuple[
     Float[ndarray, "time_slow k"],  # k
@@ -92,7 +92,12 @@ def process_level3(
     # segments = split_data(shear, section_marker)
     # for marker, data in segments.items(): # TODO
     ii = fast_to_slow_reshape_index(
-        shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+        shear.shape[-1],
+        fft_length,
+        fft_overlap,
+        diss_length,
+        diss_overlap,
+        section_marker,
     )
 
     Pf, freq = spectra(shear, sampling_freq, reshape_index=ii)
@@ -143,6 +148,7 @@ def spectra(
     fft_overlap: int = None,
     diss_length: int = None,
     diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Tuple[
     Float[ndarray, "n_shear chunk freq"],
@@ -150,15 +156,20 @@ def spectra(
 ]:
     """
     Produce spectra from cleaned shear time series.
-    If reshape_index is not supplied, calculate it.
+    If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
         reshape_index = fast_to_slow_reshape_index(
-            shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
         )
     else:
         fft_length = reshape_index.shape[-1]
-        
+
     # reshape to fft length windows
     yr = shear[..., reshape_index]
     # subtract mean
@@ -181,16 +192,29 @@ def fast_to_slow_reshape_index(
     fft_overlap: int,
     diss_length: int,
     diss_overlap: int,
+    section_marker: Int[ndarray, "time_fast"] = None,
 ) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
-    # reshape time dimension into chunks of length diss_length
-    ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
-        diss_length, diss_overlap, N
-    )
-    # reshape fft dimension into chunks of length fft_length
-    ii_fft: Int[ndarray, "fft_chunk fft_length"] = reshape_overlap_index(
-        fft_length, fft_overlap, ii_diss.shape[-1]
-    )
-    return ii_diss[:, ii_fft]
+
+    if section_marker is None:
+        section_marker = np.ones(N, dtype=int)
+
+    sections = split_data(np.arange(N), section_marker)
+
+    reshape_segments = []
+    for data in sections.values():
+
+        # reshape time dimension into chunks of length diss_length
+        ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
+            diss_length, diss_overlap, len(data)
+        )
+        # reshape fft dimension into chunks of length fft_length
+        ii_fft: Int[ndarray, "fft_chunk fft_length"] = reshape_overlap_index(
+            fft_length, fft_overlap, ii_diss.shape[-1]
+        )
+        reshape_segments.append(ii_diss[:, ii_fft] + data[0])
+
+    # concatenate along dissipation chunks
+    return np.concatenate(reshape_segments, axis=0)
 
 
 def apply_compensation_spatial_response(

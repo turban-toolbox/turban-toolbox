@@ -9,7 +9,6 @@ from .util import (
     reshape_halfoverlap_first,
     reshape_halfoverlap_last,
     average_fast_to_slow,
-    binned_gradient_halfoverlap,
 )
 
 
@@ -108,12 +107,3 @@ def test_average_fast_to_slow():
     y = average_fast_to_slow(x, 4, 3, 2)
     assert y.shape == (3, 2)
 
-
-def test_binned_gradient_halfoverlap():
-    x = np.arange(10, dtype=float)
-    pspd = np.ones_like(x)
-    dxdt = binned_gradient_halfoverlap(
-        x, pspd, chunklen_samples=4, sampling_frequency=1.0
-    )
-    expected = np.ones(4, dtype=float)
-    assert np.allclose(dxdt, expected, rtol=1e-10)

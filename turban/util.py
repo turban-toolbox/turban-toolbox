@@ -152,16 +152,22 @@ def average_fast_to_slow(
     fft_overlap: int = None,
     diss_length: int = None,
     diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Float[ndarray, "*any time_slow"]:
     """
     Average any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).
-    If reshape_index is not supplied, calculate it.
+    If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
         reshape_index = fast_to_slow_reshape_index(
-            shear.shape[-1], fft_length, fft_overlap, diss_length, diss_overlap
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
         )
     # average out the two overlapping dimensions
     return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
@@ -189,24 +195,3 @@ def integrate(
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
     return np.trapz(y_zero, x=x, axis=-1)
-
-
-def binned_gradient_halfoverlap(
-    x: Float[ndarray, "time"],  # time series
-    platform_speed: Float[ndarray, "time"],
-    chunklen_samples: int,
-    sampling_frequency: float,  # samples/second
-) -> Float[ndarray, "time_agg"]:
-    """
-    Calculate spatial gradient in half-overlapping intervals
-    """
-    x = reshape_halfoverlap_last(x, chunklen_samples)
-    pspda = reshape_halfoverlap_last(platform_speed, chunklen_samples).mean(axis=1)
-    pspda
-    # dummy time vector in seconds
-    time = np.linspace(1, chunklen_samples / sampling_frequency, chunklen_samples)
-    time, x.transpose()
-    dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
-    dxdt
-    dxdz = dxdt / pspda
-    return dxdz

@@ -5,10 +5,10 @@ from beartype.typing import Dict, Tuple, List
 from numpy import ndarray
 import xarray as xr
 import numpy as np
-from jaxtyping import Float
+from jaxtyping import Float, Int
 from netCDF4 import Dataset
 
-from turban.util import average_fast_to_slow, binned_gradient_halfoverlap
+from turban.util import average_fast_to_slow
 from turban.level1 import get_vsink, fft_grad, ShearLevel1
 from turban.level2 import ShearLevel2, select_sections
 from turban.level3 import ShearLevel3
@@ -23,23 +23,39 @@ from turban.temperature import (
 def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
     pspd: Float[ndarray, "... time_fast"],
-    section_select_idx: List[List[int]],
-    fft_length: int,
     sampling_freq: float,
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Float[ndarray, "... time_slow"]:
     """
     Calculate the gradient of `x` with respect to depth, averaged over each segment.
     This is done by using pspd, the platform speed, to convert between time and depth.
+    If reshape_index is not supplied, calculates it.
     """
-    x_segments = [x[..., inds] for inds in section_select_idx]
-    pspd_segments = [pspd[..., inds] for inds in section_select_idx]
-    dxdz_segments = []
-    for x_seg, pspd_seg in zip(x_segments, pspd_segments):
-        # TODO: 3 * fft_length is valid for chunklen=5, chunkoverlap=2
-        dxdz_segments.append(
-            binned_gradient_halfoverlap(x_seg, pspd_seg, 3 * fft_length, sampling_freq)
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
         )
-    return np.concatenate([xx for xx in dxdz_segments], axis=-1)
+    else:
+        fft_length = reshape_index.shape[-1]
+
+    x = x[..., reshape_index]
+    pspda = pspd[..., reshape_index].mean(axis=-1)
+
+    # dummy time vector in seconds
+    time = np.linspace(1, fft_length / sampling_freq, fft_length)
+    dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
+    dxdz = dxdt / pspda
+    return dxdz.mean(axis=-1)  # average gradient over each `diss_length` segment
 
 
 def fast_to_slow_avg_by_segment():
@@ -224,49 +240,6 @@ def process(
     ds4.to_netcdf(outfile, mode="a", group="level4")
 
     return ds0, ds3, ds4, dst
-
-
-def aggregate(
-    to_average: List[Float[ndarray, "time_fast"]],
-    to_gradient: List[Float[ndarray, "time_fast"]],
-    pspd: Float[ndarray, "time_fast"] | None,
-    section_select_idx: List[List[int]],
-    sampling_freq: float,
-    fft_length: int,
-    chunklen: int = 5,
-    chunkoverlap: int = 2,
-) -> Tuple[
-    List[Float[ndarray, "time_slow"]],
-    List[Float[ndarray, "time_slow"]],
-]:
-    average = []
-    if len(to_average) > 0:
-        for x in to_average:
-            segments = [x[..., inds] for inds in section_select_idx]
-            segments_out = []
-            for segment in segments:
-                segments_out.append(
-                    average_fast_to_slow(
-                        segment, fft_length, chunklen=chunklen, chunkoverlap=chunkoverlap
-                    )
-                )
-            average.append(np.concatenate(segments_out, axis=-1))
-
-    gradient = []
-    if len(to_gradient) > 0:
-        pspd_segments = [pspd[..., inds] for inds in section_select_idx]
-        for x in to_gradient:
-            segments = [x[..., inds] for inds in section_select_idx]
-            segments_out = []
-            for segment, pspd_segment in zip(segments, pspd_segments):
-                segments_out.append(
-                    binned_gradient_halfoverlap(
-                        segment, pspd_segment, 3 * fft_length, sampling_freq
-                    )
-                )
-            gradient.append(np.concatenate(segments_out, axis=-1))
-
-    return average, gradient
 
 
 def microtemp(
