@@ -246,5 +246,5 @@ def apply_compensation_highpass(
     freq_highpass: float,
 ) -> Float[ndarray, "f"]:
     correction_factor = (1.0 + (freq_highpass / freq) ** 2.0) ** 2.0
-    x /= correction_factor[newaxis, :]
+    x *= correction_factor[newaxis, :]
     return correction_factor
