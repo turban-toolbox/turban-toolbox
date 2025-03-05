@@ -60,7 +60,7 @@ def get_vsink(pressure_raw, sampling_freq=1024.0):
 
 def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
-    pspd: Float[ndarray, "... time_fast"],
+    y: Float[ndarray, "... time_fast"],
     sampling_freq: float,
     fft_length: int = None,
     fft_overlap: int = None,
@@ -70,8 +70,7 @@ def fast_to_slow_grad_by_segment(
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Float[ndarray, "... time_slow"]:
     """
-    Calculate the gradient of `x` with respect to depth, averaged over each segment.
-    This is done by using pspd, the platform speed, to convert between time and depth.
+    Calculate the gradient of `y` with respect to `x`, averaged over each segment.
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
@@ -87,13 +86,14 @@ def fast_to_slow_grad_by_segment(
         fft_length = reshape_index.shape[-1]
 
     x = x[..., reshape_index]
-    pspda = pspd[..., reshape_index].mean(axis=-1)
-
+    y = y[..., reshape_index]
+    
     # dummy time vector in seconds
     time = np.linspace(1, fft_length / sampling_freq, fft_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
-    dxdz = dxdt / pspda
-    return dxdz.mean(axis=-1)  # average gradient over each `diss_length` segment
+    dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
+    dydx = dydt / dxdt
+    return dydx.mean(axis=-1)  # average gradient over each `diss_length` segment
 
 
 def average_fast_to_slow(
@@ -119,6 +119,7 @@ def average_fast_to_slow(
             diss_overlap,
             section_marker,
         )
+
     # average out the two overlapping dimensions
     return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
 
