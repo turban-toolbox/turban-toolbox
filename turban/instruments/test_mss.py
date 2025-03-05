@@ -8,8 +8,8 @@ import pandas as pd
 
 
 from turban.ctd import *
-from turban.level1 import *
-from turban.temperature import *
+from turban.shear.level1 import *
+from turban.temperature.temperature import *
 from numpy import ndarray
 from turban.mss import convert_mrd_to_parquet
 

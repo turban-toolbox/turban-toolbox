@@ -8,8 +8,8 @@ import xarray as xr
 from netCDF4 import Dataset
 
 from turban.util import integrate
-from turban.level3 import ShearLevel3
-from turban.config import ShearConfig
+from turban.shear.level3 import ShearLevel3
+from turban.shear.config import ShearConfig
 
 
 @dataclass

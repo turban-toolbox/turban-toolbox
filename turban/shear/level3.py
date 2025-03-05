@@ -14,9 +14,9 @@ from turban.util import (
     reshape_halfoverlap_last,
     average_fast_to_slow,
 )
-from turban.level1 import ShearLevel1
-from turban.level2 import ShearLevel2, split_data
-from turban.config import ShearConfig
+from turban.shear.level1 import ShearLevel1
+from turban.shear.level2 import ShearLevel2, split_data
+from turban.shear.config import ShearConfig
 
 
 @dataclass

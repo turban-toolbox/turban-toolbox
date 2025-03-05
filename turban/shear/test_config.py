@@ -1,4 +1,4 @@
-from turban.config import ShearConfig
+from turban.shear.config import ShearConfig
 
 
 def test_config():

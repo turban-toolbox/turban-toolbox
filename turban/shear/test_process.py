@@ -2,17 +2,17 @@
 Test the entire processing pipeline
 """
 
-import os
+import os, sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from turban.level1 import get_vsink
-from turban.level2 import select_sections
-from turban.process import microtemp, shear
-from turban.mss import convert_mrd_to_parquet, level1
+from turban.shear.level2 import select_sections
+from turban.shear.process import microtemp, shear
+from turban.instruments.mss import convert_mrd_to_parquet, level1
 
 os.environ["RUST_BACKTRACE"] = "1"
 
@@ -114,10 +114,10 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
 def test_baltic_benchmark():
     import xarray as xr
-    from turban.level1 import ShearLevel1
-    from turban.level2 import ShearLevel2
-    from turban.level3 import ShearLevel3
-    from turban.level4 import ShearLevel4
+    from turban.shear.level1 import ShearLevel1
+    from turban.shear.level2 import ShearLevel2
+    from turban.shear.level3 import ShearLevel3
+    from turban.shear.level4 import ShearLevel4
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
@@ -148,9 +148,9 @@ def _test_baltic_benchmark():
     import numpy as np
     import pandas as pd
 
-    from turban.level2 import process_level2
-    from turban.level3 import process_level3
-    from turban.level4 import process_level4
+    from turban.shear.level2 import process_level2
+    from turban.shear.level3 import process_level3
+    from turban.shear.level4 import process_level4
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")

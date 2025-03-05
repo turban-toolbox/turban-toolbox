@@ -7,12 +7,20 @@ from jaxtyping import Num
 from numpy import ndarray
 import pandas as pd
 
+from pydantic import BaseModel
+
 from turban.ctd import *
-from turban.level1 import *
-from turban.temperature import *
+from turban.shear.level1 import *
+from turban.temperature.temperature import *
 from turban.util import channel_mapping
 
-os.environ["RUST_BACKTRACE"] = "1"
+from turban.instruments.instrument import Dropsonde
+
+
+class MSS(Dropsonde):
+
+    def read_mrd(self, fname: str):
+        raise NotImplementedError
 
 
 def convert_mrd_to_parquet(

@@ -1,4 +1,5 @@
 import json
+import pydantic
 
 FIXED_NAMES = {
     "TEMP_FAST": "Fast-response temperature",
@@ -9,6 +10,3 @@ FIXED_NAMES = {
     "COND": "Precision conductivity",
 
 }
-
-
-

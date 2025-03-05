@@ -5,16 +5,15 @@ try:
     import xarray as xr
 except ImportError:
     xr = None
-from .util import butterfilt
+from turban.util import butterfilt
 from jaxtyping import Float, Num, Bool, Int
 from beartype.typing import Tuple, Dict, List
 from netCDF4 import Dataset
 from numpy import ndarray
 import warnings
 
-from turban.level1 import ShearLevel1
-from turban.instrument import Instrument
-from turban.config import ShearConfig
+from turban.shear.level1 import ShearLevel1
+from turban.shear.config import ShearConfig
 
 
 @dataclass

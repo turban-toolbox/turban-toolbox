@@ -9,11 +9,11 @@ from jaxtyping import Float, Int
 from netCDF4 import Dataset
 
 from turban.util import average_fast_to_slow
-from turban.level1 import get_vsink, fft_grad, ShearLevel1
-from turban.level2 import ShearLevel2, select_sections
-from turban.level3 import ShearLevel3
-from turban.level4 import ShearLevel4
-from turban.temperature import (
+from turban.shear.level1 import get_vsink, fft_grad, ShearLevel1
+from turban.shear.level2 import ShearLevel2, select_sections
+from turban.shear.level3 import ShearLevel3
+from turban.shear.level4 import ShearLevel4
+from turban.temperature.temperature import (
     temperature_dissipation,
     diffusivity_temp,
     viscosity_kinematic,

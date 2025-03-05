@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
-from .util import butterfilt, fft_grad
+from turban.util import butterfilt, fft_grad
 
 try:
     import xarray as xr
@@ -12,7 +12,7 @@ import numpy as np
 from jaxtyping import Float
 from beartype.typing import Tuple
 
-from turban.config import ShearConfig
+from turban.shear.config import ShearConfig
 
 sea_water_density = 1025.0
 
@@ -66,23 +66,3 @@ def get_vsink(pressure_raw, sampling_freq=1024.0):
     return vsink, pressure_lp
 
 
-def mss_shear_physical(
-    vsink: Float[ndarray, "time"],
-    shear_channels: Float[ndarray, "n_shear time"],
-    sampling_freq=1024.0,
-) -> Float[ndarray, "n_shear time"]:
-    """Calculates physical shear for the MSS shear probes.
-    Returns:
-        shear channels in physical units, in same order as passed in
-
-    TODO: data needs canonical column names
-    """
-    target_freq = 256.0
-
-    # convert from MSS "shear" (i.e. a velocity) to time derivative (units m/s/s)
-    shear_channels_phys = []
-    for i, sh in enumerate(shear_channels):
-        sh_phys = fft_grad(sh, 1 / sampling_freq) / vsink**2 / sea_water_density
-        shear_channels_phys.append(sh_phys)
-
-    return np.array(shear_channels_phys)

@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from turban.level3 import spectra
+from turban.shear.level3 import spectra
 from turban.util import average_fast_to_slow, reshape_overlap_index
 
 def test_spectra_arr_shape():

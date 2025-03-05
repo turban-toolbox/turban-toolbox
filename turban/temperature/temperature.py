@@ -8,7 +8,7 @@ from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 from numba import jit
 
-from .util import integrate, reshape_any_first, reshape_halfoverlap_last
+from turban.util import integrate, reshape_any_first, reshape_halfoverlap_last
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
