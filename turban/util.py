@@ -96,6 +96,33 @@ def fast_to_slow_grad_by_segment(
     return dxdz.mean(axis=-1)  # average gradient over each `diss_length` segment
 
 
+def average_fast_to_slow(
+    x: Float[ndarray, "*any time_fast"],
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+) -> Float[ndarray, "*any time_slow"]:
+    """
+    Average any quantities from fast sampling rate (e.g., shear timeseries)
+    to slow sampling rate (e.g, spectra).
+    If reshape_index is not supplied, calculates it.
+    """
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
+        )
+    # average out the two overlapping dimensions
+    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
+
+
 def fast_to_slow_avg_by_segment():
     pass
 
@@ -277,33 +304,6 @@ def reshape_halfoverlap_last(
     """
     assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
     return y[..., reshape_overlap_index(w, w // 2, y.shape[-1])]
-
-
-def average_fast_to_slow(
-    x: Float[ndarray, "*any time_fast"],
-    fft_length: int = None,
-    fft_overlap: int = None,
-    diss_length: int = None,
-    diss_overlap: int = None,
-    section_marker: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
-) -> Float[ndarray, "*any time_slow"]:
-    """
-    Average any quantities from fast sampling rate (e.g., shear timeseries)
-    to slow sampling rate (e.g, spectra).
-    If reshape_index is not supplied, calculates it.
-    """
-    if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
-            shear.shape[-1],
-            fft_length,
-            fft_overlap,
-            diss_length,
-            diss_overlap,
-            section_marker,
-        )
-    # average out the two overlapping dimensions
-    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
 
 
 def _integrate_simple(
