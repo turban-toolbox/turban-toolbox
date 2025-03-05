@@ -3,8 +3,38 @@ import numpy as np
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
-from jaxtyping import Float, Int
+from jaxtyping import Float, Int, Num
 from beartype.typing import Tuple
+from netCDF4 import Dataset
+import xarray as xr
+from typing import Dict
+
+
+def load(fname):
+    with Dataset(fname) as f:
+        groups = list(f.groups)
+
+    if "level0" in groups:
+        ds0 = xr.load_dataset(fname, group="level0")
+    else:
+        ds0 = None
+
+    if "microtemp" in groups:
+        dst = xr.load_dataset(fname, group="microtemp")
+    else:
+        dst = None
+
+    if "level3" in groups:
+        ds3 = xr.load_dataset(fname, group="level3")
+    else:
+        ds3 = None
+
+    if "level4" in groups:
+        ds4 = xr.load_dataset(fname, group="level4")
+    else:
+        ds4 = None
+
+    return ds0, ds3, ds4, dst
 
 
 def is_valid_turban_netcdf(fname: str):
@@ -13,6 +43,109 @@ def is_valid_turban_netcdf(fname: str):
 
 def convert_atomix_benchmark_to_turban_netcdf(fname: str):
     raise NotImplementedError
+
+
+def get_vsink(pressure_raw, sampling_freq=1024.0):
+    # lowpass filter pressure
+    pressure_lp = butterfilt(
+        signal=pressure_raw,
+        cutoff_freq_Hz=0.5,
+        sampling_freq=sampling_freq,
+        btype="low",
+    )
+    # sinking speed
+    vsink = fft_grad(pressure_lp, 1 / sampling_freq)
+    return vsink, pressure_lp
+
+
+def fast_to_slow_grad_by_segment(
+    x: Float[ndarray, "... time_fast"],
+    pspd: Float[ndarray, "... time_fast"],
+    sampling_freq: float,
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+) -> Float[ndarray, "... time_slow"]:
+    """
+    Calculate the gradient of `x` with respect to depth, averaged over each segment.
+    This is done by using pspd, the platform speed, to convert between time and depth.
+    If reshape_index is not supplied, calculates it.
+    """
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
+        )
+    else:
+        fft_length = reshape_index.shape[-1]
+
+    x = x[..., reshape_index]
+    pspda = pspd[..., reshape_index].mean(axis=-1)
+
+    # dummy time vector in seconds
+    time = np.linspace(1, fft_length / sampling_freq, fft_length)
+    dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
+    dxdz = dxdt / pspda
+    return dxdz.mean(axis=-1)  # average gradient over each `diss_length` segment
+
+
+def fast_to_slow_avg_by_segment():
+    pass
+
+
+def fast_to_slow_reshape_index(
+    N: int,
+    fft_length: int,
+    fft_overlap: int,
+    diss_length: int,
+    diss_overlap: int,
+    section_marker: Int[ndarray, "time_fast"] = None,
+) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
+
+    if section_marker is None:
+        section_marker = np.ones(N, dtype=int)
+
+    sections = split_data(np.arange(N), section_marker)
+
+    reshape_segments = []
+    for data in sections.values():
+
+        # reshape time dimension into chunks of length diss_length
+        ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
+            diss_length, diss_overlap, len(data)
+        )
+        # reshape fft dimension into chunks of length fft_length
+        ii_fft: Int[ndarray, "fft_chunk fft_length"] = reshape_overlap_index(
+            fft_length, fft_overlap, ii_diss.shape[-1]
+        )
+        reshape_segments.append(ii_diss[:, ii_fft] + data[0])
+
+    # concatenate along dissipation chunks
+    return np.concatenate(reshape_segments, axis=0)
+
+
+def split_data(
+    data: Num[ndarray, "... time"],
+    section_markers: Int[ndarray, "... time"],
+) -> Dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
+    """Split array of data into segments based on section markers.
+    section marker "0" is neglected and not included in the output."""
+
+    markers = set(section_markers)
+    # sections = select_sections(data_and_bounds)
+    sections = {
+        marker: data[..., section_markers == marker]
+        for marker in markers
+        if marker != 0
+    }
+    return sections
 
 
 def fft_grad(

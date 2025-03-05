@@ -1,12 +1,10 @@
-import math
 
 import numpy as np
-from beartype.typing import Tuple
+from beartype.typing import Tuple, List
 from jaxtyping import Float, Int
 from numpy import ndarray, newaxis
 from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
-from numba import jit
 
 from turban.util import integrate, reshape_any_first, reshape_halfoverlap_last
 
@@ -16,6 +14,67 @@ viscosity_kinematic = 0.0000016
 diffusivity_temp = 0.00000014
 # constant for batchelor spectrum
 q_b = 3.7
+
+
+def microtemp(
+    temp_emph: Float[ndarray, "time_fast"],
+    pspd: Float[ndarray, "time_fast"],
+    section_select_idx: List[List[int]],
+    sampling_freq: float,
+    fft_length: int,
+    chunklen: int = 5,
+    chunkoverlap: int = 2,
+    outfile: str | None = None,
+) -> Tuple[Float[ndarray, "... time_slow"], ...]:
+    """
+    Process temperature microstructure.
+
+    Default values to calculate spectra using 3+2 half-overlapping FFT
+    intervals, i.e. 3*2048 samples.
+    """
+
+    dTdt = fft_grad(temp_emph, 1 / sampling_freq)
+
+    dTdt_segments = [dTdt[..., inds] for inds in section_select_idx]
+    pspd_segments = [pspd[..., inds] for inds in section_select_idx]
+
+    out = []
+
+    for dTdt_segment, pspd_segment in zip(dTdt_segments, pspd_segments):
+        (
+            k,
+            Pk,
+            chi,
+            k_batchelor_estimate,
+        ) = temperature_dissipation(
+            dTdt=dTdt_segment,
+            pspd=pspd_segment,
+            chunklen=chunklen,
+            chunkoverlap=chunkoverlap,
+            fft_length=fft_length,
+            sampling_freq=sampling_freq,
+        )
+
+        out.append(
+            xr.Dataset(
+                data_vars={
+                    "k": (["time_slow", "wavenumber"], k),
+                    "Pk": (["time_slow", "wavenumber"], Pk),
+                    # "Pnoise": (["time_slow", "wavenumber"], Pnoise),
+                    "chi": (["time_slow"], chi),
+                    "k_batchelor_estimate": (["time_slow"], k_batchelor_estimate),
+                }
+            )
+        )
+
+    ds = xr.concat(out, dim="time_slow")
+    if outfile is not None:
+        ds.to_netcdf(outfile, mode="a", group="microtemp")
+
+    return (
+        ds["chi"].values,
+        ds["k_batchelor_estimate"].values,
+    )
 
 
 def tke_dissipation(
@@ -46,10 +105,10 @@ def temperature_dissipation(
     if dTdt.shape[0] < fft_length * (chunklen + 1) / 2:
         # insufficient data available
         return (
-            np.ones((0, fft_length//2+1), dtype=float),
-            np.ones((0, fft_length//2+1), dtype=float),
-            np.ones((0, ), dtype=float),
-            np.ones((0, ), dtype=float),
+            np.ones((0, fft_length // 2 + 1), dtype=float),
+            np.ones((0, fft_length // 2 + 1), dtype=float),
+            np.ones((0,), dtype=float),
+            np.ones((0,), dtype=float),
         )
     k, Pk, Pnoise = temperature_gradient_spectra(
         dTdt,

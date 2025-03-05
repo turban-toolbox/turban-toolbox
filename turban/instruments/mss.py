@@ -15,12 +15,22 @@ from turban.temperature.temperature import *
 from turban.util import channel_mapping
 
 from turban.instruments.instrument import Dropsonde
-
+from turban.shear import ShearLevel1
+from turban.util import get_vsink
 
 class MSS(Dropsonde):
 
     def read_mrd(self, fname: str):
         raise NotImplementedError
+
+    def to_level1(self, pressure_raw, shear_raw, cfg: ShearConfig):
+        pspd, pressure_lp = get_vsink(pressure_raw, cfg.sampling_freq)
+        shear_phys = mss_shear_physical(pspd, shear_raw, self.sampling_freq)
+        return ShearLevel1(
+            pspd=pspd,
+            shear_phys=shear_phys,
+            cfg=cfg,
+        )
 
 
 def convert_mrd_to_parquet(
@@ -38,6 +48,7 @@ def convert_mrd_to_parquet(
     )
 
     return raw, str(parquet_fname)
+
 
 def level1(
     raw: Int[ndarray, "time 16"],
@@ -71,3 +82,24 @@ def level1(
     data["roll"] = data["ACCEL_Y"] * 180 / np.pi
 
     return data
+
+def mss_shear_physical(
+    vsink: Float[ndarray, "time"],
+    shear_channels: Float[ndarray, "n_shear time"],
+    sampling_freq=1024.0,
+) -> Float[ndarray, "n_shear time"]:
+    """Calculates physical shear for the MSS shear probes.
+    Returns:
+        shear channels in physical units, in same order as passed in
+
+    TODO: data needs canonical column names
+    """
+    target_freq = 256.0
+
+    # convert from MSS "shear" (i.e. a velocity) to time derivative (units m/s/s)
+    shear_channels_phys = []
+    for i, sh in enumerate(shear_channels):
+        sh_phys = fft_grad(sh, 1 / sampling_freq) / vsink**2 / sea_water_density
+        shear_channels_phys.append(sh_phys)
+
+    return np.array(shear_channels_phys)

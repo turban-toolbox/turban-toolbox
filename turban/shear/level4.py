@@ -1,54 +1,10 @@
-from dataclasses import dataclass
 from beartype.typing import Tuple
 
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float
-import xarray as xr
-from netCDF4 import Dataset
 
 from turban.util import integrate
-from turban.shear.level3 import ShearLevel3
-from turban.shear.config import ShearConfig
-
-
-@dataclass
-class ShearLevel4:
-    eps: Float[ndarray, "nshear time"]
-    cfg: ShearConfig
-
-    @classmethod
-    def from_level3(
-        cls,
-        level3: ShearLevel3,
-    ) -> "ShearLevel4":
-        eps, _, _ = process_level4(
-            psi=level3.Pk,
-            wavenumber=level3.k,
-            platform_speed=level3.platform_speed,
-            waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
-            freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
-            freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
-        )
-        return cls(eps=eps, cfg=level3.cfg)
-
-    @classmethod
-    def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
-        with xr.open_dataset(fname) as ds:
-            return cls(
-                eps=ds["eps"].values,
-                cfg=ShearConfig.from_atomix_netcdf(fname),
-            )
-
-    def to_xarray(self):
-        return xr.Dataset(
-            data_vars={
-                "eps": (["nshear", "time_slow"], self.eps),
-                # "eps_specint": (["nshear", "time_slow"], eps),
-                # "eps_isrfit": (["nshear", "time_slow"], eps),
-            }
-        )
-
 
 def process_level4(
     psi: Float[ndarray, "nshear time wavenumber"],

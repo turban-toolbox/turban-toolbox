@@ -1,0 +1,165 @@
+from dataclasses import dataclass
+from jaxtyping import Float, Int
+from .config import ShearConfig
+from numpy import ndarray
+import xarray as xr
+
+from turban.shear.level2 import process_level2
+from turban.shear.level3 import process_level3
+from turban.shear.level4 import process_level4
+
+@dataclass
+class ShearLevel1:
+
+    pspd: Float[ndarray, "time"]
+    shear: Float[ndarray, "n_shear time"]
+    cfg: ShearConfig
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str):
+        ds = xr.load_dataset(fname, group="L1_converted")
+        return cls(
+            pspd=ds.PSPD_REL.values,
+            shear=ds.SHEAR.values,
+            cfg=ShearConfig.from_atomix_netcdf(fname),
+        )
+
+
+@dataclass
+class ShearLevel2:
+    cfg: ShearConfig
+    shear: Float[ndarray, "n_shear time"]
+    pspd: Float[ndarray, "time"]
+    section_marker: Int[ndarray, "time"]
+    n_despiked: Int[ndarray, "n_shear time"] = None
+
+    @classmethod
+    def from_level1(
+        cls,
+        level1: ShearLevel1,
+        section_marker: Int[ndarray, "time"],
+    ):
+        sh_cleaned, n_despiked = process_level2(
+            level1.shear,
+            section_marker,  # TODO: from own utility or user-supplied
+            level1.cfg.sampling_freq,
+            level1.cfg.fft_length,  # TODO ditto
+        )
+
+        return cls(
+            shear=sh_cleaned,
+            pspd=level1.pspd,
+            n_despiked=n_despiked,
+            section_marker=section_marker,
+            cfg=level1.cfg,
+        )
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str):
+        ds = xr.load_dataset(fname, group="L2_cleaned")
+        return cls(
+            shear=ds.shear.values,
+            is_despiked=ds.is_despiked.values,
+            n_despiked=ds.n_despiked.values,
+            segment_marker=ds["SECTION_NUMBER"].values.astype(int),
+            cfg=ShearConfig.from_atomix_netcdf(fname),
+        )
+
+
+@dataclass
+class ShearLevel3:
+    Pk: Float[ndarray, "nshear time wavenumber"]
+    k: Float[ndarray, "time wavenumber"]
+    Pf: Float[ndarray, "nshear time wavenumber"]
+    freq: Float[ndarray, "wavenumber"]
+    platform_speed: Float[ndarray, "time"]
+    cfg: ShearConfig
+
+    @classmethod
+    def from_level2(
+        cls,
+        level2: ShearLevel2,
+    ) -> "ShearLevel3":
+        k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
+            shear=level2.shear,
+            pspd=level2.pspd,
+            section_marker=level2.section_marker,
+            fft_length=level2.cfg.fft_length,
+            sampling_freq=level2.cfg.sampling_freq,
+            spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
+            freq_highpass=level2.cfg.freq_highpass,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
+        )
+
+        return cls(
+            Pk=Pk,
+            k=k,
+            Pf=Pf,
+            freq=freq,
+            platform_speed=platform_speed,
+            cfg=level2.cfg,
+        )
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str):
+        ds = xr.load_dataset(fname, group="L3_spectra").transpose(
+            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "WAVENUMBER"
+        )
+
+        return cls(
+            Pk=ds["SH_SPEC"].values,
+            k=ds["KCYC"].values,
+            platform_speed=ds["PSPD_REL"].values,
+            cfg=ShearConfig.from_atomix_netcdf(fname),
+        )
+
+    def to_xarray(self):
+        return xr.Dataset(
+            {
+                "k": (["time_slow", "wavenumber"], self.k),
+                "Pk": (["nshear", "time_slow", "wavenumber"], self.Pk),
+                "Pf": (["nshear", "time_slow", "wavenumber"], self.Pf),
+                "freq": (["wavenumber"], self.freq),
+                "platform_speed": (["time_slow"], self.platform_speed),
+            }
+        )
+
+
+@dataclass
+class ShearLevel4:
+    eps: Float[ndarray, "nshear time"]
+    cfg: ShearConfig
+
+    @classmethod
+    def from_level3(
+        cls,
+        level3: ShearLevel3,
+    ) -> "ShearLevel4":
+        eps, _, _ = process_level4(
+            psi=level3.Pk,
+            wavenumber=level3.k,
+            platform_speed=level3.platform_speed,
+            waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
+            freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
+            freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+        )
+        return cls(eps=eps, cfg=level3.cfg)
+
+    @classmethod
+    def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
+        with xr.open_dataset(fname) as ds:
+            return cls(
+                eps=ds["eps"].values,
+                cfg=ShearConfig.from_atomix_netcdf(fname),
+            )
+
+    def to_xarray(self):
+        return xr.Dataset(
+            data_vars={
+                "eps": (["nshear", "time_slow"], self.eps),
+                # "eps_specint": (["nshear", "time_slow"], eps),
+                # "eps_isrfit": (["nshear", "time_slow"], eps),
+            }
+        )

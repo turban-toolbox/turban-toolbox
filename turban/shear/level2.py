@@ -1,60 +1,10 @@
-from dataclasses import dataclass
 import numpy as np
 
-try:
-    import xarray as xr
-except ImportError:
-    xr = None
 from turban.util import butterfilt
-from jaxtyping import Float, Num, Bool, Int
-from beartype.typing import Tuple, Dict, List
-from netCDF4 import Dataset
+from jaxtyping import Float, Bool, Int
+from beartype.typing import Tuple, List
 from numpy import ndarray
-import warnings
-
-from turban.shear.level1 import ShearLevel1
-from turban.shear.config import ShearConfig
-
-
-@dataclass
-class ShearLevel2:
-    cfg: ShearConfig
-    shear: Float[ndarray, "n_shear time"]
-    pspd: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"]
-    n_despiked: Int[ndarray, "n_shear time"] = None
-
-    @classmethod
-    def from_level1(
-        cls,
-        level1: ShearLevel1,
-        section_marker: Int[ndarray, "time"],
-    ):
-        sh_cleaned, n_despiked = process_level2(
-            level1.shear,
-            section_marker,  # TODO: from own utility or user-supplied
-            level1.cfg.sampling_freq,
-            level1.cfg.fft_length,  # TODO ditto
-        )
-
-        return cls(
-            shear=sh_cleaned,
-            pspd=level1.pspd,
-            n_despiked=n_despiked,
-            section_marker=section_marker,
-            cfg=level1.cfg,
-        )
-
-    @classmethod
-    def from_atomix_netcdf(cls, fname: str):
-        ds = xr.load_dataset(fname, group="L2_cleaned")
-        return cls(
-            shear=ds.shear.values,
-            is_despiked=ds.is_despiked.values,
-            n_despiked=ds.n_despiked.values,
-            segment_marker=ds["SECTION_NUMBER"].values.astype(int),
-            cfg=ShearConfig.from_atomix_netcdf(fname),
-        )
+from turban.util import split_data
 
 
 data_and_bounds_type = List[
@@ -265,24 +215,9 @@ def clean_shear(
     return sh, ctr
 
 
-def split_data(
-    data: Num[ndarray, "... time"],
-    section_markers: Int[ndarray, "... time"],
-) -> Dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
-    """Split array of data into segments based on section markers.
-    section marker "0" is neglected and not included in the output."""
-
-    markers = set(section_markers)
-    # sections = select_sections(data_and_bounds)
-    sections = {
-        marker: data[..., section_markers == marker]
-        for marker in markers
-        if marker != 0
-    }
-    return sections
 
 
-from numba import jit, float64, int32
+from numba import jit, float64
 from numpy import isnan, nan
 
 

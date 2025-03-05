@@ -3,7 +3,8 @@ Test the entire processing pipeline
 """
 
 import os, sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import numpy as np
 import pandas as pd
@@ -11,8 +12,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 
 from turban.shear.level2 import select_sections
-from turban.shear.process import microtemp, shear
-from turban.instruments.mss import convert_mrd_to_parquet, level1
+from turban.temperature.temperature import microtemp
 
 os.environ["RUST_BACKTRACE"] = "1"
 
@@ -114,10 +114,7 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
 def test_baltic_benchmark():
     import xarray as xr
-    from turban.shear.level1 import ShearLevel1
-    from turban.shear.level2 import ShearLevel2
-    from turban.shear.level3 import ShearLevel3
-    from turban.shear.level4 import ShearLevel4
+    from turban.shear import ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
