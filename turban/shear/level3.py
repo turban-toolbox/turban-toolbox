@@ -84,8 +84,8 @@ def spectra(
     fft_overlap: int = None,
     diss_length: int = None,
     diss_overlap: int = None,
-    section_marker: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+    section_marker: Int[ndarray, "time_fast"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
 ) -> Tuple[
     Float[ndarray, "n_shear chunk freq"],
     Float[ndarray, "freq"],  # frequencies

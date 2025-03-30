@@ -87,7 +87,7 @@ def fast_to_slow_grad_by_segment(
 
     x = x[..., reshape_index]
     y = y[..., reshape_index]
-    
+
     # dummy time vector in seconds
     time = np.linspace(1, fft_length / sampling_freq, fft_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
@@ -134,7 +134,7 @@ def fast_to_slow_reshape_index(
     fft_overlap: int,
     diss_length: int,
     diss_overlap: int,
-    section_marker: Int[ndarray, "time_fast"] = None,
+    section_marker: Int[ndarray, "time_fast"] | None = None,
 ) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
 
     if section_marker is None:
