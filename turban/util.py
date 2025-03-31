@@ -60,7 +60,7 @@ def get_vsink(pressure_raw, sampling_freq=1024.0):
 
 def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
-    pspd: Float[ndarray, "... time_fast"],
+    y: Float[ndarray, "... time_fast"],
     sampling_freq: float,
     fft_length: int = None,
     fft_overlap: int = None,
@@ -70,8 +70,7 @@ def fast_to_slow_grad_by_segment(
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
 ) -> Float[ndarray, "... time_slow"]:
     """
-    Calculate the gradient of `x` with respect to depth, averaged over each segment.
-    This is done by using pspd, the platform speed, to convert between time and depth.
+    Calculate the gradient of `y` with respect to `x`, averaged over each segment.
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
@@ -87,13 +86,42 @@ def fast_to_slow_grad_by_segment(
         fft_length = reshape_index.shape[-1]
 
     x = x[..., reshape_index]
-    pspda = pspd[..., reshape_index].mean(axis=-1)
+    y = y[..., reshape_index]
 
     # dummy time vector in seconds
     time = np.linspace(1, fft_length / sampling_freq, fft_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
-    dxdz = dxdt / pspda
-    return dxdz.mean(axis=-1)  # average gradient over each `diss_length` segment
+    dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
+    dydx = dydt / dxdt
+    return dydx.mean(axis=-1)  # average gradient over each `diss_length` segment
+
+
+def average_fast_to_slow(
+    x: Float[ndarray, "*any time_fast"],
+    fft_length: int = None,
+    fft_overlap: int = None,
+    diss_length: int = None,
+    diss_overlap: int = None,
+    section_marker: Int[ndarray, "time_fast"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+) -> Float[ndarray, "*any time_slow"]:
+    """
+    Average any quantities from fast sampling rate (e.g., shear timeseries)
+    to slow sampling rate (e.g, spectra).
+    If reshape_index is not supplied, calculates it.
+    """
+    if reshape_index is None:
+        reshape_index = fast_to_slow_reshape_index(
+            shear.shape[-1],
+            fft_length,
+            fft_overlap,
+            diss_length,
+            diss_overlap,
+            section_marker,
+        )
+
+    # average out the two overlapping dimensions
+    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
 
 
 def fast_to_slow_avg_by_segment():
@@ -106,7 +134,7 @@ def fast_to_slow_reshape_index(
     fft_overlap: int,
     diss_length: int,
     diss_overlap: int,
-    section_marker: Int[ndarray, "time_fast"] = None,
+    section_marker: Int[ndarray, "time_fast"] | None = None,
 ) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
 
     if section_marker is None:
@@ -277,33 +305,6 @@ def reshape_halfoverlap_last(
     """
     assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
     return y[..., reshape_overlap_index(w, w // 2, y.shape[-1])]
-
-
-def average_fast_to_slow(
-    x: Float[ndarray, "*any time_fast"],
-    fft_length: int = None,
-    fft_overlap: int = None,
-    diss_length: int = None,
-    diss_overlap: int = None,
-    section_marker: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
-) -> Float[ndarray, "*any time_slow"]:
-    """
-    Average any quantities from fast sampling rate (e.g., shear timeseries)
-    to slow sampling rate (e.g, spectra).
-    If reshape_index is not supplied, calculates it.
-    """
-    if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
-            shear.shape[-1],
-            fft_length,
-            fft_overlap,
-            diss_length,
-            diss_overlap,
-            section_marker,
-        )
-    # average out the two overlapping dimensions
-    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
 
 
 def _integrate_simple(

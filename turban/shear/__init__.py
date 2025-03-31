@@ -1,56 +1,59 @@
+from logging import warning
+from typing import Literal, Tuple
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from .config import ShearConfig
-from numpy import ndarray
+from numpy import NaN, ndarray
+import numpy as np
 import xarray as xr
 
 from turban.shear.level2 import process_level2
 from turban.shear.level3 import process_level3
 from turban.shear.level4 import process_level4
 
+
 @dataclass
 class ShearLevel1:
-
     pspd: Float[ndarray, "time"]
     shear: Float[ndarray, "n_shear time"]
+    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L1_converted")
+        ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             pspd=ds.PSPD_REL.values,
             shear=ds.SHEAR.values,
+            section_marker=ds2["SECTION_NUMBER"].values.astype(int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
 
 @dataclass
 class ShearLevel2:
-    cfg: ShearConfig
     shear: Float[ndarray, "n_shear time"]
     pspd: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"]
-    n_despiked: Int[ndarray, "n_shear time"] = None
+    n_despiked: Int[ndarray, "n_shear time"] | None
+    cfg: ShearConfig
 
     @classmethod
     def from_level1(
         cls,
         level1: ShearLevel1,
-        section_marker: Int[ndarray, "time"],
     ):
         sh_cleaned, n_despiked = process_level2(
             level1.shear,
-            section_marker,  # TODO: from own utility or user-supplied
+            level1.section_marker,
             level1.cfg.sampling_freq,
-            level1.cfg.fft_length,  # TODO ditto
+            level1.cfg.fft_length,  # TODO: from own utility or user-supplied
         )
 
         return cls(
             shear=sh_cleaned,
             pspd=level1.pspd,
             n_despiked=n_despiked,
-            section_marker=section_marker,
             cfg=level1.cfg,
         )
 
@@ -58,10 +61,9 @@ class ShearLevel2:
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
-            shear=ds.shear.values,
-            is_despiked=ds.is_despiked.values,
-            n_despiked=ds.n_despiked.values,
-            segment_marker=ds["SECTION_NUMBER"].values.astype(int),
+            shear=ds.SHEAR.values,
+            pspd=ds.PSPD_REL.values,
+            n_despiked=None,
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -70,20 +72,22 @@ class ShearLevel2:
 class ShearLevel3:
     Pk: Float[ndarray, "nshear time wavenumber"]
     k: Float[ndarray, "time wavenumber"]
-    Pf: Float[ndarray, "nshear time wavenumber"]
-    freq: Float[ndarray, "wavenumber"]
+    Pf: Float[ndarray, "nshear time wavenumber"] | None
+    freq: Float[ndarray, "wavenumber"] | None
     platform_speed: Float[ndarray, "time"]
+    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
 
     @classmethod
     def from_level2(
         cls,
+        level1: ShearLevel1,
         level2: ShearLevel2,
     ) -> "ShearLevel3":
         k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
-            section_marker=level2.section_marker,
+            section_marker=level1.section_marker,
             fft_length=level2.cfg.fft_length,
             sampling_freq=level2.cfg.sampling_freq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
@@ -99,6 +103,7 @@ class ShearLevel3:
             Pf=Pf,
             freq=freq,
             platform_speed=platform_speed,
+            section_marker=None,
             cfg=level2.cfg,
         )
 
@@ -111,7 +116,10 @@ class ShearLevel3:
         return cls(
             Pk=ds["SH_SPEC"].values,
             k=ds["KCYC"].values,
+            Pf=None,
+            freq=None,
             platform_speed=ds["PSPD_REL"].values,
+            section_marker=None,
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -120,8 +128,12 @@ class ShearLevel3:
             {
                 "k": (["time_slow", "wavenumber"], self.k),
                 "Pk": (["nshear", "time_slow", "wavenumber"], self.Pk),
-                "Pf": (["nshear", "time_slow", "wavenumber"], self.Pf),
-                "freq": (["wavenumber"], self.freq),
+                "Pf": (
+                    (["nshear", "time_slow", "wavenumber"], self.Pf)
+                    if self.Pf is not None
+                    else None
+                ),
+                "freq": (["wavenumber"], self.freq) if self.freq is not None else None,
                 "platform_speed": (["time_slow"], self.platform_speed),
             }
         )
@@ -149,9 +161,9 @@ class ShearLevel4:
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
-        with xr.open_dataset(fname) as ds:
+        with xr.open_dataset(fname, group="L4_dissipation") as ds:
             return cls(
-                eps=ds["eps"].values,
+                eps=ds["EPSI"].values,
                 cfg=ShearConfig.from_atomix_netcdf(fname),
             )
 
@@ -163,3 +175,65 @@ class ShearLevel4:
                 # "eps_isrfit": (["nshear", "time_slow"], eps),
             }
         )
+
+
+class ShearProcessing:
+
+    def __init__(
+        self,
+        level1: ShearLevel1 | None,
+        level2: ShearLevel2 | None,
+        level3: ShearLevel3 | None,
+        level4: ShearLevel4 | None,
+    ):
+        self._level1 = level1
+        self._level2 = level2
+        self._level3 = level3
+        self._level4 = level4
+
+    @classmethod
+    def from_atomix_netcdf(
+        cls,
+        fname: str,
+        load_levels: tuple[Literal[1, 2, 3, 4], ...] = (1, 2, 3, 4),
+    ):
+        # TODO figure out what to do with segment_marker
+        _level1 = ShearLevel1.from_atomix_netcdf(fname) if 1 in load_levels else None
+        _level2 = ShearLevel2.from_atomix_netcdf(fname) if 2 in load_levels else None
+        _level3 = ShearLevel3.from_atomix_netcdf(fname) if 3 in load_levels else None
+        _level4 = ShearLevel4.from_atomix_netcdf(fname) if 4 in load_levels else None
+        return cls(_level1, _level2, _level3, _level4)
+
+    @property
+    def level1(self):
+        if self._level1 is None:
+            raise ValueError("Level 1 data not loaded")
+        return self._level1
+
+    @property
+    def level2(self):
+        if self._level2 is None:
+            self._level2 = ShearLevel2.from_level1(self.level1)
+        return self._level2
+
+    @property
+    def level3(self):
+        if self._level3 is None:
+            self._level3 = ShearLevel3.from_level2(self.level1, self.level2)
+        return self._level3
+
+    @property
+    def level4(self):
+        if self._level4 is None:
+            self._level4 = ShearLevel4.from_level3(self.level3)
+        return self._level4
+
+    @property
+    def cfg(self):
+        configs = [
+            l.cfg
+            for l in [self._level1, self._level2, self._level3, self._level4]
+            if l is not None
+        ]
+        assert all(cfg == configs[0] for cfg in configs), "Inconsistent configurations"
+        return configs[0]

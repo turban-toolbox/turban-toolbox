@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from turban.shear.level3 import spectra
+from turban.shear.level3 import power_spectrum
 from turban.util import average_fast_to_slow, reshape_overlap_index
 
 def test_spectra_arr_shape():
@@ -15,7 +15,7 @@ def test_spectra_arr_shape():
     chunklen = 3
     chunkoverlap = 2
 
-    y1, f = spectra(x, fft_length, sampling_freq, chunklen, chunkoverlap)
+    y1, f = power_spectrum(x, fft_length, sampling_freq, chunklen, chunkoverlap)
     # platform speed
     y2 = average_fast_to_slow(x, fft_length, chunklen, chunkoverlap)
 
