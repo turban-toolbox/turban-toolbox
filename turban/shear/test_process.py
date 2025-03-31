@@ -114,7 +114,27 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
 def test_baltic_benchmark():
     import xarray as xr
-    from turban.shear import ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4
+    from turban.shear import ShearProcessing, ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4
+
+    for load_levels in [(1, 2), (1, 2, 3)]:
+
+        p = ShearProcessing.from_atomix_netcdf(
+            "MSS_BalticSea/MSS_Baltic.nc", load_levels=load_levels
+        )
+        assert isinstance(p.level4.eps, np.ndarray)
+
+
+    p = ShearProcessing.from_atomix_netcdf(
+            "MSS_BalticSea/MSS_Baltic.nc", load_levels=(1,))
+        
+    level1 = p.level1
+    level2 = p.level2
+    level3 = p.level3
+    level4 = p.level4
+    assert isinstance(level1, ShearLevel1)
+    assert isinstance(level2, ShearLevel2)
+    assert isinstance(level3, ShearLevel3)
+    assert isinstance(level4, ShearLevel4)
 
     ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
     ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
@@ -128,75 +148,12 @@ def test_baltic_benchmark():
     )  # for consistency with turban level 3
     ds4 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L4_dissipation")
 
-    level1 = ShearLevel1.from_atomix_netcdf("MSS_BalticSea/MSS_Baltic.nc")
-    level2 = ShearLevel2.from_level1(level1, ds2.SECTION_NUMBER.values.astype(int))
-    level3 = ShearLevel3.from_level2(level2)
-    level4 = ShearLevel4.from_level3(level3)
     ds3_turban = level3.to_xarray()
     ds4_turban = level4.to_xarray()
 
     _plot_level3(ds3, ds3_turban)
     _plot_level4(ds4, ds4_turban)
 
-
-def _test_baltic_benchmark():
-    import xarray as xr
-
-    import numpy as np
-    import pandas as pd
-
-    from turban.shear.level2 import process_level2
-    from turban.shear.level3 import process_level3
-    from turban.shear.level4 import process_level4
-
-    ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
-    ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
-    ds3 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra").rename(
-        {
-            "N_SHEAR_SENSORS": "nshear",
-            "SH_SPEC": "Pk",
-            "KCYC": "k",
-            "WAVENUMBER": "wavenumber",
-        }
-    )  # for consistency with turban level 3
-    ds4 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L4_dissipation")
-
-    (idx,) = np.where(ds2.SECTION_NUMBER == 1)
-    level2 = process_level2(
-        shear=ds1.SHEAR.values,
-        section_select_idx=[idx.tolist()],
-        sampling_freq=1024.0,
-        fft_length=2048,
-    )
-
-    assert len(level2) == 1
-    shear_cleaned, is_despiked, n_iter = level2[0]
-
-    dt = ds2.TIME.diff("TIME").mean().values / pd.Timedelta(seconds=1)
-
-    fft_length = 2048
-
-    level3 = process_level3(
-        shear=ds2.SHEAR.values,
-        pspd=ds2.PSPD_REL.values,
-        fft_length=fft_length,
-        sampling_freq=1 / dt,
-        spatial_response_wavenum=50.0,
-        freq_highpass=0.15,
-        chunklen=5,
-        chunkoverlap=2,
-        ancillary={"PRES": ds1.PRES.values},
-    )
-
-    level4 = process_level4(
-        level3.Pk.values, level3.k.values, level3.platform_speed.values
-    )
-    level4["PRES"] = level3["PRES"]
-
-    _plot_level3(ds3, level3)
-    _plot_level4(ds4, level4)
-
-    # return ds1, ds2, ds3, ds4, level2, level3, level4
 
 
 def _plot_level3(ds3, level3):
