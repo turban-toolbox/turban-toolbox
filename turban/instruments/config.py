@@ -1,10 +1,9 @@
-from typing import List, Dict, Optional
 from pydantic import BaseModel
 
 
 class Sensor(BaseModel):
     name: str
-    coefficients: List[float]
+    coefficients: list[float]
     channel: int
     calibration_type: str
 
@@ -16,10 +15,10 @@ class ShearSensor(Sensor):
     calibration_date: str
 
 
-class Instrument(BaseModel):
+class InstrumentConfig(BaseModel):
     sampling_freq: float
-    sensors: Dict[str, Sensor]
+    sensors: dict[str, Sensor]
 
 
-class Dropsonde(Instrument):
+class DropsondeConfig(InstrumentConfig):
     pass

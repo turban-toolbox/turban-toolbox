@@ -7,47 +7,68 @@ from jaxtyping import Num
 from numpy import ndarray
 import pandas as pd
 
-from pydantic import BaseModel
 
 from turban.ctd import *
-from turban.shear.level1 import *
+from turban.instruments.config import InstrumentConfig
 from turban.temperature.temperature import *
 from turban.util import channel_mapping
 
-from turban.instruments.instrument import Dropsonde
-from turban.shear import ShearLevel1
-from turban.util import get_vsink
+from turban.instruments import Dropsonde
+from turban.shear import ShearLevel1, ShearProcessing
+from turban.shear.config import ShearConfig
+from turban.util import get_vsink, fft_grad
+from turban.instruments.mss.mss_mrd import mrd
+
 
 class MSS(Dropsonde):
 
-    def read_mrd(self, fname: str):
-        raise NotImplementedError
+    def __init__(self, cfg: InstrumentConfig | None = None):
+        """Allow neglecting InstrumentConfig for now."""
+        if cfg is not None:
+            super().__init__(cfg)
+        else:
 
-    def to_level1(self, pressure_raw, shear_raw, cfg: ShearConfig):
-        pspd, pressure_lp = get_vsink(pressure_raw, cfg.sampling_freq)
-        shear_phys = mss_shear_physical(pspd, shear_raw, self.sampling_freq)
+            class MockCfg:
+                sampling_freq = 1024.0
+
+            self.cfg = MockCfg()
+
+    def read_mrd(self, fname: Path | str) -> None:
+        self.mrd = mrd(str(fname))  # TODO make mrd uppercase (PEP8)
+
+    def to_shear_level1(
+        self, section_marker: Int[ndarray, "time"], cfg: ShearConfig
+    ) -> ShearLevel1:
+        pressure_raw = self.mrd.level0["PRESS"]
+        shear_raw = np.concatenate(
+            [
+                vals[newaxis]
+                for chname, vals in self.mrd.level0.items()
+                if chname.startswith("SHE")
+            ],
+            axis=0,
+        )
+        pspd, pressure_lp = get_vsink(pressure_raw, self.cfg.sampling_freq)
+        shear_phys = mss_shear_physical(pspd, shear_raw, self.cfg.sampling_freq)
         return ShearLevel1(
             pspd=pspd,
-            shear_phys=shear_phys,
+            shear=shear_phys,
+            section_marker=section_marker,
             cfg=cfg,
         )
 
-
-def convert_mrd_to_parquet(
-    mrd_fname: str,
-    parquet_fname: str | None = None,
-) -> Tuple[Int[ndarray, "time 16"], str]:
-    if parquet_fname is None:
-        parquet_fname = Path(mrd_fname).with_suffix(".pq")
-
-    raw = mx.read_mrd(mrd_fname)
-
-    raw = np.array(raw).copy()
-    pd.DataFrame(raw, columns=[f"{i:02d}" for i in range(1, 17)]).to_parquet(
-        parquet_fname
-    )
-
-    return raw, str(parquet_fname)
+    def to_shear_processing(
+        self,
+        section_marker: Int[ndarray, "time"],
+        cfg: ShearConfig,
+    ) -> ShearProcessing:
+        """Convert to shear processing pipeline."""
+        return ShearProcessing(
+            self.to_shear_level1(section_marker, cfg),
+            None,
+            None,
+            None,
+        )
 
 
 def level1(
@@ -83,6 +104,7 @@ def level1(
 
     return data
 
+
 def mss_shear_physical(
     vsink: Float[ndarray, "time"],
     shear_channels: Float[ndarray, "n_shear time"],
@@ -99,7 +121,7 @@ def mss_shear_physical(
     # convert from MSS "shear" (i.e. a velocity) to time derivative (units m/s/s)
     shear_channels_phys = []
     for i, sh in enumerate(shear_channels):
-        sh_phys = fft_grad(sh, 1 / sampling_freq) / vsink**2 / sea_water_density
+        sh_phys = fft_grad(sh, 1 / sampling_freq) / vsink**2 / 1025
         shear_channels_phys.append(sh_phys)
 
     return np.array(shear_channels_phys)
