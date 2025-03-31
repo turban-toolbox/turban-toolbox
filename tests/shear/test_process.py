@@ -2,9 +2,12 @@
 Test the entire processing pipeline
 """
 
-import os, sys
+import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+top_level = Path(__file__).resolve().parent.parent.parent
+
+sys.path.insert(0, str(top_level))
 
 import numpy as np
 import pandas as pd
@@ -14,7 +17,6 @@ import matplotlib.pyplot as plt
 from turban.shear.level2 import select_sections
 from turban.temperature.temperature import microtemp
 
-os.environ["RUST_BACKTRACE"] = "1"
 
 # raw, _ = convert_mrd_to_parquet(
 #     "/home/doppler/data/MSS/youngsound2015/raw/CAST1755.MRD",
@@ -114,19 +116,23 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
 def test_baltic_benchmark():
     import xarray as xr
-    from turban.shear import ShearProcessing, ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4
+    from turban.shear import (
+        ShearProcessing,
+        ShearLevel1,
+        ShearLevel2,
+        ShearLevel3,
+        ShearLevel4,
+    )
+
+    fname = str(top_level / "data" / "mss" / "MSS_Baltic.nc")
 
     for load_levels in [(1, 2), (1, 2, 3)]:
 
-        p = ShearProcessing.from_atomix_netcdf(
-            "MSS_BalticSea/MSS_Baltic.nc", load_levels=load_levels
-        )
+        p = ShearProcessing.from_atomix_netcdf(fname, load_levels=load_levels)
         assert isinstance(p.level4.eps, np.ndarray)
 
+    p = ShearProcessing.from_atomix_netcdf(fname, load_levels=(1,))
 
-    p = ShearProcessing.from_atomix_netcdf(
-            "MSS_BalticSea/MSS_Baltic.nc", load_levels=(1,))
-        
     level1 = p.level1
     level2 = p.level2
     level3 = p.level3
@@ -136,9 +142,9 @@ def test_baltic_benchmark():
     assert isinstance(level3, ShearLevel3)
     assert isinstance(level4, ShearLevel4)
 
-    ds1 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L1_converted")
-    ds2 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L2_cleaned")
-    ds3 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L3_spectra").rename(
+    ds1 = xr.load_dataset(fname, group="L1_converted")
+    ds2 = xr.load_dataset(fname, group="L2_cleaned")
+    ds3 = xr.load_dataset(fname, group="L3_spectra").rename(
         {
             "N_SHEAR_SENSORS": "nshear",
             "SH_SPEC": "Pk",
@@ -146,14 +152,13 @@ def test_baltic_benchmark():
             "WAVENUMBER": "wavenumber",
         }
     )  # for consistency with turban level 3
-    ds4 = xr.load_dataset("MSS_BalticSea/MSS_Baltic.nc", group="L4_dissipation")
+    ds4 = xr.load_dataset(fname, group="L4_dissipation")
 
     ds3_turban = level3.to_xarray()
     ds4_turban = level4.to_xarray()
 
     _plot_level3(ds3, ds3_turban)
     _plot_level4(ds4, ds4_turban)
-
 
 
 def _plot_level3(ds3, level3):
