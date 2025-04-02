@@ -2,14 +2,13 @@ import numpy as np
 
 from turban.util import butterfilt
 from jaxtyping import Float, Bool, Int
-from beartype.typing import Tuple, List
 from numpy import ndarray
 from turban.util import split_data
 
 
-data_and_bounds_type = List[
-    Tuple[
-        Tuple[
+data_and_bounds_type = list[
+    tuple[
+        tuple[
             None | float,  # minimum
             None | float,  # maximum
         ],
@@ -23,7 +22,7 @@ def process_level2(
     section_markers: Int[ndarray, "time"],
     sampling_freq: float,
     fft_length: int,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
 ]:
@@ -62,7 +61,7 @@ def process_level2(
 def select_sections(
     data_and_bounds: data_and_bounds_type,
     segment_min_len: int = None,
-) -> List[List[int]]:
+) -> list[list[int]]:
     """
     Select sections from a list of time series. Arguments are alternatingly
     data and tuples of (min, max) values
@@ -86,7 +85,7 @@ def select_sections(
     return sections
 
 
-def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> List[List[int]]:
+def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> list[list[int]]:
     """Separate a list of bools into contiguous chunks"""
     bools_as_ints = list(map(int, bools))
     sections = []
@@ -111,7 +110,7 @@ def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> List[List[int]]:
 
 
 def sections_to_marker(
-    sections: List[List[int]],
+    sections: list[list[int]],
     n: int,  # length of time series
 ) -> Int[ndarray, "time"]:
     """Convert a list of sections to a marker array.
@@ -176,7 +175,7 @@ def clean_shear(
     spike_replace_after: int = 512,
     spike_include_before: int = 10,
     spike_include_after: int = 20,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "time"],  # despiked shear
     Int[ndarray, "time"],  # number of despike iterations on each sample
 ]:
@@ -213,8 +212,6 @@ def clean_shear(
         )
 
     return sh, ctr
-
-
 
 
 from numba import jit, float64

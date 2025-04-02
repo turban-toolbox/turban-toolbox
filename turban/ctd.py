@@ -1,5 +1,3 @@
-from beartype.typing import Tuple
-
 import gsw
 import numpy as np
 from numpy import ndarray
@@ -14,7 +12,7 @@ def calc_ctd(
     P: Float[ndarray, "time"],
     lon: float,
     lat: float,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "time"],
     Float[ndarray, "time"],
     Float[ndarray, "time"],

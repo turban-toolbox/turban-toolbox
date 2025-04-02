@@ -1,6 +1,4 @@
-
 import numpy as np
-from beartype.typing import Tuple, List
 from jaxtyping import Float, Int
 from numpy import ndarray, newaxis
 from scipy.signal import butter, freqz, lfilter, lfiltic
@@ -19,13 +17,13 @@ q_b = 3.7
 def microtemp(
     temp_emph: Float[ndarray, "time_fast"],
     pspd: Float[ndarray, "time_fast"],
-    section_select_idx: List[List[int]],
+    section_select_idx: list[list[int]],
     sampling_freq: float,
     fft_length: int,
     chunklen: int = 5,
     chunkoverlap: int = 2,
     outfile: str | None = None,
-) -> Tuple[Float[ndarray, "... time_slow"], ...]:
+) -> tuple[Float[ndarray, "... time_slow"], ...]:
     """
     Process temperature microstructure.
 
@@ -93,7 +91,7 @@ def temperature_dissipation(
     fft_length: int,
     sampling_freq: float,
     wavenumber_limit_upper: float = 500.0,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "time_slow"],
@@ -226,7 +224,7 @@ def temperature_gradient_spectra(
     chunkoverlap: int,
     fft_length: int,
     sampling_freq: float,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "1 wavenumber"],
@@ -402,7 +400,7 @@ def flatten01(x: ndarray):
 
 
 def get_noise(
-    spectra: Float[ndarray, "time frequency"]
+    spectra: Float[ndarray, "time frequency"],
 ) -> Float[ndarray, "1 frequency"]:
     """
     Define noise as average of least intense 5% of spectra

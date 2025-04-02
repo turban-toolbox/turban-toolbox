@@ -1,5 +1,5 @@
 from logging import warning
-from typing import Literal, Tuple
+from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from .config import ShearConfig

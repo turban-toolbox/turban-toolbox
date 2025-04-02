@@ -1,5 +1,3 @@
-from beartype.typing import Tuple
-
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float
@@ -13,7 +11,7 @@ def process_level4(
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Float[ndarray, "nshear time"],  # eps_specint
     Float[ndarray, "nshear time"],  # eps_isrfit
@@ -134,7 +132,7 @@ def get_eps_second_estimate(
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Float[ndarray, "nshear time"],  # cutoff wavenumber
 ]:

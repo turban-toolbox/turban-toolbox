@@ -1,5 +1,3 @@
-from beartype.typing import Tuple
-
 from typing import Literal
 from numpy import ndarray, newaxis
 import numpy as np
@@ -17,7 +15,7 @@ def power_spectrum(
     diss_overlap: int | None = None,
     section_marker: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
-) -> Tuple[
+) -> tuple[
     Float[ndarray, "... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:
@@ -46,7 +44,7 @@ def cospectrum(
     section_marker: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
     window: Literal["hanning"] | None = "hanning",
-) -> Tuple[
+) -> tuple[
     Complex[ndarray, "... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:

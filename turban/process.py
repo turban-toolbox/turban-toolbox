@@ -1,7 +1,6 @@
 #!/bin/env python
 from pathlib import Path
 
-from beartype.typing import Dict, List
 from numpy import ndarray
 import xarray as xr
 import numpy as np
@@ -15,7 +14,7 @@ from turban.temperature.temperature import (
 
 
 def process(
-    data: Dict[str, Float[ndarray, "time"]],
+    data: dict[str, Float[ndarray, "time"]],
     sampling_freq: float,
     fft_length_microtemp: int,
     fft_length_shear: int,
@@ -26,16 +25,16 @@ def process(
     outfile: str | None = None,
     pspd_acceptable_minimum: float = 0.3,  # minimum acceptable platform speed
     level4_to_average: (
-        List[str] | None
+        list[str] | None
     ) = None,  # fields from `data` to aggregate into level4
     level4_to_gradient: (
-        List[str] | None
+        list[str] | None
     ) = None,  # fields from `data` to aggregate into level4
     microtemp_to_average: (
-        List[str] | None
+        list[str] | None
     ) = None,  # fields from `data` to aggregate into microtemp
     microtemp_to_gradient: (
-        List[str] | None
+        list[str] | None
     ) = None,  # fields from `data` to aggregate into microtemp
 ):
     if level4_to_average is None:

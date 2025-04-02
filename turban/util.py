@@ -4,10 +4,8 @@ from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
 from jaxtyping import Float, Int, Num
-from beartype.typing import Tuple
 from netCDF4 import Dataset
 import xarray as xr
-from typing import Dict
 
 
 def load(fname):
@@ -162,7 +160,7 @@ def fast_to_slow_reshape_index(
 def split_data(
     data: Num[ndarray, "... time"],
     section_markers: Int[ndarray, "... time"],
-) -> Dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
+) -> dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
     """Split array of data into segments based on section markers.
     section marker "0" is neglected and not included in the output."""
 
@@ -191,7 +189,7 @@ def fft_grad(
     return dxdt[..., :N].real
 
 
-def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: Tuple[int, ...]):
+def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: tuple[int, ...]):
     for _ in range(len(targetshape) - len(arr.shape)):
         arr = arr[np.newaxis, ...]
     return arr

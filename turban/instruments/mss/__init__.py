@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from beartype.typing import Dict
 
 import numpy as np
 from jaxtyping import Num
@@ -77,7 +76,7 @@ def level1(
     lon: float,
     lat: float,
     sampling_freq: float = 1024.0,
-) -> Dict[str, Num[ndarray, "time"]]:
+) -> dict[str, Num[ndarray, "time"]]:
     """
     Convert raw MSS data to physical units
     """

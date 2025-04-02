@@ -1,5 +1,3 @@
-from beartype.typing import Tuple, Dict
-
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
@@ -19,14 +17,14 @@ def process_level3(
     spatial_response_wavenum: float,
     freq_highpass: float,
     section_marker: Int[ndarray, "time_fast"],
-    ancillary: Dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
-) -> Tuple[
+    ancillary: dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
+) -> tuple[
     Float[ndarray, "time_slow k"],  # k
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pk
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pf
     Float[ndarray, "wavenumber"],  # freq
     Float[ndarray, "time_slow"],  # pspda
-    Dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
+    dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
 ]:
     ii = fast_to_slow_reshape_index(
         shear.shape[-1],
