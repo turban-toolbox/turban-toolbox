@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from attr import dataclass
 from turban.instruments.config import InstrumentConfig
 from turban.shear import ShearLevel1
 
