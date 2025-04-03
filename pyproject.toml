@@ -3,14 +3,32 @@ name = "turban-toolbox"
 dynamic = ["version"]
 description = "Turbulence Analysis Toolbox"
 authors = [
-	{name = "Achim Randelhoff", email = "ara@akvaplan.niva.no"},
-	{name = "Peter Holtermann", email = "peter.holtermann@io-warnemuende.de"},
+    { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
+    { name = "Peter Holtermann", email = "peter.holtermann@io-warnemuende.de" },
 ]
-license = {text = "GPLv03"}
-dependencies = ['numpy']
+license = { text = "GPLv03" }
+dependencies = [
+    'beartype',
+    'datashader',
+    'gsw',
+    'hvplot',
+    'jaxtyping',
+    'matplotlib',
+    'netCDF4',
+    'numba',
+    'numpy',
+    'pandas',
+    'panel',
+    'pydantic',
+    'pytest-cov',
+    'pytest',
+    'scipy',
+    'setuptools',
+    'xarray',
+]
 requires-python = ">=3.9"
 readme = "README.md"
-classifiers=[
+classifiers = [
 	'Development Status :: 4 - Beta',
         'Topic :: Scientific/Engineering',          
         'Intended Audience :: Science/Research',
@@ -23,9 +41,7 @@ classifiers=[
 
 
 [build-system]
-requires = [
-    "setuptools",
-]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
