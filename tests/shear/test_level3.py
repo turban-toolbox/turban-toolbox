@@ -11,13 +11,14 @@ def test_spectra_arr_shape():
     x = np.repeat(np.arange(N).astype(float)[np.newaxis, ...], 3, axis=0)
     assert x.shape == (3, N)
     fft_length = 6
+    fft_overlap = 3
     sampling_freq = 1.0
     chunklen = 3
     chunkoverlap = 2
 
-    y1, f = power_spectrum(x, fft_length, sampling_freq, chunklen, chunkoverlap)
+    y1, f = power_spectrum(x, sampling_freq, fft_length, fft_overlap, chunklen, chunkoverlap)
     # platform speed
-    y2 = average_fast_to_slow(x, fft_length, chunklen, chunkoverlap)
+    y2 = average_fast_to_slow(x, fft_length, fft_overlap, chunklen, chunkoverlap)
 
     assert f.shape == (fft_length / 2 + 1,), "Wrong number of frequencies"
     assert y1.shape[:2] == y2.shape

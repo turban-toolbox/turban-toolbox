@@ -1,6 +1,5 @@
-import pytest
 import numpy as np
-from .level2 import (
+from turban.shear.level2 import (
     boolarr_to_sections,
     sections_to_marker,
     detect_shear_spikes,

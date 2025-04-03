@@ -1,5 +1,6 @@
 from turban.shear.config import ShearConfig
+from tests.fixtures import atomix_nc_filename
 
 
-def test_config():
-    cfg = ShearConfig.from_atomix_netcdf("MSS_BalticSea/MSS_Baltic.nc")
+def test_config(atomix_nc_filename):
+    cfg = ShearConfig.from_atomix_netcdf(atomix_nc_filename)

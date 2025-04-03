@@ -104,6 +104,6 @@ def test_average_fast_to_slow():
     assert x.shape == (3, 10)
     # half-overlapping intervals of length 4: 4 intervals
     # then averaged over intervals of length 3 with overlap 1: 2
-    y = average_fast_to_slow(x, 4, 3, 2)
+    y = average_fast_to_slow(x, 4, 2, 6, 2)
     assert y.shape == (3, 2)
 

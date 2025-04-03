@@ -2,20 +2,13 @@
 Test the entire processing pipeline
 """
 
-import sys
-from pathlib import Path
-
-top_level = Path(__file__).resolve().parent.parent.parent
-
-sys.path.insert(0, str(top_level))
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from turban.shear.level2 import select_sections
-from turban.temperature.temperature import microtemp
+from tests.fixtures import atomix_nc_filename
 
 
 # raw, _ = convert_mrd_to_parquet(
@@ -36,63 +29,6 @@ from turban.temperature.temperature import microtemp
 # pspda = np.nanmedian(data["pspd"])
 
 
-def _load_0030():
-    ds = xr.open_dataset(
-        "/home/doppler/instruments/MSS/data/cast0030.nc", group="L2_cleaned"
-    ).isel(TIME=slice(30000, 200_000))
-    pspd = ds.PSPD_REL.values
-    secno = ds.SECTION_NUMBER
-    ds = xr.open_dataset(
-        "/home/doppler/instruments/MSS/data/cast0030.nc", group="L1_converted"
-    ).isel(TIME=slice(30000, 200_000))
-    dTdt = ds.GRADT.isel(N_GRADT_SENSORS=0).values * pspd
-    temp = ds.TEMP.isel(N_TEMP_SENSORS=0).values
-
-
-def _test_temp():
-    sampling_freq = 1024.0
-    pspd, pressure_lp = get_vsink(data["PRESSURE"], sampling_freq)
-    pspda = np.nanmedian(pspd)
-    section_select_criteria = [
-        ((5.0, None), pressure_lp),
-        ((0.9 * pspda, 1.1 * pspda), pspd),
-    ]
-
-    section_select_idx = select_sections(section_select_criteria)
-
-    microtemp(
-        data["TEMP_EMPH"],
-        pspd,
-        section_select_idx,
-        sampling_freq=sampling_freq,
-        fft_length=2048,
-        chunklen=5,
-        chunkoverlap=2,
-    )
-
-
-def _test_shear():
-
-    section_select_criteria = [
-        ((5.0, None), data["pressure_lp"]),
-        ((0.9 * pspda, 1.1 * pspda), data["pspd"]),
-        ((-20.0, 20.0), data["pitch"]),
-        ((-20.0, 20.0), data["roll"]),
-    ]
-
-    section_select_idx = select_sections(
-        section_select_criteria, segment_min_len=2048 * 3
-    )
-
-    wavenumber, spectra, epsilon = shear(
-        np.array([data[k] for k in ["SHEAR_1", "SHEAR_2"]]),
-        data["pspd"],
-        section_select_idx,
-        fft_length=2048,
-        sampling_freq=1024.0,
-        chunklen=5,
-        chunkoverlap=2,
-    )
 
 
 def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
@@ -114,7 +50,7 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
     return im
 
 
-def test_baltic_benchmark():
+def test_baltic_benchmark(atomix_nc_filename):
     import xarray as xr
     from turban.shear import (
         ShearProcessing,
@@ -124,14 +60,12 @@ def test_baltic_benchmark():
         ShearLevel4,
     )
 
-    fname = str(top_level / "data" / "mss" / "MSS_Baltic.nc")
-
     for load_levels in [(1, 2), (1, 2, 3)]:
 
-        p = ShearProcessing.from_atomix_netcdf(fname, load_levels=load_levels)
+        p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=load_levels)
         assert isinstance(p.level4.eps, np.ndarray)
 
-    p = ShearProcessing.from_atomix_netcdf(fname, load_levels=(1,))
+    p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=(1,))
 
     level1 = p.level1
     level2 = p.level2
@@ -142,9 +76,9 @@ def test_baltic_benchmark():
     assert isinstance(level3, ShearLevel3)
     assert isinstance(level4, ShearLevel4)
 
-    ds1 = xr.load_dataset(fname, group="L1_converted")
-    ds2 = xr.load_dataset(fname, group="L2_cleaned")
-    ds3 = xr.load_dataset(fname, group="L3_spectra").rename(
+    ds1 = xr.load_dataset(atomix_nc_filename, group="L1_converted")
+    ds2 = xr.load_dataset(atomix_nc_filename, group="L2_cleaned")
+    ds3 = xr.load_dataset(atomix_nc_filename, group="L3_spectra").rename(
         {
             "N_SHEAR_SENSORS": "nshear",
             "SH_SPEC": "Pk",
@@ -152,7 +86,7 @@ def test_baltic_benchmark():
             "WAVENUMBER": "wavenumber",
         }
     )  # for consistency with turban level 3
-    ds4 = xr.load_dataset(fname, group="L4_dissipation")
+    ds4 = xr.load_dataset(atomix_nc_filename, group="L4_dissipation")
 
     ds3_turban = level3.to_xarray()
     ds4_turban = level4.to_xarray()
