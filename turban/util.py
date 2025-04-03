@@ -110,7 +110,7 @@ def average_fast_to_slow(
     """
     if reshape_index is None:
         reshape_index = fast_to_slow_reshape_index(
-            shear.shape[-1],
+            x.shape[-1],
             fft_length,
             fft_overlap,
             diss_length,
