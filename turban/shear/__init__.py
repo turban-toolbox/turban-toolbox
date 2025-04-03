@@ -3,7 +3,7 @@ from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from .config import ShearConfig
-from numpy import NaN, ndarray
+from numpy import nan, ndarray
 import numpy as np
 import xarray as xr
 

@@ -95,8 +95,8 @@ class mrd():
             self.meta['basename'] = ''
             self.meta['cast'] = ''
             self.meta['date'] = datetime.datetime(1970,1,1)
-            self.meta['lon'] = np.NaN
-            self.meta['lat'] = np.NaN
+            self.meta['lon'] = np.nan
+            self.meta['lat'] = np.nan
 
             self.logger.debug('No filename given')
             # If the configuration has a key called "header", lets parse it
@@ -122,7 +122,7 @@ class mrd():
             try:
                 cast = int(os.path.splitext(self.basename)[0][-4:])
             except:
-                cast = numpy.NaN
+                cast = numpy.nan
 
             self.file_type = ''
             self.channels = []
@@ -132,8 +132,8 @@ class mrd():
             self.meta['basename'] = basename
             self.meta['cast']     = cast
             self.meta['date']     = None
-            self.meta['lon']      = np.NaN
-            self.meta['lat']      = np.NaN
+            self.meta['lon']      = np.nan
+            self.meta['lat']      = np.nan
 
             # Opening file for reading and calculating sha1
             try:
@@ -357,7 +357,7 @@ class mrd():
 
             shear = np.asarray(shear)
             level1['SHEAR'] = shear.T
-            shear[np.isinf(shear)] = np.NaN
+            shear[np.isinf(shear)] = np.nan
 
             return [level1,level1_units]
 
@@ -381,7 +381,7 @@ class mrd():
         Ntot = np.shape(level1['SHEAR'])[0]  # Number of shear sensorslen(shear)  # The total length
         level2 = {}
         level2['TIME'] = level1['TIME'].copy()
-        level2['SHEAR'] = level1['SHEAR'] * np.NaN
+        level2['SHEAR'] = level1['SHEAR'] * np.nan
 
         if FLAG_interpolate_NAN:
             t = np.arange(0, Ntot) # Fake time axis
@@ -390,14 +390,14 @@ class mrd():
                 self.logger.debug(funcname + 'Interpolating {:s}'.format(var))
                 #print('Hallo', level1)
                 #print('Hallo', level1[var])
-                nnan = sum(np.isnan(level1[var])) # Count number of NaNs
+                nnan = sum(np.isnan(level1[var])) # Count number of nans
                 if nnan:
-                    logger.debug('Interpolating NaN {:d} pspd_rel'.format(nnan))
+                    logger.debug('Interpolating nan {:d} pspd_rel'.format(nnan))
                     igood = ~np.isnan(level1[var])
                     if sum(igood) > (RATIO_BADDATA * Ntot):
                         level2[var] = np.interp(t, t[igood], level1[var][igood])
                     else:
-                        level2[var] = level1[var] * np.NaN
+                        level2[var] = level1[var] * np.nan
                         logger.debug(funcname + 'Will stop processing, bad data exceeds limit')
                         FLAG_BADDATA_EXCEEDED = True
                 else:
@@ -408,7 +408,7 @@ class mrd():
                 nnanshear = sum(np.isnan(level1['SHEAR'][:, i]))
                 if nnanshear:
                     print('Interpolating')
-                    logger.debug('Interpolating NaN {:d} of {:d} SHEAR #{:d}'.format(nnanshear, Ntot, i))
+                    logger.debug('Interpolating nan {:d} of {:d} SHEAR #{:d}'.format(nnanshear, Ntot, i))
                     igood = ~np.isnan(level1['SHEAR'][:, i])
                     if sum(igood) > (RATIO_BADDATA * Ntot):
                         level2['SHEAR'][:, i] = np.interp(t, t[igood], level1['SHEAR'][igood, i])
@@ -448,7 +448,7 @@ class mrd():
         #dshdt_desp = dshdt
 
         vsink_tmp = vsink.copy()
-        vsink_tmp[vsink_tmp == 0] = np.NaN
+        vsink_tmp[vsink_tmp == 0] = np.nan
 
         shear      = dshdt_desp * (density **(-1)) * (vsink_tmp**(-2))
         return shear
@@ -724,7 +724,7 @@ class mrd():
             return None
 
         # Create matrix for converted data
-        #data = numpy.zeros(numpy.shape(rawdatac)) * numpy.NaN
+        #data = numpy.zeros(numpy.shape(rawdatac)) * numpy.nan
         data = {}
         data_units = {}
         nchannels = numpy.shape(rawdatac)[1]
