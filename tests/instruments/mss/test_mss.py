@@ -1,19 +1,12 @@
-import sys
-from pathlib import Path
 import numpy as np
-
-top_level = Path(__file__).resolve().parent.parent.parent.parent
-
-sys.path.insert(0, str(top_level))
-
+from tests.fixtures import mss_mrd_filename
 from turban.instruments.mss import MSS
 from turban.shear import ShearConfig
 
-
-def test_mss():
+def test_mss(mss_mrd_filename):
     mss = MSS()
 
-    mss.read_mrd(top_level / "data" / "mss" / "Nien0020.MRD")
+    mss.read_mrd(mss_mrd_filename)
 
     shear_config = ShearConfig(
         sampling_freq=mss.cfg.sampling_freq,
