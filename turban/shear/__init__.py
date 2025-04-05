@@ -138,6 +138,33 @@ class ShearLevel3:
             }
         )
 
+    @property
+    def number_fft_windows_per_spectrum(self):
+        """N_f in the ATOMIX paper"""
+        return self.cfg.diss_length // self.cfg.fft_length
+
+    @property
+    def number_signals_vibration_removal(self):
+        """N_V in the ATOMIX paper"""
+        warning.warn('Not implemented')
+        return 0
+
+    @property
+    def log_psi_variance(self):
+        """sigma^2_{ln\Psi} in the ATOMIX paper"""
+        return (
+            5 / 4 * (self.number_fft_windows_per_spectrum - self.number_sig) ** (-7 / 9)
+        )
+
+    @property
+    def Pk_confidence_interval(self):
+        """95% confidence interval of power spectrum.
+        Eq. 23 in the ATOMIX paper"""
+        return (
+            self.Pk * np.exp(1.96 * self.log_psi_variance),
+            self.Pk * np.exp(-1.96 * self.log_psi_variance),
+            )
+
 
 @dataclass
 class ShearLevel4:
