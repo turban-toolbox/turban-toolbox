@@ -139,11 +139,6 @@ class ShearLevel3:
         )
 
     @property
-    def number_fft_windows_per_spectrum(self):
-        """N_f in the ATOMIX paper"""
-        return self.cfg.diss_length // self.cfg.fft_length
-
-    @property
     def number_signals_vibration_removal(self):
         """N_V in the ATOMIX paper"""
         warning.warn('Not implemented')
@@ -153,7 +148,7 @@ class ShearLevel3:
     def log_psi_variance(self):
         """sigma^2_{ln\Psi} in the ATOMIX paper"""
         return (
-            5 / 4 * (self.number_fft_windows_per_spectrum - self.number_sig) ** (-7 / 9)
+            5 / 4 * (self.cfg.number_fft_windows_per_spectrum - self.number_signals_vibration_removal) ** (-7 / 9)
         )
 
     @property

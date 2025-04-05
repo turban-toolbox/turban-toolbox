@@ -24,3 +24,8 @@ class SegmentConfig(BaseModel):
     def from_atomix_netcdf(cls, fname):
         kwarg = cls._attrs_from_atomix_netcdf(fname)
         return cls(**kwarg)
+
+    @property
+    def number_fft_windows_per_spectrum(self):
+        """N_f in the ATOMIX paper"""
+        return self.diss_length // self.fft_length
