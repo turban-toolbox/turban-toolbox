@@ -59,14 +59,12 @@ def inertial_range_fit(
 
     The default value for A corresponds to Kolomgorov's constant for 1-dimensional
     spectra C1=0.53.
-
-    TODO: find upper limit of inertial subrange (function of k_kolmogorov?)
     """
     ln_epsilon = 1.5 * (
         np.log(psi) - np.log(a_kolmogorov) - np.log(wavenumber[newaxis, ...]) / 3
     )
 
-    ln_epsilon_fitrange = np.where(wavenumber[newaxis, ...] < 3, ln_epsilon, np.nan)
+    ln_epsilon_fitrange = np.where(wavenumber[newaxis, ...] < 0.01*k_kolmogorov, ln_epsilon, np.nan,)
     return np.exp(np.nanmean(ln_epsilon_fitrange, axis=2))
 
 
