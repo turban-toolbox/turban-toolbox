@@ -4,6 +4,7 @@ from jaxtyping import Float
 
 from turban.util import integrate
 
+
 def process_level4(
     psi: Float[ndarray, "nshear time wavenumber"],
     wavenumber: Float[ndarray, "time wavenumber"],
@@ -64,7 +65,11 @@ def inertial_range_fit(
         np.log(psi) - np.log(a_kolmogorov) - np.log(wavenumber[newaxis, ...]) / 3
     )
 
-    ln_epsilon_fitrange = np.where(wavenumber[newaxis, ...] < 0.01*k_kolmogorov, ln_epsilon, np.nan,)
+    ln_epsilon_fitrange = np.where(
+        wavenumber[newaxis, ...] < 0.01 * k_kolmogorov,
+        ln_epsilon,
+        np.nan,
+    )
     return np.exp(np.nanmean(ln_epsilon_fitrange, axis=2))
 
 

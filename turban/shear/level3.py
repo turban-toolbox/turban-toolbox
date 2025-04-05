@@ -76,8 +76,6 @@ def process_level3(
     return k, Pk, Pf, freq, pspda, ancillary_out
 
 
-
-
 def apply_compensation_spatial_response(
     x: Float[ndarray, "n_shear time_slow k"],
     k: Float[ndarray, "time_slow k"],
