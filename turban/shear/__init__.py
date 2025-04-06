@@ -3,7 +3,7 @@ from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from .config import ShearConfig
-from numpy import nan, ndarray
+from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
@@ -14,9 +14,9 @@ from turban.shear.level4 import process_level4
 
 @dataclass
 class ShearLevel1:
-    pspd: Float[ndarray, "time"]
-    shear: Float[ndarray, "n_shear time"]
-    section_marker: Int[ndarray, "time"] | None
+    pspd: Float[ndarray, "time"] # type: ignore
+    shear: Float[ndarray, "n_shear time"]  # type: ignore
+    section_marker: Int[ndarray, "time"] | None # type: ignore
     cfg: ShearConfig
 
     @classmethod
@@ -33,9 +33,9 @@ class ShearLevel1:
 
 @dataclass
 class ShearLevel2:
-    shear: Float[ndarray, "n_shear time"]
-    pspd: Float[ndarray, "time"]
-    n_despiked: Int[ndarray, "n_shear time"] | None
+    shear: Float[ndarray, "n_shear time"] # type: ignore
+    pspd: Float[ndarray, "time"] # type: ignore
+    n_despiked: Int[ndarray, "n_shear time"] | None # type: ignore
     cfg: ShearConfig
 
     @classmethod
@@ -70,12 +70,12 @@ class ShearLevel2:
 
 @dataclass
 class ShearLevel3:
-    Pk: Float[ndarray, "nshear time wavenumber"]
-    k: Float[ndarray, "time wavenumber"]
-    Pf: Float[ndarray, "nshear time wavenumber"] | None
-    freq: Float[ndarray, "wavenumber"] | None
-    platform_speed: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"] | None
+    Pk: Float[ndarray, "nshear time wavenumber"] # type: ignore
+    k: Float[ndarray, "time wavenumber"] # type: ignore
+    Pf: Float[ndarray, "nshear time wavenumber"] | None # type: ignore
+    freq: Float[ndarray, "wavenumber"] | None # type: ignore
+    platform_speed: Float[ndarray, "time"] # type: ignore
+    section_marker: Int[ndarray, "time"] | None # type: ignore
     cfg: ShearConfig
 
     @classmethod
@@ -173,7 +173,7 @@ class ShearLevel3:
         return tau_eps * self.platform_speed
 
 @dataclass
-class ShearLevel4(HasLevelBelow):
+class ShearLevel4:
     eps: Float[ndarray, "nshear time"] # type: ignore
     visc_mol: Float[ndarray, "time"] # type: ignore
     resolved_var_frac: Float[ndarray, "nshear time"] # V_fin ATOMIX paper # type: ignore
