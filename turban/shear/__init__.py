@@ -158,19 +158,25 @@ class ShearLevel3:
         )
 
     @property
-    def Pk_confidence_interval(self):
+    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]: # type: ignore
         """95% confidence interval of power spectrum.
         Eq. 23 in the ATOMIX paper"""
-        return (
-            self.Pk * np.exp(1.96 * self.log_psi_variance),
-            self.Pk * np.exp(-1.96 * self.log_psi_variance),
-        )
+        return np.concatenate((
+            self.Pk * np.exp(1.96 * self.log_psi_variance)[newaxis, ...],
+            self.Pk * np.exp(-1.96 * self.log_psi_variance)[newaxis, ...],
+        ), axis=0)
 
+    @property
+    def data_length(self) -> Float[ndarray, "time"]: # type: ignore
+        """l_\epsilon in ATOMIX paper"""
+        tau_eps = self.cfg.sampling_freq
+        return tau_eps * self.platform_speed
 
 @dataclass
-class ShearLevel4:
-    eps: Float[ndarray, "nshear time"]
-    cfg: ShearConfig
+class ShearLevel4(HasLevelBelow):
+    eps: Float[ndarray, "nshear time"] # type: ignore
+    visc_mol: Float[ndarray, "time"] # type: ignore
+    resolved_var_frac: Float[ndarray, "nshear time"] # V_fin ATOMIX paper # type: ignore
 
     @classmethod
     def from_level3(
@@ -191,7 +197,7 @@ class ShearLevel4:
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
             return cls(
-                eps=ds["EPSI"].values,
+                eps=ds["EPSI"].values ,
                 cfg=ShearConfig.from_atomix_netcdf(fname),
             )
 
@@ -204,6 +210,21 @@ class ShearLevel4:
             }
         )
 
+    @property
+    def kolmogorov_length(self) -> Float[ndarray, "nshear time"]: # type: ignore
+        """L_K in ATOMIX paper"""
+        return (self.visc_mol[newaxis, :]**3 / self.eps) ** 0.25
+
+    @property
+    def log_diss_var(self) -> Float[ndarray, "nshear time"]: # type: ignore
+        """Eq. 29 in ATOMIX paper"""
+        resolved_var_frac = None
+        data_length_nondim = self.level3.data_length[newaxis, :] / self.kolmogorov_length * resolved_var_frac**0.75
+        return 5.5/(1+(data_length_nondim/4)**(7/9))
+
+    @property
+    def diss_confidence_interval(self):
+        self.eps
 
 class ShearProcessing:
 
