@@ -224,7 +224,10 @@ class ShearLevel4:
 
     @property
     def diss_confidence_interval(self):
-        self.eps
+        return np.concatenate((
+            self.eps * np.exp(1.96 * self.log_diss_var)[newaxis, :],
+            self.eps * np.exp(-1.96 * self.log_diss_var)[newaxis, :],
+        ), axis=0)
 
 class ShearProcessing:
 
