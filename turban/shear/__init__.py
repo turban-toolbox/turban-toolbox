@@ -172,34 +172,51 @@ class ShearLevel3:
     @property
     def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
-        tau_eps = self.cfg.sampling_freq
+        tau_eps = self.cfg.diss_length / self.cfg.sampling_freq
         return tau_eps * self.platform_speed
 
 
 @dataclass
 class ShearLevel4:
     eps: Float[ndarray, "nshear time"]
-    visc_mol: Float[ndarray, "time"]
+    eps_source_flag: Int[ndarray, "nshear time"]
+    log_diss_var: Float[ndarray, "nshear time"]
+    kolm_length: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_fin ATOMIX paper
+    num_spec_points: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def from_level3(
         cls,
         level3: ShearLevel3,
     ) -> "ShearLevel4":
-        eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac = (
-            process_level4(
-                psi=level3.Pk,
-                wavenumber=level3.k,
-                platform_speed=level3.platform_speed,
-                waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
-                freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
-                freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
-                data_length=level3.data_length,
-                log_psi_var=level3.log_psi_var,
-            )
+        (
+            eps,
+            eps_source_flag,
+            log_diss_var,
+            kolm_length,
+            resolved_var_frac,
+            num_spec_points,
+        ) = process_level4(
+            psi=level3.Pk,
+            wavenumber=level3.k,
+            platform_speed=level3.platform_speed,
+            waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
+            freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
+            freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+            data_length=level3.data_length,
+            log_psi_var=level3.log_psi_var,
         )
-        return cls(eps=eps, cfg=level3.cfg)
+        return cls(
+            eps=eps,
+            eps_source_flag=eps_source_flag,
+            log_diss_var=log_diss_var,
+            kolm_length=kolm_length,
+            resolved_var_frac=resolved_var_frac,
+            num_spec_points=num_spec_points,
+            cfg=level3.cfg,
+        )
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":

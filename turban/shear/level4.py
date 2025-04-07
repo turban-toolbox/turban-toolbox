@@ -1,3 +1,4 @@
+from multiprocessing import Value
 from unicodedata import numeric
 from numpy import ndarray, newaxis
 import numpy as np
@@ -18,13 +19,17 @@ def process_level4(
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Int[ndarray, "nshear time"],  # eps_source_flag. 1: spec_int, 2: isr_fit
+    Float[ndarray, "nshear time"],  # log(eps) variance
+    Float[ndarray, "nshear time"],  # kolmogorov length as per Eq. 29
+    Float[ndarray, "nshear time"],  # resolved fraction of shear variance
+    Int[ndarray, "nshear time"],  # number of spectral points
 ]:
     """
     Produce epsilon estimates from shear power spectra.
     """
     eps_crit = 1e-5
     # nu = get_seawater_viscosity(999.)
-    visc_mol = np.array(1.6e-6)[newaxis]
+    visc_mol = np.array(1.6e-6)[newaxis] # TODO: get from temperature (aggregate in level3)
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
@@ -61,16 +66,16 @@ def process_level4(
         log_psi_var,
     )
 
-    return eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac
+    return eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac, num_spec_points
 
 
 def dissipation_qc_metrics(
     eps: Float[ndarray, "nshear time"],
-    eps_source_flag: Float[ndarray, "nshear time"],
-    visc_mol: Float[ndarray, "nshear time"],
+    eps_source_flag: Int[ndarray, "nshear time"],
+    visc_mol: Float[ndarray, "time"],
     data_length: Float[ndarray, "time"],
     resolved_var_frac: Float[ndarray, "nshear time"],
-    num_spec_points: Float[ndarray, "time"],
+    num_spec_points: Int[ndarray, "nshear time"],
     log_psi_var: float,
 ) -> tuple[
     Float[ndarray, "nshear time"], # log(eps) variance
@@ -99,7 +104,7 @@ def inertial_range_fit(
     a_kolmogorov: float = 8.19,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # epsilon
-    Float[ndarray, "nshear time"],  # number of spectral points used, N_s
+    Int[ndarray, "nshear time"],  # number of spectral points used, N_s
 ]:
     """
     See Eq. 28. This assumes a known Kolmogorov constant, as opposed to linear
@@ -113,7 +118,7 @@ def inertial_range_fit(
     )
 
     ln_epsilon_fitrange = np.where(
-        wavenumber[newaxis, ...] < 0.01 * k_kolmogorov,
+        wavenumber[newaxis, ...] < 0.01 * k_kolmogorov[:, :, newaxis],
         ln_epsilon,
         np.nan,
     )
@@ -154,10 +159,11 @@ def spectrum_integration(
     eps_previous = eps2
     while np.any(eps_increase > 1.01):
         eps_previous = eps
+        # raise ValueError (waveno_cutoff.shape)
         eps /= get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
         eps_increase = eps / eps_previous
 
-    # resolved_var_frac = get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
+    resolved_var_frac = get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
     return eps, resolved_var_frac
 
 
@@ -218,11 +224,11 @@ def get_eps_second_estimate(
 
 
 def get_spectral_variance_resolved_fraction(
-    waveno: Float[ndarray, "time"],
+    waveno: Float[ndarray, "nshear time"],
     eps: Float[ndarray, "nshear time"],
     nu: Float[ndarray, "time"],
 ) -> Float[ndarray, "nshear time"]:
     # Eq. 11; I_L (3rd model)
     length_kolmogorov = np.sqrt(nu[newaxis, :] ** 3 / eps)
-    k43 = (waveno[newaxis, :] * length_kolmogorov) ** (4.0 / 3.0)
+    k43 = (waveno * length_kolmogorov) ** (4.0 / 3.0)
     return np.tanh(65.5 * k43) - 9.0 * k43 * np.exp((-54.5 * k43))
