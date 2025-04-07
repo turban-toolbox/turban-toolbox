@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from netCDF4 import Dataset
+import numpy as np
 
 
 class SegmentConfig(BaseModel):
@@ -32,7 +33,7 @@ class SegmentConfig(BaseModel):
         """N_f in the ATOMIX paper"""
         fft_segment_start = np.arange(
             0,
-            fft.diss_length - self.fft_length + 1,
+            self.diss_length - self.fft_length + 1,
             self.fft_length - self.fft_overlap,
-        )  # start of each fft)segment within spectrum segment
+        )  # start of each fft segment within a spectrum segment
         return len(fft_segment_start)

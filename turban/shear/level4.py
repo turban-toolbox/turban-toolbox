@@ -1,6 +1,7 @@
+from unicodedata import numeric
 from numpy import ndarray, newaxis
 import numpy as np
-from jaxtyping import Float
+from jaxtyping import Float, Int
 
 from turban.util import integrate
 
@@ -12,40 +13,83 @@ def process_level4(
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
+    data_length: Float[ndarray, "time"],
+    log_psi_var: float
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
-    Float[ndarray, "nshear time"],  # eps_specint
-    Float[ndarray, "nshear time"],  # eps_isrfit
+    Int[ndarray, "nshear time"],  # eps_source_flag. 1: spec_int, 2: isr_fit
 ]:
     """
     Produce epsilon estimates from shear power spectra.
     """
+    eps_crit = 1e-5
     # nu = get_seawater_viscosity(999.)
-    nu = np.array(1.6e-6)[newaxis]
+    visc_mol = np.array(1.6e-6)[newaxis]
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
     # 1st estimate
-    eps1 = get_eps_first_estimate(psi, wavenumber, nu)
+    eps1 = get_eps_first_estimate(psi, wavenumber, visc_mol)
 
     # Inertial subrange integration
-    eps_specint = spectrum_integration(
+    eps_specint, resolved_var_frac = spectrum_integration(
         psi,
         wavenumber,
         eps1,
-        nu,
+        visc_mol,
         platform_speed,
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
     )
 
-    k_kolmogorov = (eps1 / nu**3) ** 0.25
-    eps_isrfit = inertial_range_fit(psi, wavenumber, k_kolmogorov)
+    k_kolmogorov = (eps1 / visc_mol**3) ** 0.25
+    eps_isrfit, num_spec_points = inertial_range_fit(
+        psi, wavenumber, k_kolmogorov
+    )
 
-    eps = np.where(eps1 < 1e-5, eps_specint, eps_isrfit)
+    eps = np.where(eps1 < eps_crit, eps_specint, eps_isrfit)
+    eps_source_flag = np.where(eps1 < eps_crit, 1, 2)
 
-    return eps, eps_specint, eps_isrfit
+    log_diss_var, kolm_length = dissipation_qc_metrics(
+        eps,
+        eps_source_flag,
+        visc_mol,
+        data_length,
+        resolved_var_frac,
+        num_spec_points,
+        log_psi_var,
+    )
+
+    return eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac
+
+
+def dissipation_qc_metrics(
+    eps: Float[ndarray, "nshear time"],
+    eps_source_flag: Float[ndarray, "nshear time"],
+    visc_mol: Float[ndarray, "nshear time"],
+    data_length: Float[ndarray, "time"],
+    resolved_var_frac: Float[ndarray, "nshear time"],
+    num_spec_points: Float[ndarray, "time"],
+    log_psi_var: float,
+) -> tuple[
+    Float[ndarray, "nshear time"], # log(eps) variance
+    Float[ndarray, "nshear time"], # kolmogorov length
+]:
+
+    kolm_length = (visc_mol[newaxis, :] ** 3 / eps) ** 0.25
+    data_length_nondim = data_length[newaxis, :] / kolm_length * resolved_var_frac**0.75
+    log_diss_var_spec_int = 5.5 / (1 + (data_length_nondim / 4) ** (7 / 9))
+
+    log_diss_var_isr_fit = 1.5 * log_psi_var / np.sqrt(num_spec_points)
+
+    log_diss_var = np.where(
+        eps_source_flag == 1,
+        log_diss_var_spec_int,
+        log_diss_var_isr_fit,
+    )
+
+    return log_diss_var, kolm_length
 
 
 def inertial_range_fit(
@@ -53,7 +97,10 @@ def inertial_range_fit(
     wavenumber: Float[ndarray, "time wavenumber"],
     k_kolmogorov: Float[ndarray, "nshear time"],
     a_kolmogorov: float = 8.19,
-) -> Float[ndarray, "nshear time"]:
+) -> tuple[
+    Float[ndarray, "nshear time"],  # epsilon
+    Float[ndarray, "nshear time"],  # number of spectral points used, N_s
+]:
     """
     See Eq. 28. This assumes a known Kolmogorov constant, as opposed to linear
     regression to both slope and offset.
@@ -70,7 +117,9 @@ def inertial_range_fit(
         ln_epsilon,
         np.nan,
     )
-    return np.exp(np.nanmean(ln_epsilon_fitrange, axis=2))
+    eps = np.exp(np.nanmean(ln_epsilon_fitrange, axis=2))
+    number_spectral_points = np.isnan(ln_epsilon_fitrange).sum(axis=2)
+    return eps, number_spectral_points
 
 
 def spectrum_integration(
@@ -82,7 +131,10 @@ def spectrum_integration(
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
-):
+) -> tuple[
+    Float[ndarray, "nshear time"],
+    Float[ndarray, "nshear time"],
+]:
     # 2nd estimate
     (eps2, waveno_cutoff) = get_eps_second_estimate(
         psi,
@@ -105,7 +157,8 @@ def spectrum_integration(
         eps /= get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
         eps_increase = eps / eps_previous
 
-    return eps
+    # resolved_var_frac = get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
+    return eps, resolved_var_frac
 
 
 def get_eps_first_estimate(

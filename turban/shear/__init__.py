@@ -1,4 +1,4 @@
-from logging import warning
+from logging import warnings
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
@@ -14,9 +14,9 @@ from turban.shear.level4 import process_level4
 
 @dataclass
 class ShearLevel1:
-    pspd: Float[ndarray, "time"] # type: ignore
-    shear: Float[ndarray, "n_shear time"]  # type: ignore
-    section_marker: Int[ndarray, "time"] | None # type: ignore
+    pspd: Float[ndarray, "time"]
+    shear: Float[ndarray, "n_shear time"]
+    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
 
     @classmethod
@@ -33,9 +33,9 @@ class ShearLevel1:
 
 @dataclass
 class ShearLevel2:
-    shear: Float[ndarray, "n_shear time"] # type: ignore
-    pspd: Float[ndarray, "time"] # type: ignore
-    n_despiked: Int[ndarray, "n_shear time"] | None # type: ignore
+    shear: Float[ndarray, "n_shear time"]
+    pspd: Float[ndarray, "time"]
+    n_despiked: Int[ndarray, "n_shear time"] | None
     cfg: ShearConfig
 
     @classmethod
@@ -70,12 +70,12 @@ class ShearLevel2:
 
 @dataclass
 class ShearLevel3:
-    Pk: Float[ndarray, "nshear time wavenumber"] # type: ignore
-    k: Float[ndarray, "time wavenumber"] # type: ignore
-    Pf: Float[ndarray, "nshear time wavenumber"] | None # type: ignore
-    freq: Float[ndarray, "wavenumber"] | None # type: ignore
-    platform_speed: Float[ndarray, "time"] # type: ignore
-    section_marker: Int[ndarray, "time"] | None # type: ignore
+    Pk: Float[ndarray, "nshear time wavenumber"]
+    k: Float[ndarray, "time wavenumber"]
+    Pf: Float[ndarray, "nshear time wavenumber"] | None
+    freq: Float[ndarray, "wavenumber"] | None
+    platform_speed: Float[ndarray, "time"]
+    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
 
     @classmethod
@@ -141,11 +141,11 @@ class ShearLevel3:
     @property
     def number_signals_vibration_removal(self):
         """N_V in the ATOMIX paper"""
-        warning.warn("Not implemented")
+        warnings.warn("Not implemented")
         return 0
 
     @property
-    def log_psi_variance(self):
+    def log_psi_var(self):
         """sigma^2_{ln\Psi} in the ATOMIX paper"""
         return (
             5
@@ -158,38 +158,46 @@ class ShearLevel3:
         )
 
     @property
-    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]: # type: ignore
+    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]:
         """95% confidence interval of power spectrum.
         Eq. 23 in the ATOMIX paper"""
-        return np.concatenate((
-            self.Pk * np.exp(1.96 * self.log_psi_variance)[newaxis, ...],
-            self.Pk * np.exp(-1.96 * self.log_psi_variance)[newaxis, ...],
-        ), axis=0)
+        return np.concatenate(
+            (
+                self.Pk * np.exp(1.96 * self.log_psi_var)[newaxis, ...],
+                self.Pk * np.exp(-1.96 * self.log_psi_var)[newaxis, ...],
+            ),
+            axis=0,
+        )
 
     @property
-    def data_length(self) -> Float[ndarray, "time"]: # type: ignore
+    def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
         tau_eps = self.cfg.sampling_freq
         return tau_eps * self.platform_speed
 
+
 @dataclass
 class ShearLevel4:
-    eps: Float[ndarray, "nshear time"] # type: ignore
-    visc_mol: Float[ndarray, "time"] # type: ignore
-    resolved_var_frac: Float[ndarray, "nshear time"] # V_fin ATOMIX paper # type: ignore
+    eps: Float[ndarray, "nshear time"]
+    visc_mol: Float[ndarray, "time"]
+    resolved_var_frac: Float[ndarray, "nshear time"]  # V_fin ATOMIX paper
 
     @classmethod
     def from_level3(
         cls,
         level3: ShearLevel3,
     ) -> "ShearLevel4":
-        eps, _, _ = process_level4(
-            psi=level3.Pk,
-            wavenumber=level3.k,
-            platform_speed=level3.platform_speed,
-            waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
-            freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
-            freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+        eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac = (
+            process_level4(
+                psi=level3.Pk,
+                wavenumber=level3.k,
+                platform_speed=level3.platform_speed,
+                waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
+                freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
+                freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+                data_length=level3.data_length,
+                log_psi_var=level3.log_psi_var,
+            )
         )
         return cls(eps=eps, cfg=level3.cfg)
 
@@ -197,7 +205,7 @@ class ShearLevel4:
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
             return cls(
-                eps=ds["EPSI"].values ,
+                eps=ds["EPSI"].values,
                 cfg=ShearConfig.from_atomix_netcdf(fname),
             )
 
@@ -210,24 +218,6 @@ class ShearLevel4:
             }
         )
 
-    @property
-    def kolmogorov_length(self) -> Float[ndarray, "nshear time"]: # type: ignore
-        """L_K in ATOMIX paper"""
-        return (self.visc_mol[newaxis, :]**3 / self.eps) ** 0.25
-
-    @property
-    def log_diss_var(self) -> Float[ndarray, "nshear time"]: # type: ignore
-        """Eq. 29 in ATOMIX paper"""
-        resolved_var_frac = None
-        data_length_nondim = self.level3.data_length[newaxis, :] / self.kolmogorov_length * resolved_var_frac**0.75
-        return 5.5/(1+(data_length_nondim/4)**(7/9))
-
-    @property
-    def diss_confidence_interval(self):
-        return np.concatenate((
-            self.eps * np.exp(1.96 * self.log_diss_var)[newaxis, :],
-            self.eps * np.exp(-1.96 * self.log_diss_var)[newaxis, :],
-        ), axis=0)
 
 class ShearProcessing:
 
