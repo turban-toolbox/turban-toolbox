@@ -92,7 +92,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds4_turban = level4.to_xarray()
 
     _plot_level3(ds3, ds3_turban)
-    _plot_level4(ds4, ds4_turban)
+    # _plot_level4(ds4, ds4_turban) # disable for now
 
 
 def _plot_level3(ds3, level3):

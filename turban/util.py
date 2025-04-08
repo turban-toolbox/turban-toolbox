@@ -1,4 +1,5 @@
 import json
+from functools import wraps
 import numpy as np
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
@@ -127,7 +128,7 @@ def fast_to_slow_avg_by_segment():
 
 
 def fast_to_slow_reshape_index(
-    N: int,
+    data_len: int,
     fft_length: int,
     fft_overlap: int,
     diss_length: int,
@@ -136,9 +137,9 @@ def fast_to_slow_reshape_index(
 ) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
 
     if section_marker is None:
-        section_marker = np.ones(N, dtype=int)
+        section_marker = np.ones(data_len, dtype=int)
 
-    sections = split_data(np.arange(N), section_marker)
+    sections = split_data(np.arange(data_len), section_marker)
 
     reshape_segments = []
     for data in sections.values():
@@ -327,3 +328,58 @@ def integrate(
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
     return np.trapz(y_zero, x=x, axis=-1)
+
+
+def ensure_reshape_index(func):
+    """Make sure that `func` has `reshape_index` available by alternatively supplying
+    fft_length etc."""
+
+    @wraps(func)
+    def decorated(
+        *argv,
+        data_len: int = None,  # length of data vector
+        fft_length: int = None,
+        fft_overlap: int = None,
+        diss_length: int = None,
+        diss_overlap: int = None,
+        section_marker: Int[ndarray, "num_data"] = None,
+        **kwarg,
+    ):
+        if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
+            kwarg["reshape_index"] = fast_to_slow_reshape_index(
+                data_len,
+                fft_length,
+                fft_overlap,
+                diss_length,
+                diss_overlap,
+                section_marker,
+            )
+        return func(*argv, **kwarg)
+
+    return decorated
+
+
+@ensure_reshape_index
+def get_cleaned_fraction(
+    x: Float[ndarray, "*any time_fast"],
+    x_clean: Float[ndarray, "*any time_fast"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
+) -> Float[ndarray, "*any time_slow"]:
+    is_cleaned = x != x_clean
+    ii = diss_chunk_wise_reshape_index(reshape_index)
+
+    num_cleaned_samples = is_cleaned[..., ii].sum(axis=-1)
+    num_total_samples = ii.shape[-1]
+    return num_cleaned_samples / num_total_samples
+
+
+def diss_chunk_wise_reshape_index(
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+) -> Int[ndarray, "diss_chunk diss_length"]:
+    """Flatten the last two dimensions into one, making sure only unique indices appear
+    for each `diss_chunk`.
+    """
+    ii = reshape_index
+    ii_flat = ii.reshape((ii.shape[0], ii.shape[1] * ii.shape[2]))
+    diss_length = ii_flat[0].max() - ii_flat[0].min() + 1
+    return ii_flat.min(axis=1)[:, newaxis] + np.arange(0, diss_length)[newaxis, :]

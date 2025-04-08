@@ -7,9 +7,10 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
+from turban.util import get_cleaned_fraction
 from turban.shear.level2 import process_level2
 from turban.shear.level3 import process_level3
-from turban.shear.level4 import process_level4
+from turban.shear.level4 import process_level4, get_quality_metric
 
 
 @dataclass
@@ -35,7 +36,7 @@ class ShearLevel1:
 class ShearLevel2:
     shear: Float[ndarray, "n_shear time"]
     pspd: Float[ndarray, "time"]
-    n_despiked: Int[ndarray, "n_shear time"] | None
+    num_despike_iter: Int[ndarray, "n_shear time"] | None
     cfg: ShearConfig
 
     @classmethod
@@ -43,7 +44,7 @@ class ShearLevel2:
         cls,
         level1: ShearLevel1,
     ):
-        sh_cleaned, n_despiked = process_level2(
+        sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_marker,
             level1.cfg.sampling_freq,
@@ -53,7 +54,7 @@ class ShearLevel2:
         return cls(
             shear=sh_cleaned,
             pspd=level1.pspd,
-            n_despiked=n_despiked,
+            num_despike_iter=num_despike_iter,
             cfg=level1.cfg,
         )
 
@@ -63,7 +64,7 @@ class ShearLevel2:
         return cls(
             shear=ds.SHEAR.values,
             pspd=ds.PSPD_REL.values,
-            n_despiked=None,
+            num_despike_iter=None,
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -77,6 +78,8 @@ class ShearLevel3:
     platform_speed: Float[ndarray, "time"]
     section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
+    spike_fraction: Float[ndarray, "nshear time"] | None = None
+    max_despike_iter: Int[ndarray, "nshear time"] | None = None
 
     @classmethod
     def from_level2(
@@ -97,6 +100,18 @@ class ShearLevel3:
             diss_overlap=level2.cfg.diss_overlap,
         )
 
+        spike_fraction = get_cleaned_fraction(
+            x=level1.shear,
+            x_clean=level2.shear,
+            data_len=level1.shear.shape[-1],
+            fft_length=level2.cfg.fft_length,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
+        )
+
+        max_despike_iter = np.ones_like(spike_fraction, dtype=int)  # TODO
+
         return cls(
             Pk=Pk,
             k=k,
@@ -104,6 +119,8 @@ class ShearLevel3:
             freq=freq,
             platform_speed=platform_speed,
             section_marker=None,
+            spike_fraction=spike_fraction,
+            max_despike_iter=max_despike_iter,
             cfg=level2.cfg,
         )
 
@@ -212,9 +229,16 @@ class ShearLevel4:
             log_psi_var=level3.log_psi_var,
         )
 
-        quality_metric = np.zeros_like(eps)
-        quality_metric += np.where(fom > 1.4, 1, 0)  # Poor figure of merit
-        quality_metric += np.where(fom > 1.4, 2, 0)  # Large despike fraction
+        # q = get_quality_metric(
+        #     eps=eps,
+        #     eps_source_flag=eps_source_flag,
+        #     fom=fom,
+        #     spike_fraction=level3.spike_fraction,
+        #     log_diss_var=log_diss_var,
+        #     num_spec_points=num_spec_points,
+        #     num_despike_iter=level3.max_despike_iter,
+        #     resolved_var_frac=resolved_var_frac,
+        # )
 
         return cls(
             eps=eps,

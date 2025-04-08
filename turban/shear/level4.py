@@ -1,6 +1,4 @@
-from multiprocessing import Value
-from selectors import EpollSelector
-from unicodedata import numeric
+import warnings
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
@@ -98,6 +96,47 @@ def process_level4(
         log_diss_mad,
         num_spec_points,
     )
+
+
+def get_quality_metric(
+    eps: Float[ndarray, "nshear time"],
+    eps_source_flag: Int[ndarray, "nshear time"],
+    fom: Float[ndarray, "nshear time"],
+    spike_fraction: Float[ndarray, "nshear time"],
+    log_diss_var: Float[ndarray, "nshear time"],
+    num_spec_points: Int[ndarray, "nshear time"],
+    num_despike_iter: Int[ndarray, "nshear time"],
+    resolved_var_frac: Float[ndarray, "nshear time"],
+) -> Int[ndarray, "nshear time"]:
+    """
+    Aassemble `Q` flag from ATOMIX paper. We do this probe-wise.
+
+    Notes: ATOMIX specifies that if FOM is too large, then shear_disagree should be
+    disregarded. We choose not to, and leave it at the discretion of the user."""
+
+    if eps.shape[0] == 2:
+        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
+        shear_disagree = np.where(
+            eps_source_flag == 1,
+            eps_dev >= 2.77 * log_diss_var,
+            eps_dev >= 4.2 * log_diss_var / np.sqrt(num_spec_points),
+        )
+    else:
+        warnings.warn(
+            """Can currently not handle disagreement between more or less than
+                      two shear probes"""
+        )
+        shear_disagree = np.ones_like(eps, dtype=bool)
+
+    quality_metric = np.zeros_like(eps, dtype=int)
+    quality_metric += np.where(fom > 1.4, 1, 0)  # Poor figure of merit
+    quality_metric += np.where(spike_fraction > 0.05, 2, 0)  # Large despike fraction
+    # Shear estimates disagree between probes
+    quality_metric += np.where(shear_disagree, 4, 0)
+    # Too many despike iterations
+    quality_metric += np.where(num_despike_iter > 0.05, 8, 0)
+    # Insufficient variance resolved
+    quality_metric += np.where(resolved_var_frac < 0.6, 16, 0)
 
 
 def get_log_diss_var(
