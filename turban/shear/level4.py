@@ -23,6 +23,8 @@ def process_level4(
     Float[ndarray, "nshear time"],  # log(eps) variance
     Float[ndarray, "nshear time"],  # kolmogorov length as per Eq. 29
     Float[ndarray, "nshear time"],  # resolved fraction of shear variance
+    Float[ndarray, "nshear time"],  # Figure of Merit
+    Float[ndarray, "nshear time"],  # Mean Absolute Deviation of log(psi)
     Int[ndarray, "nshear time"],  # number of spectral points
 ]:
     """
@@ -30,34 +32,43 @@ def process_level4(
     """
     eps_crit = 1e-5
     # nu = get_seawater_viscosity(999.)
-    visc_mol = np.array(1.6e-6)[
+    mol_visc = np.array(1.6e-6)[
         newaxis
     ]  # TODO: get from temperature (aggregate in level3)
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
     # 1st estimate
-    eps1 = get_eps_first_estimate(psi, wavenumber, visc_mol)
+    eps1 = get_eps_first_estimate(psi, wavenumber, mol_visc)
 
     # Inertial subrange integration
-    eps_specint, resolved_var_frac = spectrum_integration(
+    eps_specint, resolved_var_frac, waveno_cutoff_specint = spectrum_integration(
         psi,
         wavenumber,
         eps1,
-        visc_mol,
+        mol_visc,
         platform_speed,
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
     )
 
-    k_kolmogorov = (eps1 / visc_mol**3) ** 0.25
-    eps_isrfit, num_spec_points = inertial_range_fit(psi, wavenumber, k_kolmogorov)
+    k_kolmogorov = (eps1 / mol_visc**3) ** 0.25
+    eps_isrfit, waveno_cutoff_isrfit = inertial_range_fit(psi, wavenumber, k_kolmogorov)
 
     eps = np.where(eps1 < eps_crit, eps_specint, eps_isrfit)
     eps_source_flag = np.where(eps1 < eps_crit, 1, 2)
 
-    kolm_length = (visc_mol[newaxis, :] ** 3 / eps) ** 0.25
+    waveno_cutoff = np.where(
+        eps_source_flag == 1,
+        waveno_cutoff_specint,
+        waveno_cutoff_isrfit,
+    )
+    # do not count first element: psi(0)=0
+    num_spec_points = (wavenumber[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]).sum(
+        axis=-1
+    ) - 1
+    kolm_length = (mol_visc[newaxis, :] ** 3 / eps) ** 0.25
 
     log_diss_var = get_log_diss_var(
         eps_source_flag,
@@ -68,12 +79,23 @@ def process_level4(
         log_psi_var,
     )
 
+    psi_model = model_spectrum(wavenumber, eps, mol_visc)
+    use_wavenumber = wavenumber[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
+    fom, log_diss_mad, num_spec_points_fom = figure_of_merit(
+        np.where(use_wavenumber, psi, np.nan)[..., 1:],
+        np.where(use_wavenumber, psi_model, np.nan)[..., 1:],
+        log_psi_var,
+    )
+    assert np.all(np.equal(num_spec_points, num_spec_points_fom))  # Sanity check
+
     return (
         eps,
         eps_source_flag,
         log_diss_var,
         kolm_length,
         resolved_var_frac,
+        fom,
+        log_diss_mad,
         num_spec_points,
     )
 
@@ -103,10 +125,21 @@ def get_log_diss_var(
     return log_diss_var
 
 
-def figure_of_merit():
-    log_diss_mad =
+def figure_of_merit(
+    psi: Float[ndarray, "nshear time wavenumber"],
+    psi_model: Float[ndarray, "nshear time wavenumber"],
+    log_psi_var: float,
+) -> tuple[
+    Float[ndarray, "nshear time"],
+    Float[ndarray, "nshear time"],
+    Int[ndarray, "nshear time"],
+]:
+    summand = np.abs(np.log(psi) - np.log(psi_model))
+    num_spec_points = (~np.isnan(summand)).sum(axis=-1)
+    log_diss_mad = np.nanmean(summand, axis=-1)
     tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  # T_M in ATOMIX paper
     fom = log_diss_mad / log_psi_var / tm
+    return fom, log_diss_mad, num_spec_points
 
 
 def inertial_range_fit(
@@ -116,7 +149,7 @@ def inertial_range_fit(
     a_kolmogorov: float = 8.19,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # epsilon
-    Int[ndarray, "nshear time"],  # number of spectral points used, N_s
+    Float[ndarray, "nshear time"],  # wavenumber cutoff
 ]:
     """
     See Eq. 28. This assumes a known Kolmogorov constant, as opposed to linear
@@ -128,15 +161,14 @@ def inertial_range_fit(
     ln_epsilon = 1.5 * (
         np.log(psi) - np.log(a_kolmogorov) - np.log(wavenumber[newaxis, ...]) / 3
     )
-
+    waveno_cutoff = 0.01 * k_kolmogorov
     ln_epsilon_fitrange = np.where(
-        wavenumber[newaxis, ...] < 0.01 * k_kolmogorov[:, :, newaxis],
+        wavenumber[newaxis, ...] < waveno_cutoff[:, :, newaxis],
         ln_epsilon,
         np.nan,
     )
     eps = np.exp(np.nanmean(ln_epsilon_fitrange, axis=2))
-    number_spectral_points = np.isnan(ln_epsilon_fitrange).sum(axis=2)
-    return eps, number_spectral_points
+    return eps, waveno_cutoff
 
 
 def spectrum_integration(
@@ -149,6 +181,7 @@ def spectrum_integration(
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
 ) -> tuple[
+    Float[ndarray, "nshear time"],
     Float[ndarray, "nshear time"],
     Float[ndarray, "nshear time"],
 ]:
@@ -180,7 +213,7 @@ def spectrum_integration(
     resolved_var_frac = get_spectral_variance_resolved_fraction(
         waveno_cutoff, kolmogorov_length(eps, mol_visc)
     )
-    return eps, resolved_var_frac
+    return eps, resolved_var_frac, waveno_cutoff
 
 
 def get_eps_first_estimate(
@@ -271,9 +304,9 @@ def model_spectrum(
 ):
     """Uses the Lueck spectrum (Eq. 9) - consistent with
     `get_spectral_variance_resolved_fraction`"""
-    k_nondim = k / kolmogorov_length(eps, mol_visc)
+    k_nondim = k[newaxis, :, :] / kolmogorov_length(eps, mol_visc)[:, :, newaxis]
     psi_nondim = model_spectrum_lueck(k_nondim)
-    return psi_nondim * psi_nondim_factor(eps, mol_visc)
+    return psi_nondim * psi_nondim_factor(eps, mol_visc)[:, :, newaxis]
 
 
 def model_spectrum_lueck(
