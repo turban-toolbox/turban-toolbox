@@ -354,7 +354,7 @@ def model_spectrum(
 ) -> Float[ndarray, "*any waveno"]:
     """Uses the Lueck spectrum (Eq. 9) - consistent with
     `get_spectral_variance_resolved_fraction`"""
-    k_nondim = k * kolmogorov_length(eps, mol_visc)[:, newaxis]
+    k_nondim = k * kolmogorov_length(eps, mol_visc)[..., newaxis]
     psi_nondim = model_spectrum_lueck(k_nondim)
     return psi_nondim * psi_nondim_factor(eps, mol_visc)[:, newaxis]
 
