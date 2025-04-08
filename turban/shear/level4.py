@@ -1,7 +1,7 @@
 import warnings
 from numpy import ndarray, newaxis
 import numpy as np
-from jaxtyping import Float, Int
+from jaxtyping import Float, Int, Bool
 
 from turban.util import integrate
 
@@ -139,6 +139,15 @@ def get_quality_metric(
     quality_metric += np.where(resolved_var_frac < 0.6, 16, 0)
 
     return quality_metric
+
+
+def unwrap_quality_metric(q: Int[ndarray, "*any"]) -> dict[int, Bool[ndarray, "*any"]]:
+    flag_arr: Bool[ndarray, "*any"] = np.unpackbits(
+        q.astype(np.uint8)[np.newaxis], axis=0, bitorder="little"
+    ).astype(bool)
+    base = [2**i for i in range(8)]
+    flag_dict = {name: val for name, val in zip(base, flag_arr)}
+    return flag_dict
 
 
 def get_log_diss_var(
