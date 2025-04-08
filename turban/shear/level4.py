@@ -1,4 +1,5 @@
 from multiprocessing import Value
+from selectors import EpollSelector
 from unicodedata import numeric
 from numpy import ndarray, newaxis
 import numpy as np
@@ -15,7 +16,7 @@ def process_level4(
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
     data_length: Float[ndarray, "time"],
-    log_psi_var: float
+    log_psi_var: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Int[ndarray, "nshear time"],  # eps_source_flag. 1: spec_int, 2: isr_fit
@@ -29,7 +30,9 @@ def process_level4(
     """
     eps_crit = 1e-5
     # nu = get_seawater_viscosity(999.)
-    visc_mol = np.array(1.6e-6)[newaxis] # TODO: get from temperature (aggregate in level3)
+    visc_mol = np.array(1.6e-6)[
+        newaxis
+    ]  # TODO: get from temperature (aggregate in level3)
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
@@ -49,40 +52,43 @@ def process_level4(
     )
 
     k_kolmogorov = (eps1 / visc_mol**3) ** 0.25
-    eps_isrfit, num_spec_points = inertial_range_fit(
-        psi, wavenumber, k_kolmogorov
-    )
+    eps_isrfit, num_spec_points = inertial_range_fit(psi, wavenumber, k_kolmogorov)
 
     eps = np.where(eps1 < eps_crit, eps_specint, eps_isrfit)
     eps_source_flag = np.where(eps1 < eps_crit, 1, 2)
 
-    log_diss_var, kolm_length = dissipation_qc_metrics(
-        eps,
+    kolm_length = (visc_mol[newaxis, :] ** 3 / eps) ** 0.25
+
+    log_diss_var = get_log_diss_var(
         eps_source_flag,
-        visc_mol,
+        kolm_length,
         data_length,
         resolved_var_frac,
         num_spec_points,
         log_psi_var,
     )
 
-    return eps, eps_source_flag, log_diss_var, kolm_length, resolved_var_frac, num_spec_points
+    return (
+        eps,
+        eps_source_flag,
+        log_diss_var,
+        kolm_length,
+        resolved_var_frac,
+        num_spec_points,
+    )
 
 
-def dissipation_qc_metrics(
-    eps: Float[ndarray, "nshear time"],
+def get_log_diss_var(
     eps_source_flag: Int[ndarray, "nshear time"],
-    visc_mol: Float[ndarray, "time"],
+    kolm_length: Float[ndarray, "nshear time"],
     data_length: Float[ndarray, "time"],
     resolved_var_frac: Float[ndarray, "nshear time"],
     num_spec_points: Int[ndarray, "nshear time"],
     log_psi_var: float,
-) -> tuple[
-    Float[ndarray, "nshear time"], # log(eps) variance
-    Float[ndarray, "nshear time"], # kolmogorov length
-]:
-
-    kolm_length = (visc_mol[newaxis, :] ** 3 / eps) ** 0.25
+) -> Float[ndarray, "nshear time"]:  # log(eps) variance
+    """Notes:
+    `eps_source_flag`: 1: spec_int, 2: isr_fit
+    """
     data_length_nondim = data_length[newaxis, :] / kolm_length * resolved_var_frac**0.75
     log_diss_var_spec_int = 5.5 / (1 + (data_length_nondim / 4) ** (7 / 9))
 
@@ -94,7 +100,13 @@ def dissipation_qc_metrics(
         log_diss_var_isr_fit,
     )
 
-    return log_diss_var, kolm_length
+    return log_diss_var
+
+
+def figure_of_merit():
+    log_diss_mad =
+    tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  # T_M in ATOMIX paper
+    fom = log_diss_mad / log_psi_var / tm
 
 
 def inertial_range_fit(
@@ -131,7 +143,7 @@ def spectrum_integration(
     psi: Float[ndarray, "nshear time wavenumber"],
     wavenumber: Float[ndarray, "time wavenumber"],
     eps1: Float[ndarray, "nshear time"],
-    nu: Float[ndarray, "time"],
+    mol_visc: Float[ndarray, "time"],
     platform_speed: Float[ndarray, "time"],
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
@@ -145,7 +157,7 @@ def spectrum_integration(
         psi,
         wavenumber,
         eps1,
-        nu,
+        mol_visc,
         platform_speed,
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
@@ -160,10 +172,14 @@ def spectrum_integration(
     while np.any(eps_increase > 1.01):
         eps_previous = eps
         # raise ValueError (waveno_cutoff.shape)
-        eps /= get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
+        eps /= get_spectral_variance_resolved_fraction(
+            waveno_cutoff, kolmogorov_length(eps, mol_visc)
+        )
         eps_increase = eps / eps_previous
 
-    resolved_var_frac = get_spectral_variance_resolved_fraction(waveno_cutoff, eps, nu)
+    resolved_var_frac = get_spectral_variance_resolved_fraction(
+        waveno_cutoff, kolmogorov_length(eps, mol_visc)
+    )
     return eps, resolved_var_frac
 
 
@@ -225,10 +241,47 @@ def get_eps_second_estimate(
 
 def get_spectral_variance_resolved_fraction(
     waveno: Float[ndarray, "nshear time"],
-    eps: Float[ndarray, "nshear time"],
-    nu: Float[ndarray, "time"],
+    length_kolmogorov: Float[ndarray, "nshear time"],
 ) -> Float[ndarray, "nshear time"]:
     # Eq. 11; I_L (3rd model)
-    length_kolmogorov = np.sqrt(nu[newaxis, :] ** 3 / eps)
     k43 = (waveno * length_kolmogorov) ** (4.0 / 3.0)
     return np.tanh(65.5 * k43) - 9.0 * k43 * np.exp((-54.5 * k43))
+
+
+def kolmogorov_length(
+    eps: Float[ndarray, "*any"],
+    mol_visc: Float[ndarray, "*any"],
+) -> Float[ndarray, "*any"]:
+    """The Kolmogorov length scale"""
+    return (mol_visc**3 / eps) ** 0.25
+
+
+def psi_nondim_factor(
+    eps: Float[ndarray, "*any"],
+    mol_visc: Float[ndarray, "*any"],
+) -> Float[ndarray, "*any"]:
+    """To pass from non-dimensional to dimensional shear spectra, see Eq. 6"""
+    return (eps**3 / mol_visc) ** 0.25
+
+
+def model_spectrum(
+    k: Float[ndarray, "*any waveno"],
+    eps: Float[ndarray, "*any"],
+    mol_visc: Float[ndarray, "*any"],
+):
+    """Uses the Lueck spectrum (Eq. 9) - consistent with
+    `get_spectral_variance_resolved_fraction`"""
+    k_nondim = k / kolmogorov_length(eps, mol_visc)
+    psi_nondim = model_spectrum_lueck(k_nondim)
+    return psi_nondim * psi_nondim_factor(eps, mol_visc)
+
+
+def model_spectrum_lueck(
+    kn: Float[ndarray, "*any waveno"],  # nondimensional wavenumber
+) -> Float[ndarray, "*any waveno"]:
+    """Non-dimensional form, Eq. 9"""
+    y = (kn / 0.015) ** 2
+    fac1 = 8.048 * kn ** (1 / 3) / (1 + (21.7 * kn) ** 3)
+    fac2 = 1 / (1 + (6.6 * kn) ** 2.5)
+    fac3 = 1 + 0.36 * y / ((y - 1) ** 2 + 2 * y)
+    return fac1 * fac2 * fac3
