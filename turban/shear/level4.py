@@ -116,11 +116,13 @@ def get_quality_metric(
 
     if eps.shape[0] == 2:
         eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
-        shear_disagree = np.where(
-            eps_source_flag == 1,
-            eps_dev >= 2.77 * log_diss_var,
-            eps_dev >= 4.2 * log_diss_var / np.sqrt(num_spec_points),
-        )
+        shear_disagree = eps_dev >= 2.77 * log_diss_var
+        # The ATOMIX paper gives the following - but I believe they are the same
+        # np.where(
+        #     eps_source_flag == 1,
+        #     eps_dev >= 2.77 * log_diss_var,
+        #     eps_dev >= 4.2 * log_psi_var / np.sqrt(num_spec_points),
+        # )
     else:
         warnings.warn(
             """Can currently not handle disagreement between more or less than

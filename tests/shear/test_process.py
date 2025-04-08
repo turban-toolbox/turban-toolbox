@@ -99,6 +99,12 @@ def test_baltic_benchmark(atomix_nc_filename):
     # _plot_level3(ds3, ds3_turban) # disable for now
     # _plot_level4(ds4, ds4_turban) # TODO 
 
+def _plot_despiking(ds1, level1, ds2, level2):
+    plt.plot(level1.shear[0])
+    plt.plot(level2.shear[0])
+
+    ds1.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
+    ds2.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
 
 def _plot_level3(ds3, level3):
     level3["k"].loc[
