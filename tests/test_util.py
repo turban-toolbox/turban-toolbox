@@ -8,7 +8,7 @@ from turban.util import (
     reshape_any_last,
     reshape_halfoverlap_first,
     reshape_halfoverlap_last,
-    average_fast_to_slow,
+    agg_fast_to_slow,
     get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
     fast_to_slow_reshape_index,
@@ -136,5 +136,27 @@ def test_average_fast_to_slow():
     assert x.shape == (3, 10)
     # half-overlapping intervals of length 4: 4 intervals
     # then averaged over intervals of length 3 with overlap 1: 2
-    y = average_fast_to_slow(x, 4, 2, 6, 2)
+    y = agg_fast_to_slow(
+        x,
+        data_len=x.shape[-1],
+        fft_length=4,
+        fft_overlap=2,
+        diss_length=6,
+        diss_overlap=2,
+    )
+
     assert y.shape == (3, 2)
+
+
+def test_agg_fast_to_slow():
+    x = np.arange(20.)
+    xm = agg_fast_to_slow(
+        x,
+        data_len=len(x),
+        fft_length=4,
+        fft_overlap=2,
+        diss_length=10,
+        diss_overlap=0,
+        agg_method="max",
+    )
+    assert np.all(xm == np.array([9., 19.]))

@@ -9,6 +9,35 @@ from netCDF4 import Dataset
 import xarray as xr
 
 
+def ensure_reshape_index(func):
+    """Make sure that `func` has `reshape_index` available by alternatively supplying
+    fft_length etc."""
+
+    @wraps(func)
+    def decorated(
+        *argv,
+        data_len: int = None,  # length of data vector
+        fft_length: int = None,
+        fft_overlap: int = None,
+        diss_length: int = None,
+        diss_overlap: int = None,
+        section_marker: Int[ndarray, "num_data"] = None,
+        **kwarg,
+    ):
+        if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
+            kwarg["reshape_index"] = fast_to_slow_reshape_index(
+                data_len,
+                fft_length,
+                fft_overlap,
+                diss_length,
+                diss_overlap,
+                section_marker,
+            )
+        return func(*argv, **kwarg)
+
+    return decorated
+
+
 def load(fname):
     with Dataset(fname) as f:
         groups = list(f.groups)
@@ -95,32 +124,22 @@ def fast_to_slow_grad_by_segment(
     return dydx.mean(axis=-1)  # average gradient over each `diss_length` segment
 
 
-def average_fast_to_slow(
+@ensure_reshape_index
+def agg_fast_to_slow(
     x: Float[ndarray, "*any time_fast"],
-    fft_length: int = None,
-    fft_overlap: int = None,
-    diss_length: int = None,
-    diss_overlap: int = None,
-    section_marker: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+    agg_method: str = "mean",
 ) -> Float[ndarray, "*any time_slow"]:
     """
-    Average any quantities from fast sampling rate (e.g., shear timeseries)
+    Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).
-    If reshape_index is not supplied, calculates it.
-    """
-    if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
-            x.shape[-1],
-            fft_length,
-            fft_overlap,
-            diss_length,
-            diss_overlap,
-            section_marker,
-        )
 
-    # average out the two overlapping dimensions
-    return x[..., reshape_index].mean(axis=-1).mean(axis=-1)
+    `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
+    `max`, etc.
+    """
+    ii = diss_chunk_wise_reshape_index(reshape_index)
+    xi = x[..., ii]
+    return getattr(xi, agg_method)(axis=-1)
 
 
 def fast_to_slow_avg_by_segment():
@@ -328,35 +347,6 @@ def integrate(
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
     return np.trapz(y_zero, x=x, axis=-1)
-
-
-def ensure_reshape_index(func):
-    """Make sure that `func` has `reshape_index` available by alternatively supplying
-    fft_length etc."""
-
-    @wraps(func)
-    def decorated(
-        *argv,
-        data_len: int = None,  # length of data vector
-        fft_length: int = None,
-        fft_overlap: int = None,
-        diss_length: int = None,
-        diss_overlap: int = None,
-        section_marker: Int[ndarray, "num_data"] = None,
-        **kwarg,
-    ):
-        if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
-            kwarg["reshape_index"] = fast_to_slow_reshape_index(
-                data_len,
-                fft_length,
-                fft_overlap,
-                diss_length,
-                diss_overlap,
-                section_marker,
-            )
-        return func(*argv, **kwarg)
-
-    return decorated
 
 
 @ensure_reshape_index

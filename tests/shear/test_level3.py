@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from turban.shear.level3 import power_spectrum
-from turban.util import average_fast_to_slow, reshape_overlap_index
+from turban.util import agg_fast_to_slow, reshape_overlap_index
 
 def test_spectra_arr_shape():
     """
@@ -18,7 +18,7 @@ def test_spectra_arr_shape():
 
     y1, f = power_spectrum(x, sampling_freq, fft_length, fft_overlap, chunklen, chunkoverlap)
     # platform speed
-    y2 = average_fast_to_slow(x, fft_length, fft_overlap, chunklen, chunkoverlap)
+    y2 = agg_fast_to_slow(x, fft_length, fft_overlap, chunklen, chunkoverlap)
 
     assert f.shape == (fft_length / 2 + 1,), "Wrong number of frequencies"
     assert y1.shape[:2] == y2.shape

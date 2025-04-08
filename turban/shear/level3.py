@@ -2,7 +2,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
 
-from turban.util import average_fast_to_slow, fast_to_slow_reshape_index
+from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
 from turban.utils.spectra import power_spectrum
 
 
@@ -44,7 +44,7 @@ def process_level3(
         else np.stack((pspd, *(arr for k, arr in ancillary.items())), axis=0)
     )
     # platform speed
-    data_slow: Float[ndarray, "variable time_slow"] = average_fast_to_slow(
+    data_slow: Float[ndarray, "variable time_slow"] = agg_fast_to_slow(
         data_fast, reshape_index=ii
     )
     pspda = data_slow[0, :]
