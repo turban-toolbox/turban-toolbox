@@ -2,7 +2,6 @@
 Test the entire processing pipeline
 """
 
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -29,8 +28,6 @@ from tests.fixtures import atomix_nc_filename
 # pspda = np.nanmedian(data["pspd"])
 
 
-
-
 def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
     import datashader as dsh
@@ -50,6 +47,16 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
     return im
 
 
+def _test_load_atomix_netcdf(atomix_nc_filename):
+    from turban.shear import ShearProcessing
+
+    for load_levels in [(1, 2), (1, 2, 3)]:
+        p = ShearProcessing.from_atomix_netcdf(
+            atomix_nc_filename, load_levels=load_levels
+        )
+        assert isinstance(p.level4.eps, np.ndarray)
+
+
 def test_baltic_benchmark(atomix_nc_filename):
     import xarray as xr
     from turban.shear import (
@@ -59,11 +66,6 @@ def test_baltic_benchmark(atomix_nc_filename):
         ShearLevel3,
         ShearLevel4,
     )
-
-    for load_levels in [(1, 2), (1, 2, 3)]:
-
-        p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=load_levels)
-        assert isinstance(p.level4.eps, np.ndarray)
 
     p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=(1,))
 

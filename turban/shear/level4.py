@@ -138,6 +138,8 @@ def get_quality_metric(
     # Insufficient variance resolved
     quality_metric += np.where(resolved_var_frac < 0.6, 16, 0)
 
+    return quality_metric
+
 
 def get_log_diss_var(
     eps_source_flag: Int[ndarray, "nshear time"],

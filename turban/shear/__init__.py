@@ -78,6 +78,7 @@ class ShearLevel3:
     platform_speed: Float[ndarray, "time"]
     section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
+    # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"] | None = None
     max_despike_iter: Int[ndarray, "nshear time"] | None = None
 
@@ -108,6 +109,7 @@ class ShearLevel3:
             fft_overlap=level2.cfg.fft_overlap,
             diss_length=level2.cfg.diss_length,
             diss_overlap=level2.cfg.diss_overlap,
+            section_marker=level1.section_marker,
         )
 
         max_despike_iter = np.ones_like(spike_fraction, dtype=int)  # TODO
@@ -229,16 +231,16 @@ class ShearLevel4:
             log_psi_var=level3.log_psi_var,
         )
 
-        # q = get_quality_metric(
-        #     eps=eps,
-        #     eps_source_flag=eps_source_flag,
-        #     fom=fom,
-        #     spike_fraction=level3.spike_fraction,
-        #     log_diss_var=log_diss_var,
-        #     num_spec_points=num_spec_points,
-        #     num_despike_iter=level3.max_despike_iter,
-        #     resolved_var_frac=resolved_var_frac,
-        # )
+        q = get_quality_metric(
+            eps=eps,
+            eps_source_flag=eps_source_flag,
+            fom=fom,
+            spike_fraction=level3.spike_fraction,
+            log_diss_var=log_diss_var,
+            num_spec_points=num_spec_points,
+            num_despike_iter=level3.max_despike_iter,
+            resolved_var_frac=resolved_var_frac,
+        )
 
         return cls(
             eps=eps,
