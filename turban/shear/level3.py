@@ -63,8 +63,6 @@ def process_level3(
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
 
-    print(correction_factor_spatial)
-
     ancillary_out = (
         {
             name: (["time_slow"], data_slow[ind + 1, :])

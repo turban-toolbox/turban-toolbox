@@ -28,7 +28,6 @@ def test_get_cleaned_fraction():
         diss_length=10,
         diss_overlap=0,
     )
-    print(cl_frac)
     assert np.all(cl_frac == np.array([2 / 10, 0]))
 
 
