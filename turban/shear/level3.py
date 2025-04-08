@@ -24,6 +24,7 @@ def process_level3(
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pf
     Float[ndarray, "wavenumber"],  # freq
     Float[ndarray, "time_slow"],  # pspda
+    Int[ndarray, "time_slow"],  # section_marker_slow
     dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
 ]:
     ii = fast_to_slow_reshape_index(
@@ -49,6 +50,8 @@ def process_level3(
     )
     pspda = data_slow[0, :]
 
+    section_marker_slow = section_marker[..., ii].max(axis=-1).max(axis=-1)
+
     # to wavenumber domain
     Pk = Pf * pspda[newaxis, :, newaxis] / fft_length / (sampling_freq / 2)
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
@@ -59,10 +62,8 @@ def process_level3(
     )
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
-    # get_uncertainty_estimates(P)
 
     print(correction_factor_spatial)
-    # raise ValueError(correction_factor_spatial)
 
     ancillary_out = (
         {
@@ -73,7 +74,7 @@ def process_level3(
         else {}
     )
 
-    return k, Pk, Pf, freq, pspda, ancillary_out
+    return k, Pk, Pf, freq, pspda, section_marker_slow, ancillary_out
 
 
 def apply_compensation_spatial_response(

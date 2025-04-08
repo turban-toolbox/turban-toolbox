@@ -126,10 +126,10 @@ def fast_to_slow_grad_by_segment(
 
 @ensure_reshape_index
 def agg_fast_to_slow(
-    x: Float[ndarray, "*any time_fast"],
+    x: Num[ndarray, "*any time_fast"],
     reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
     agg_method: str = "mean",
-) -> Float[ndarray, "*any time_slow"]:
+) -> Num[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).

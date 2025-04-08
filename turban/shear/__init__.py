@@ -7,7 +7,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import get_cleaned_fraction
+from turban.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.shear.level2 import process_level2
 from turban.shear.level3 import process_level3
 from turban.shear.level4 import process_level4, get_quality_metric
@@ -76,9 +76,9 @@ class ShearLevel3:
     Pf: Float[ndarray, "nshear time wavenumber"] | None
     freq: Float[ndarray, "wavenumber"] | None
     platform_speed: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
     # TODO load from atomix netcdf
+    section_marker: Int[ndarray, "time"] | None = None
     spike_fraction: Float[ndarray, "nshear time"] | None = None
     max_despike_iter: Int[ndarray, "nshear time"] | None = None
 
@@ -88,7 +88,7 @@ class ShearLevel3:
         level1: ShearLevel1,
         level2: ShearLevel2,
     ) -> "ShearLevel3":
-        k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
+        k, Pk, Pf, freq, platform_speed, section_marker, ancillary = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
             section_marker=level1.section_marker,
@@ -112,7 +112,16 @@ class ShearLevel3:
             section_marker=level1.section_marker,
         )
 
-        max_despike_iter = np.ones_like(spike_fraction, dtype=int)  # TODO
+        max_despike_iter = agg_fast_to_slow(
+            level2.num_despike_iter,
+            data_len=level2.num_despike_iter.shape[-1],
+            fft_length=level2.cfg.fft_length,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
+            section_marker=level1.section_marker,
+            agg_method="max",
+        )
 
         return cls(
             Pk=Pk,
@@ -120,7 +129,7 @@ class ShearLevel3:
             Pf=Pf,
             freq=freq,
             platform_speed=platform_speed,
-            section_marker=None,
+            section_marker=section_marker,
             spike_fraction=spike_fraction,
             max_despike_iter=max_despike_iter,
             cfg=level2.cfg,
@@ -154,6 +163,9 @@ class ShearLevel3:
                 ),
                 "freq": (["wavenumber"], self.freq) if self.freq is not None else None,
                 "platform_speed": (["time_slow"], self.platform_speed),
+                "section_marker": (["time"], self.section_marker),
+                "spike_fraction": (["nshear", "time"], self.spike_fraction),
+                "max_despike_iter": (["nshear", "time"], self.max_despike_iter),
             }
         )
 
@@ -202,8 +214,9 @@ class ShearLevel4:
     log_diss_var: Float[ndarray, "nshear time"]
     log_diss_mad: Float[ndarray, "nshear time"]
     kolm_length: Float[ndarray, "nshear time"]
-    resolved_var_frac: Float[ndarray, "nshear time"]  # V_fin ATOMIX paper
+    resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
+    quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
 
     @classmethod
@@ -231,7 +244,7 @@ class ShearLevel4:
             log_psi_var=level3.log_psi_var,
         )
 
-        q = get_quality_metric(
+        quality_metric = get_quality_metric(
             eps=eps,
             eps_source_flag=eps_source_flag,
             fom=fom,
@@ -250,6 +263,7 @@ class ShearLevel4:
             kolm_length=kolm_length,
             resolved_var_frac=resolved_var_frac,
             num_spec_points=num_spec_points,
+            quality_metric=quality_metric,
             cfg=level3.cfg,
         )
 
@@ -265,8 +279,13 @@ class ShearLevel4:
         return xr.Dataset(
             data_vars={
                 "eps": (["nshear", "time_slow"], self.eps),
-                # "eps_specint": (["nshear", "time_slow"], eps),
-                # "eps_isrfit": (["nshear", "time_slow"], eps),
+                "eps_source_flag": (["nshear", "time_slow"], self.eps_source_flag),
+                "log_diss_var": (["nshear", "time_slow"], self.log_diss_var),
+                "log_diss_mad": (["nshear", "time_slow"], self.log_diss_mad),
+                "kolm_length": (["nshear", "time_slow"], self.kolm_length),
+                "resolved_var_frac": (["nshear", "time_slow"], self.resolved_var_frac),
+                "num_spec_points": (["nshear", "time_slow"], self.num_spec_points),
+                "quality_metric": (["nshear", "time_slow"], self.quality_metric),
             }
         )
 
