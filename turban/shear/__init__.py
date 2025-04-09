@@ -64,7 +64,8 @@ class ShearLevel2:
         return cls(
             shear=ds.SHEAR.values,
             pspd=ds.PSPD_REL.values,
-            num_despike_iter=None,
+            # TODO: apparently not exported in benchmark files...?
+            num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -78,9 +79,9 @@ class ShearLevel3:
     platform_speed: Float[ndarray, "time"]
     cfg: ShearConfig
     # TODO load from atomix netcdf
-    section_marker: Int[ndarray, "time"] | None = None
-    spike_fraction: Float[ndarray, "nshear time"] | None = None
-    max_despike_iter: Int[ndarray, "nshear time"] | None = None
+    section_marker: Int[ndarray, "time"]
+    spike_fraction: Float[ndarray, "nshear time"]
+    max_despike_iter: Int[ndarray, "nshear time"]
 
     @classmethod
     def from_level2(
@@ -147,7 +148,10 @@ class ShearLevel3:
             Pf=None,
             freq=None,
             platform_speed=ds["PSPD_REL"].values,
-            section_marker=None,
+            section_marker=ds["SECTION_NUMBER"].values.astype(int),
+            spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
+            max_despike_iter=9999
+            * np.ones_like(ds["SH_SPEC"].values[:, :, 0], dtype=int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
