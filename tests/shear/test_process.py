@@ -2,7 +2,6 @@
 Test the entire processing pipeline
 """
 
-
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -29,8 +28,6 @@ from tests.fixtures import atomix_nc_filename
 # pspda = np.nanmedian(data["pspd"])
 
 
-
-
 def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
     import datashader as dsh
@@ -50,6 +47,16 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
     return im
 
 
+def test_load_atomix_netcdf(atomix_nc_filename):
+    from turban.shear import ShearProcessing
+
+    for load_levels in [(1, 2), (1, 2, 3)]:
+        p = ShearProcessing.from_atomix_netcdf(
+            atomix_nc_filename, load_levels=load_levels
+        )
+        assert isinstance(p.level4.eps, np.ndarray)
+
+
 def test_baltic_benchmark(atomix_nc_filename):
     import xarray as xr
     from turban.shear import (
@@ -59,11 +66,6 @@ def test_baltic_benchmark(atomix_nc_filename):
         ShearLevel3,
         ShearLevel4,
     )
-
-    for load_levels in [(1, 2), (1, 2, 3)]:
-
-        p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=load_levels)
-        assert isinstance(p.level4.eps, np.ndarray)
 
     p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=(1,))
 
@@ -91,9 +93,18 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds3_turban = level3.to_xarray()
     ds4_turban = level4.to_xarray()
 
-    _plot_level3(ds3, ds3_turban)
-    _plot_level4(ds4, ds4_turban)
+    ds3_turban.to_netcdf('out/tests/baltic_level3.nc')
+    ds4_turban.to_netcdf('out/tests/baltic_level4.nc')
+    
+    # _plot_level3(ds3, ds3_turban) # disable for now
+    # _plot_level4(ds4, ds4_turban) # TODO 
 
+def _plot_despiking(ds1, level1, ds2, level2):
+    plt.plot(level1.shear[0])
+    plt.plot(level2.shear[0])
+
+    ds1.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
+    ds2.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
 
 def _plot_level3(ds3, level3):
     level3["k"].loc[

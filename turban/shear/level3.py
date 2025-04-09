@@ -2,7 +2,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
 
-from turban.util import average_fast_to_slow, fast_to_slow_reshape_index
+from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
 from turban.utils.spectra import power_spectrum
 
 
@@ -24,6 +24,7 @@ def process_level3(
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pf
     Float[ndarray, "wavenumber"],  # freq
     Float[ndarray, "time_slow"],  # pspda
+    Int[ndarray, "time_slow"],  # section_marker_slow
     dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
 ]:
     ii = fast_to_slow_reshape_index(
@@ -44,10 +45,12 @@ def process_level3(
         else np.stack((pspd, *(arr for k, arr in ancillary.items())), axis=0)
     )
     # platform speed
-    data_slow: Float[ndarray, "variable time_slow"] = average_fast_to_slow(
+    data_slow: Float[ndarray, "variable time_slow"] = agg_fast_to_slow(
         data_fast, reshape_index=ii
     )
     pspda = data_slow[0, :]
+
+    section_marker_slow = section_marker[..., ii].max(axis=-1).max(axis=-1)
 
     # to wavenumber domain
     Pk = Pf * pspda[newaxis, :, newaxis] / fft_length / (sampling_freq / 2)
@@ -59,10 +62,6 @@ def process_level3(
     )
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
-    # get_uncertainty_estimates(P)
-
-    print(correction_factor_spatial)
-    # raise ValueError(correction_factor_spatial)
 
     ancillary_out = (
         {
@@ -73,9 +72,7 @@ def process_level3(
         else {}
     )
 
-    return k, Pk, Pf, freq, pspda, ancillary_out
-
-
+    return k, Pk, Pf, freq, pspda, section_marker_slow, ancillary_out
 
 
 def apply_compensation_spatial_response(

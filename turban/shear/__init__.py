@@ -1,15 +1,16 @@
-from logging import warning
+from logging import warnings
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from .config import ShearConfig
-from numpy import nan, ndarray
+from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
+from turban.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.shear.level2 import process_level2
 from turban.shear.level3 import process_level3
-from turban.shear.level4 import process_level4
+from turban.shear.level4 import process_level4, get_quality_metric
 
 
 @dataclass
@@ -35,7 +36,7 @@ class ShearLevel1:
 class ShearLevel2:
     shear: Float[ndarray, "n_shear time"]
     pspd: Float[ndarray, "time"]
-    n_despiked: Int[ndarray, "n_shear time"] | None
+    num_despike_iter: Int[ndarray, "n_shear time"] | None
     cfg: ShearConfig
 
     @classmethod
@@ -43,7 +44,7 @@ class ShearLevel2:
         cls,
         level1: ShearLevel1,
     ):
-        sh_cleaned, n_despiked = process_level2(
+        sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_marker,
             level1.cfg.sampling_freq,
@@ -53,7 +54,7 @@ class ShearLevel2:
         return cls(
             shear=sh_cleaned,
             pspd=level1.pspd,
-            n_despiked=n_despiked,
+            num_despike_iter=num_despike_iter,
             cfg=level1.cfg,
         )
 
@@ -63,7 +64,8 @@ class ShearLevel2:
         return cls(
             shear=ds.SHEAR.values,
             pspd=ds.PSPD_REL.values,
-            n_despiked=None,
+            # TODO: apparently not exported in benchmark files...?
+            num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -75,8 +77,11 @@ class ShearLevel3:
     Pf: Float[ndarray, "nshear time wavenumber"] | None
     freq: Float[ndarray, "wavenumber"] | None
     platform_speed: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"] | None
     cfg: ShearConfig
+    # TODO load from atomix netcdf
+    section_marker: Int[ndarray, "time"]
+    spike_fraction: Float[ndarray, "nshear time"]
+    max_despike_iter: Int[ndarray, "nshear time"]
 
     @classmethod
     def from_level2(
@@ -84,7 +89,7 @@ class ShearLevel3:
         level1: ShearLevel1,
         level2: ShearLevel2,
     ) -> "ShearLevel3":
-        k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
+        k, Pk, Pf, freq, platform_speed, section_marker, ancillary = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
             section_marker=level1.section_marker,
@@ -97,13 +102,37 @@ class ShearLevel3:
             diss_overlap=level2.cfg.diss_overlap,
         )
 
+        spike_fraction = get_cleaned_fraction(
+            x=level1.shear,
+            x_clean=level2.shear,
+            data_len=level1.shear.shape[-1],
+            fft_length=level2.cfg.fft_length,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
+            section_marker=level1.section_marker,
+        )
+
+        max_despike_iter = agg_fast_to_slow(
+            level2.num_despike_iter,
+            data_len=level2.num_despike_iter.shape[-1],
+            fft_length=level2.cfg.fft_length,
+            fft_overlap=level2.cfg.fft_overlap,
+            diss_length=level2.cfg.diss_length,
+            diss_overlap=level2.cfg.diss_overlap,
+            section_marker=level1.section_marker,
+            agg_method="max",
+        )
+
         return cls(
             Pk=Pk,
             k=k,
             Pf=Pf,
             freq=freq,
             platform_speed=platform_speed,
-            section_marker=None,
+            section_marker=section_marker,
+            spike_fraction=spike_fraction,
+            max_despike_iter=max_despike_iter,
             cfg=level2.cfg,
         )
 
@@ -119,7 +148,10 @@ class ShearLevel3:
             Pf=None,
             freq=None,
             platform_speed=ds["PSPD_REL"].values,
-            section_marker=None,
+            section_marker=ds["SECTION_NUMBER"].values.astype(int),
+            spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
+            max_despike_iter=9999
+            * np.ones_like(ds["SH_SPEC"].values[:, :, 0], dtype=int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -135,13 +167,60 @@ class ShearLevel3:
                 ),
                 "freq": (["wavenumber"], self.freq) if self.freq is not None else None,
                 "platform_speed": (["time_slow"], self.platform_speed),
+                "section_marker": (["time"], self.section_marker),
+                "spike_fraction": (["nshear", "time"], self.spike_fraction),
+                "max_despike_iter": (["nshear", "time"], self.max_despike_iter),
             }
         )
+
+    @property
+    def number_signals_vibration_removal(self):
+        """N_V in the ATOMIX paper"""
+        warnings.warn("Not implemented")
+        return 0
+
+    @property
+    def log_psi_var(self):
+        """sigma^2_{ln\Psi} in the ATOMIX paper"""
+        return (
+            5
+            / 4
+            * (
+                self.cfg.number_fft_windows_per_spectrum
+                - self.number_signals_vibration_removal
+            )
+            ** (-7 / 9)
+        )
+
+    @property
+    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]:
+        """95% confidence interval of power spectrum.
+        Eq. 23 in the ATOMIX paper"""
+        return np.concatenate(
+            (
+                self.Pk * np.exp(1.96 * self.log_psi_var)[newaxis, ...],
+                self.Pk * np.exp(-1.96 * self.log_psi_var)[newaxis, ...],
+            ),
+            axis=0,
+        )
+
+    @property
+    def data_length(self) -> Float[ndarray, "time"]:
+        """l_\epsilon in ATOMIX paper"""
+        tau_eps = self.cfg.diss_length / self.cfg.sampling_freq
+        return tau_eps * self.platform_speed
 
 
 @dataclass
 class ShearLevel4:
     eps: Float[ndarray, "nshear time"]
+    eps_source_flag: Int[ndarray, "nshear time"]
+    log_diss_var: Float[ndarray, "nshear time"]
+    log_diss_mad: Float[ndarray, "nshear time"]
+    kolm_length: Float[ndarray, "nshear time"]
+    resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
+    num_spec_points: Int[ndarray, "nshear time"]
+    quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
 
     @classmethod
@@ -149,15 +228,48 @@ class ShearLevel4:
         cls,
         level3: ShearLevel3,
     ) -> "ShearLevel4":
-        eps, _, _ = process_level4(
+        (
+            eps,
+            eps_source_flag,
+            log_diss_var,
+            kolm_length,
+            resolved_var_frac,
+            fom,
+            log_diss_mad,
+            num_spec_points,
+        ) = process_level4(
             psi=level3.Pk,
             wavenumber=level3.k,
             platform_speed=level3.platform_speed,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+            data_length=level3.data_length,
+            log_psi_var=level3.log_psi_var,
         )
-        return cls(eps=eps, cfg=level3.cfg)
+
+        quality_metric = get_quality_metric(
+            eps=eps,
+            eps_source_flag=eps_source_flag,
+            fom=fom,
+            spike_fraction=level3.spike_fraction,
+            log_diss_var=log_diss_var,
+            num_spec_points=num_spec_points,
+            num_despike_iter=level3.max_despike_iter,
+            resolved_var_frac=resolved_var_frac,
+        )
+
+        return cls(
+            eps=eps,
+            eps_source_flag=eps_source_flag,
+            log_diss_var=log_diss_var,
+            log_diss_mad=log_diss_mad,
+            kolm_length=kolm_length,
+            resolved_var_frac=resolved_var_frac,
+            num_spec_points=num_spec_points,
+            quality_metric=quality_metric,
+            cfg=level3.cfg,
+        )
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
@@ -171,8 +283,13 @@ class ShearLevel4:
         return xr.Dataset(
             data_vars={
                 "eps": (["nshear", "time_slow"], self.eps),
-                # "eps_specint": (["nshear", "time_slow"], eps),
-                # "eps_isrfit": (["nshear", "time_slow"], eps),
+                "eps_source_flag": (["nshear", "time_slow"], self.eps_source_flag),
+                "log_diss_var": (["nshear", "time_slow"], self.log_diss_var),
+                "log_diss_mad": (["nshear", "time_slow"], self.log_diss_mad),
+                "kolm_length": (["nshear", "time_slow"], self.kolm_length),
+                "resolved_var_frac": (["nshear", "time_slow"], self.resolved_var_frac),
+                "num_spec_points": (["nshear", "time_slow"], self.num_spec_points),
+                "quality_metric": (["nshear", "time_slow"], self.quality_metric),
             }
         )
 

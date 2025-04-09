@@ -100,14 +100,6 @@ def temperature_dissipation(
     """
     Calculate chi (temperature variance dissipation)
     """
-    if dTdt.shape[0] < fft_length * (chunklen + 1) / 2:
-        # insufficient data available
-        return (
-            np.ones((0, fft_length // 2 + 1), dtype=float),
-            np.ones((0, fft_length // 2 + 1), dtype=float),
-            np.ones((0,), dtype=float),
-            np.ones((0,), dtype=float),
-        )
     k, Pk, Pnoise = temperature_gradient_spectra(
         dTdt,
         pspd,

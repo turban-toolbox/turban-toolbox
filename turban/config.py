@@ -1,9 +1,12 @@
 from pydantic import BaseModel
 from netCDF4 import Dataset
+import numpy as np
+
 
 class SegmentConfig(BaseModel):
     """Configures segment-wise processing of timeseries."""
-    sampling_freq: float # [Hz]
+
+    sampling_freq: float  # [Hz]
     fft_length: int
     fft_overlap: int
     diss_length: int
@@ -24,3 +27,13 @@ class SegmentConfig(BaseModel):
     def from_atomix_netcdf(cls, fname):
         kwarg = cls._attrs_from_atomix_netcdf(fname)
         return cls(**kwarg)
+
+    @property
+    def number_fft_windows_per_spectrum(self):
+        """N_f in the ATOMIX paper"""
+        fft_segment_start = np.arange(
+            0,
+            self.diss_length - self.fft_length + 1,
+            self.fft_length - self.fft_overlap,
+        )  # start of each fft segment within a spectrum segment
+        return len(fft_segment_start)
