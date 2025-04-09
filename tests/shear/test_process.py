@@ -47,7 +47,7 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
     return im
 
 
-def _test_load_atomix_netcdf(atomix_nc_filename):
+def test_load_atomix_netcdf(atomix_nc_filename):
     from turban.shear import ShearProcessing
 
     for load_levels in [(1, 2), (1, 2, 3)]:
