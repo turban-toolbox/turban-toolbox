@@ -150,12 +150,12 @@ def test_average_fast_to_slow():
 def test_agg_fast_to_slow():
     x = np.arange(20.)
     xm = agg_fast_to_slow(
-        x,
         data_len=len(x),
         fft_length=4,
         fft_overlap=2,
         diss_length=10,
         diss_overlap=0,
         agg_method="max",
+        x,
     )
     assert np.all(xm == np.array([9., 19.]))

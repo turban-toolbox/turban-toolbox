@@ -1,6 +1,7 @@
 import json
 from functools import wraps
 import numpy as np
+from inspect import signature,  Parameter
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
@@ -22,6 +23,7 @@ def ensure_reshape_index(func):
         diss_length: int = None,
         diss_overlap: int = None,
         section_marker: Int[ndarray, "num_data"] = None,
+
         **kwarg,
     ):
         if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
@@ -34,6 +36,17 @@ def ensure_reshape_index(func):
                 section_marker,
             )
         return func(*argv, **kwarg)
+    
+    sig = signature(func)
+    new_parameters = [
+        Parameter('data_len', Parameter.POSITIONAL_OR_KEYWORD, annotation=int),
+        Parameter('fft_length', Parameter.POSITIONAL_OR_KEYWORD, annotation=int),
+        Parameter('fft_overlap', Parameter.POSITIONAL_OR_KEYWORD, annotation=int),
+        Parameter('diss_length', Parameter.POSITIONAL_OR_KEYWORD, annotation=int),
+        Parameter('diss_overlap', Parameter.POSITIONAL_OR_KEYWORD, annotation=int),
+        Parameter('section_marker', Parameter.POSITIONAL_OR_KEYWORD, annotation=Int[ndarray, "num_data"]),
+        ] 
+    decorated.__signature__ = sig.replace(parameters=new_parameters+ list(sig.parameters.values()))
 
     return decorated
 
