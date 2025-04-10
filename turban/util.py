@@ -137,9 +137,22 @@ def agg_fast_to_slow(
     `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
     `max`, etc.
     """
+    if agg_method in ("grad"):
+        raise NotImplementedError("Cannot calculate gradients yet")
     ii = diss_chunk_wise_reshape_index(reshape_index)
     xi = x[..., ii]
     return getattr(xi, agg_method)(axis=-1)
+
+
+def agg_fast_to_slow_batch(
+    data: dict[str, Num[ndarray, "any time_fast"]],
+    *argv,
+    **kwarg,
+):
+    arr_fast = np.stack((arr for _, arr in data.items()), axis=0)
+    arr_slow = agg_fast_to_slow(arr_fast, *argv, **kwarg)
+    data_slow = {name: arr_slow[ind, :] for ind, name in enumerate(data.keys())}
+    return data_slow
 
 
 def fast_to_slow_avg_by_segment():

@@ -1,5 +1,6 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
+from functools import wraps
 from logging import warnings
 from typing import get_type_hints
 from abc import abstractmethod, ABC
@@ -11,7 +12,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
+from turban.util import agg_fast_to_slow_batch, fast_to_slow_reshape_index
 
 
 @dataclass(kw_only=True)
@@ -93,29 +94,37 @@ class Level4(HasLevelBelow, TimeseriesLevel):
     pass
 
 
-@dataclass(kw_only=True)
 class AggAux:
+    """Aggregates auxiliary variables from fast to slow timesteps"""
+
     def __init__(
         self,
-        slow: dict[str, Num[ndarray, "... time_slow"]],
-        fast: dict[str, Num[ndarray, "... time_fast"]],
-        diss_length: int, diss_overlap: int,
-        section_marker: Int[ndarray, "... time_fast"] | None = None,
-        
+        data_len: int,
+        diss_length: int,
+        diss_overlap: int,
+        section_marker: Int[ndarray, "... data_len"] | None = None,
     ) -> None:
-        
-        self._data_slow = slow
-        self._data_fast = fast
         if section_marker is None:
-            self.section_marker
-        self.section_marker = section_marker
-        self._data_fast_len = section_marker.shape[-1]
+            self.section_marker = np.ones((data_len), dtype=int)
+        else:
+            self.section_marker = section_marker
 
-    def agg(self,  agg_methods: dict[str, str]):
-        if self._data_slow
-        ii = fast_to_slow_reshape_index(data_len=)
-        for agg_method, var_name in agg_methods.items():
+        self._data_len = data_len
+        self._diss_length = diss_length
+        self._diss_overlap = diss_overlap
+        self._agg_index = fast_to_slow_reshape_index(data_len)
 
+    def agg(
+        self,
+        data: dict[str, dict[str, Num[ndarray, "... time_fast"]]],
+    ) -> dict[str, dict[str, Num[ndarray, "... time_slow"]]]:
+        """Aggregates data in the form {agg_method: {variable_name: ndarray}}"""
+        slow = {}
+        for agg_method, data_fast in data.items():
+            slow[agg_method] = agg_fast_to_slow_batch(
+                data_fast, self._agg_index, agg_method
+            )
+        return slow
 
 
 class Processing(ABC):
@@ -126,15 +135,6 @@ class Processing(ABC):
     def _level_mapping(self) -> dict:
         # Slightly clumsy way of requiring a class attribute called _level_mapping
         return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
-
-    @property
-    @abstractmethod
-    def _agg_mapping(self) -> dict:
-        """Slightly clumsy way of requiring a class attribute called `_agg_mapping`.
-        `_agg_mapping` determines which quantities are aggregated from fast to slow time.
-
-        {agg_method: [name]}"""
-        return {"mean": []}
 
     def __init__(self, data: TimeseriesLevel, level: Literal[1, 2, 3, 4]):
         for l in range(level + 1, 5):

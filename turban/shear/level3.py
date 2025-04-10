@@ -17,7 +17,6 @@ def process_level3(
     spatial_response_wavenum: float,
     freq_highpass: float,
     section_marker: Int[ndarray, "time_fast"],
-    ancillary: dict[str, Float[ndarray, "time_fast"]] = None,  # average to time_slow
 ) -> tuple[
     Float[ndarray, "time_slow k"],  # k
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pk
@@ -63,16 +62,8 @@ def process_level3(
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
 
-    ancillary_out = (
-        {
-            name: (["time_slow"], data_slow[ind + 1, :])
-            for ind, name in enumerate(ancillary.keys())
-        }
-        if ancillary is not None
-        else {}
-    )
 
-    return k, Pk, Pf, freq, pspda, section_marker_slow, ancillary_out
+    return k, Pk, Pf, freq, pspda, section_marker_slow
 
 
 def apply_compensation_spatial_response(
