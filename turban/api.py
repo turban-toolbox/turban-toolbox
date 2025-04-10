@@ -2,7 +2,7 @@
 
 from logging import warnings
 from typing import get_type_hints
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int, AbstractArray, Num
@@ -11,7 +11,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow
+from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
 
 
 @dataclass(kw_only=True)
@@ -93,7 +93,32 @@ class Level4(HasLevelBelow, TimeseriesLevel):
     pass
 
 
-class Processing:
+@dataclass(kw_only=True)
+class AggAux:
+    def __init__(
+        self,
+        slow: dict[str, Num[ndarray, "... time_slow"]],
+        fast: dict[str, Num[ndarray, "... time_fast"]],
+        diss_length: int, diss_overlap: int,
+        section_marker: Int[ndarray, "... time_fast"] | None = None,
+        
+    ) -> None:
+        
+        self._data_slow = slow
+        self._data_fast = fast
+        if section_marker is None:
+            self.section_marker
+        self.section_marker = section_marker
+        self._data_fast_len = section_marker.shape[-1]
+
+    def agg(self,  agg_methods: dict[str, str]):
+        if self._data_slow
+        ii = fast_to_slow_reshape_index(data_len=)
+        for agg_method, var_name in agg_methods.items():
+
+
+
+class Processing(ABC):
     """Propagates a given start level up to level 4."""
 
     @property
@@ -101,6 +126,15 @@ class Processing:
     def _level_mapping(self) -> dict:
         # Slightly clumsy way of requiring a class attribute called _level_mapping
         return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
+
+    @property
+    @abstractmethod
+    def _agg_mapping(self) -> dict:
+        """Slightly clumsy way of requiring a class attribute called `_agg_mapping`.
+        `_agg_mapping` determines which quantities are aggregated from fast to slow time.
+
+        {agg_method: [name]}"""
+        return {"mean": []}
 
     def __init__(self, data: TimeseriesLevel, level: Literal[1, 2, 3, 4]):
         for l in range(level + 1, 5):
