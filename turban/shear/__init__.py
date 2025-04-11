@@ -2,6 +2,7 @@ from logging import warnings
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
+from netCDF4 import Dataset
 from .config import ShearConfig
 from numpy import newaxis, nan, ndarray
 import numpy as np
@@ -11,7 +12,7 @@ from turban.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.shear.level2 import process_level2
 from turban.shear.level3 import process_level3
 from turban.shear.level4 import process_level4, get_quality_metric
-from turban.api import Level1, Level2, Level3, Level4, Processing
+from turban.api import AggAux, Level1, Level2, Level3, Level4, Processing
 
 
 @dataclass(kw_only=True)
@@ -36,7 +37,7 @@ class ShearLevel1(Level1):
 @dataclass(kw_only=True)
 class ShearLevel2(Level2):
     shear: Float[ndarray, "n_shear time"]
-    num_despike_iter: Int[ndarray, "n_shear time"] 
+    num_despike_iter: Int[ndarray, "n_shear time"]
 
     @classmethod
     def from_level_below(
@@ -277,4 +278,51 @@ class ShearProcessing(Processing):
         level: Literal[1, 2, 3, 4],
     ):
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-        return cls(data, level)
+
+        aux_vars = ["time", "press", "temp", "cond"]
+        arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(fname, aux_vars)))
+        data_aux = {
+            "time": (
+                ["time"],
+                arr["time"],
+                {"mean": "time_slow"},
+            ),
+            "press": (
+                ["time"],
+                arr["press"],
+                {"mean": "press"},
+            ),
+            "temp": (
+                ["time"],
+                arr["temp"][0, :],
+                {"mean": "temp"},
+            ),
+            "cond": (
+                ["time"],
+                arr["cond"],
+                {"mean": "cond"},
+            ),
+        }
+        coords_aux = ["time", "time_slow"]
+        return cls(data, level, data_aux, coords_aux)
+
+
+class AtomixNetcdfLoader:
+    _map = {
+        "time": "L1_converted/TIME",
+        # 'L1_converted/SHEAR',
+        # 'L1_converted/TIME_CTD',
+        # 'L1_converted/PSPD_REL',
+        "press": "L1_converted/PRES",
+        # 'L1_converted/VIB',
+        "temp": "L1_converted/TEMP",
+        # 'L1_converted/TEMP_CTD',
+        "cond": "L1_converted/CNDC",
+    }
+
+    def load(self, fname: str, vars: list[str]):
+        with Dataset(fname) as ds:
+            for var in vars:
+                print(ds[self._map[var]][:])
+            data = [ds[self._map[var]][:] for var in vars]
+        return data

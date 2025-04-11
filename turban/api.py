@@ -14,6 +14,15 @@ import xarray as xr
 
 from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
 
+_AuxDataTypehint = dict[
+    str,
+    tuple[
+        list[str],
+        Num[ndarray, "*any time_fast"],
+        dict[str, str | None],
+    ],
+]
+
 
 @dataclass(kw_only=True)
 class TimeseriesLevel:
@@ -123,14 +132,7 @@ class AggAux:
 
     def agg(
         self,
-        data: dict[
-            str,
-            tuple[
-                tuple[str],
-                Num[ndarray, "*any time_fast"],
-                dict[str, str | None],
-            ],
-        ],
+        data: _AuxDataTypehint,
         coords: list[str],
     ) -> None:
         """Aggregates data in the form
@@ -142,7 +144,9 @@ class AggAux:
                     varname_new = f"{varname}_{agg_method}"
                 slow[varname_new] = (
                     dims,
-                    agg_fast_to_slow(arr, self._agg_index, agg_method),
+                    agg_fast_to_slow(
+                        arr, reshape_index=self._agg_index, agg_method=agg_method
+                    ),
                 )
         self._slow = slow
         self._fast = {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
@@ -169,23 +173,14 @@ class Processing(ABC):
         self,
         data: TimeseriesLevel,
         level: Literal[1, 2, 3, 4],
-        data_aux: (
-            dict[
-                str,
-                tuple[
-                    tuple[str],
-                    Num[ndarray, "*any time_fast"],
-                    dict[str, str | None],
-                ],
-            ]
-            | None
-        ) = None,
+        data_aux: _AuxDataTypehint | None = None,
         coords_aux: list[str] | None = None,
+        cls_aux: type = AggAux,
     ):
         for l in range(level + 1, 5):
             data = self._level_mapping[l].from_level_below(data)
         self.data = data
-        agg = AggAux(
+        agg = cls_aux(
             self.data_len_fast,
             self.cfg.diss_length,
             self.cfg.diss_overlap,
@@ -193,7 +188,7 @@ class Processing(ABC):
         )
         if data_aux is not None and coords_aux is not None:
             agg.agg(data_aux, coords_aux)
-        self._agg = agg
+        self.aux = agg
 
     @property
     def level1(self):
@@ -231,6 +226,8 @@ class Processing(ABC):
             return None
         else:
             return self.level2.time.shape[-1]
+
+    # def to_xarray(self):
 
 
 def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict]:
