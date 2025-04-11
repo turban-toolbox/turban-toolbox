@@ -1,8 +1,9 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
+from functools import wraps
 from logging import warnings
 from typing import get_type_hints
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int, AbstractArray, Num
@@ -11,7 +12,16 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow
+from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
+
+_AuxDataTypehint = dict[
+    str,
+    tuple[
+        list[str],
+        Num[ndarray, "*any time_fast"],
+        dict[str, str | None],
+    ],
+]
 
 
 @dataclass(kw_only=True)
@@ -93,7 +103,64 @@ class Level4(HasLevelBelow, TimeseriesLevel):
     pass
 
 
-class Processing:
+class AggAux:
+    """Aggregates auxiliary variables from fast to slow timesteps"""
+
+    def __init__(
+        self,
+        data_len: int,
+        diss_length: int,
+        diss_overlap: int,
+        section_marker: Int[ndarray, "... data_len"] | None = None,
+    ) -> None:
+        if section_marker is None:
+            self.section_marker = np.ones((data_len), dtype=int)
+        else:
+            self.section_marker = section_marker
+
+        self._data_len = data_len
+        self._diss_length = diss_length
+        self._diss_overlap = diss_overlap
+        self._agg_index = fast_to_slow_reshape_index(
+            data_len,
+            diss_length,
+            0,
+            diss_length,
+            diss_overlap,
+            section_marker,
+        )
+
+    def agg(
+        self,
+        data: _AuxDataTypehint,
+        coords: list[str],
+    ) -> None:
+        """Aggregates data in the form
+        {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}"""
+        slow = {}
+        for varname, (dims, arr, rename_dict) in data.items():
+            for agg_method, varname_new in rename_dict.items():
+                if varname_new is None:
+                    varname_new = f"{varname}_{agg_method}"
+                slow[varname_new] = (
+                    dims,
+                    agg_fast_to_slow(
+                        arr, reshape_index=self._agg_index, agg_method=agg_method
+                    ),
+                )
+        self._slow = slow
+        self._fast = {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
+        self._coords = coords
+
+    def to_xarray(self):
+        coords, data_vars = _split_dict_by(self._slow, self._coords)
+        slow = xr.Dataset(data_vars=data_vars, coords=coords)
+        coords, data_vars = _split_dict_by(self._fast, self._coords)
+        fast = xr.Dataset(data_vars=data_vars, coords=coords)
+        return slow, fast
+
+
+class Processing(ABC):
     """Propagates a given start level up to level 4."""
 
     @property
@@ -102,10 +169,26 @@ class Processing:
         # Slightly clumsy way of requiring a class attribute called _level_mapping
         return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
 
-    def __init__(self, data: TimeseriesLevel, level: Literal[1, 2, 3, 4]):
+    def __init__(
+        self,
+        data: TimeseriesLevel,
+        level: Literal[1, 2, 3, 4],
+        data_aux: _AuxDataTypehint | None = None,
+        coords_aux: list[str] | None = None,
+        cls_aux: type = AggAux,
+    ):
         for l in range(level + 1, 5):
             data = self._level_mapping[l].from_level_below(data)
         self.data = data
+        agg = cls_aux(
+            self.data_len_fast,
+            self.cfg.diss_length,
+            self.cfg.diss_overlap,
+            self.level1.section_marker,
+        )
+        if data_aux is not None and coords_aux is not None:
+            agg.agg(data_aux, coords_aux)
+        self.aux = agg
 
     @property
     def level1(self):
@@ -135,3 +218,19 @@ class Processing:
     @property
     def cfg(self):
         return self.level4.cfg
+
+    @property
+    def data_len_fast(self):
+        """Length of the fast time vector (levels 1 and 2)"""
+        if self.level2 is None:
+            return None
+        else:
+            return self.level2.time.shape[-1]
+
+    # def to_xarray(self):
+
+
+def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
+    has_key = {k: v for k, v in dct.items() if k in keys}
+    has_key_not = {k: v for k, v in dct.items() if k not in keys}
+    return has_key, has_key_not

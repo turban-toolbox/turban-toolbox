@@ -1,9 +1,9 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from turban.instruments.config import InstrumentConfig
 from turban.shear import ShearLevel1
 
 
-class Instrument:
+class Instrument(ABC):
     def __init__(self, cfg: InstrumentConfig):
         self.cfg = cfg
 
