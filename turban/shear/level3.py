@@ -24,7 +24,6 @@ def process_level3(
     Float[ndarray, "wavenumber"],  # freq
     Float[ndarray, "time_slow"],  # pspda
     Int[ndarray, "time_slow"],  # section_marker_slow
-    dict[str, Float[ndarray, "time_slow"]],  # ancillary_out
 ]:
     ii = fast_to_slow_reshape_index(
         shear.shape[-1],
@@ -37,17 +36,8 @@ def process_level3(
 
     Pf, freq = power_spectrum(shear, sampling_freq, reshape_index=ii)
 
-    # Average to time_slow
-    data_fast: Float[ndarray, "variable time_fast"] = (
-        pspd[newaxis, :]  # add dimension
-        if ancillary is None
-        else np.stack((pspd, *(arr for k, arr in ancillary.items())), axis=0)
-    )
     # platform speed
-    data_slow: Float[ndarray, "variable time_slow"] = agg_fast_to_slow(
-        data_fast, reshape_index=ii
-    )
-    pspda = data_slow[0, :]
+    pspda = agg_fast_to_slow(pspd, reshape_index=ii)
 
     section_marker_slow = section_marker[..., ii].max(axis=-1).max(axis=-1)
 
@@ -61,7 +51,6 @@ def process_level3(
     )
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
-
 
     return k, Pk, Pf, freq, pspda, section_marker_slow
 

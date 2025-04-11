@@ -22,6 +22,7 @@ class ShearLevel1(Level1):
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L1_converted")
+        # TODO: handle section_marker through level 2
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
@@ -87,7 +88,7 @@ class ShearLevel3(Level3):
     ) -> "ShearLevel3":
         level2 = data
         level1 = data.level_below
-        k, Pk, Pf, freq, platform_speed, section_marker, ancillary = process_level3(
+        k, Pk, Pf, freq, platform_speed, section_marker = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
             section_marker=level1.section_marker,

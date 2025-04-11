@@ -12,7 +12,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow_batch, fast_to_slow_reshape_index
+from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
 
 
 @dataclass(kw_only=True)
@@ -112,19 +112,48 @@ class AggAux:
         self._data_len = data_len
         self._diss_length = diss_length
         self._diss_overlap = diss_overlap
-        self._agg_index = fast_to_slow_reshape_index(data_len)
+        self._agg_index = fast_to_slow_reshape_index(
+            data_len,
+            diss_length,
+            0,
+            diss_length,
+            diss_overlap,
+            section_marker,
+        )
 
     def agg(
         self,
-        data: dict[str, dict[str, Num[ndarray, "... time_fast"]]],
-    ) -> dict[str, dict[str, Num[ndarray, "... time_slow"]]]:
-        """Aggregates data in the form {agg_method: {variable_name: ndarray}}"""
+        data: dict[
+            str,
+            tuple[
+                tuple[str],
+                Num[ndarray, "*any time_fast"],
+                dict[str, str | None],
+            ],
+        ],
+        coords: list[str],
+    ) -> None:
+        """Aggregates data in the form
+        {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}"""
         slow = {}
-        for agg_method, data_fast in data.items():
-            slow[agg_method] = agg_fast_to_slow_batch(
-                data_fast, self._agg_index, agg_method
-            )
-        return slow
+        for varname, (dims, arr, rename_dict) in data.items():
+            for agg_method, varname_new in rename_dict.items():
+                if varname_new is None:
+                    varname_new = f"{varname}_{agg_method}"
+                slow[varname_new] = (
+                    dims,
+                    agg_fast_to_slow(arr, self._agg_index, agg_method),
+                )
+        self._slow = slow
+        self._fast = {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
+        self._coords = coords
+
+    def to_xarray(self):
+        coords, data_vars = _split_dict_by(self._slow, self._coords)
+        slow = xr.Dataset(data_vars=data_vars, coords=coords)
+        coords, data_vars = _split_dict_by(self._fast, self._coords)
+        fast = xr.Dataset(data_vars=data_vars, coords=coords)
+        return slow, fast
 
 
 class Processing(ABC):
@@ -136,10 +165,35 @@ class Processing(ABC):
         # Slightly clumsy way of requiring a class attribute called _level_mapping
         return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
 
-    def __init__(self, data: TimeseriesLevel, level: Literal[1, 2, 3, 4]):
+    def __init__(
+        self,
+        data: TimeseriesLevel,
+        level: Literal[1, 2, 3, 4],
+        data_aux: (
+            dict[
+                str,
+                tuple[
+                    tuple[str],
+                    Num[ndarray, "*any time_fast"],
+                    dict[str, str | None],
+                ],
+            ]
+            | None
+        ) = None,
+        coords_aux: list[str] | None = None,
+    ):
         for l in range(level + 1, 5):
             data = self._level_mapping[l].from_level_below(data)
         self.data = data
+        agg = AggAux(
+            self.data_len_fast,
+            self.cfg.diss_length,
+            self.cfg.diss_overlap,
+            self.level1.section_marker,
+        )
+        if data_aux is not None and coords_aux is not None:
+            agg.agg(data_aux, coords_aux)
+        self._agg = agg
 
     @property
     def level1(self):
@@ -169,3 +223,17 @@ class Processing(ABC):
     @property
     def cfg(self):
         return self.level4.cfg
+
+    @property
+    def data_len_fast(self):
+        """Length of the fast time vector (levels 1 and 2)"""
+        if self.level2 is None:
+            return None
+        else:
+            return self.level2.time.shape[-1]
+
+
+def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict]:
+    has_key = {k: v for k, v in dct.items() if k in keys}
+    has_key_not = {k: v for k, v in dct.items() if k not in keys}
+    return has_key, has_key_not

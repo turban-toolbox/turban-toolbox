@@ -145,7 +145,7 @@ def agg_fast_to_slow(
 
 
 def agg_fast_to_slow_batch(
-    data: dict[str, Num[ndarray, "any time_fast"]],
+    data: dict[str, Num[ndarray, "time_fast"]],
     *argv,
     **kwarg,
 ):
