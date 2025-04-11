@@ -147,6 +147,7 @@ def detect_shear_spikes(
     spike_threshold: float = 8.0,
     spike_include_before: int = 10,
     spike_include_after: int = 20,
+    cutoff_freq_lp: float = 0.5,
 ) -> Bool[ndarray, "time"]:
     sh_hp = butterfilt(
         signal=sh,
@@ -157,11 +158,10 @@ def detect_shear_spikes(
     sh_abs = np.abs(sh_hp)
     sh_lp = butterfilt(
         signal=sh_abs,
-        cutoff_freq_Hz=1,
+        cutoff_freq_Hz=cutoff_freq_lp,
         sampling_freq=sampling_freq,
         btype="lp",
     )
-    print(sh_abs / sh_lp)
     spikes = (sh_abs / sh_lp) > spike_threshold  # boolean array
     spikes = enlarge_bool(spikes, spike_include_before, spike_include_after)
     return np.array(spikes)
