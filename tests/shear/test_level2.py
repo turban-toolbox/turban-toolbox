@@ -36,7 +36,7 @@ def test_despike_benchmark(atomix_nc_filename):
     ds1.isel(**isel).shear.plot(**plotarg)
     ds2.isel(**isel).shear.plot(**plotarg)
     ds2_bm.isel(**isel).shear.plot(**plotarg)
-    # ax.legend(['L1', 'L2 turban', 'L2 benchmark'])
+    ax.legend(['L1', 'L2 turban', 'L2 benchmark'])
     ax.grid()
     ax.set_title(f"Samples {ti.start}..{ti.stop}")
     fig.savefig('out/tests/level2-despike.png')
