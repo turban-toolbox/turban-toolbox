@@ -322,7 +322,5 @@ class AtomixNetcdfLoader:
 
     def load(self, fname: str, vars: list[str]):
         with Dataset(fname) as ds:
-            for var in vars:
-                print(ds[self._map[var]][:])
             data = [ds[self._map[var]][:] for var in vars]
         return data

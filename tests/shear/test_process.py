@@ -71,6 +71,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     level2 = p.level2
     level3 = p.level3
     level4 = p.level4
+    aux, _ = p.aux.to_xarray()
     assert isinstance(level1, ShearLevel1)
     assert isinstance(level2, ShearLevel2)
     assert isinstance(level3, ShearLevel3)
@@ -95,7 +96,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds4_turban.to_netcdf("out/tests/baltic_level4.nc")
 
     # _plot_level3(ds3, ds3_turban) # disable for now
-    # _plot_level4(ds4, ds4_turban) # TODO
+    _plot_level4(ds4, aux, ds4_turban) # TODO
 
 
 def _plot_despiking(ds1, level1, ds2, level2):
@@ -189,12 +190,12 @@ def _plot_level3(ds3, level3):
         fig.savefig(f"out/tests/baltic-level3-shear-{nshear}.png")
 
 
-def _plot_level4(ds4, level4):
+def _plot_level4(ds4, aux, level4):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 9))
     ax.plot(ds4.PRES, ds4.EPSI_FINAL, "k", label="benchmark", marker="o")
-    ax.plot(level4.PRES, level4.eps.mean("nshear"), "r", label="turban", marker="o")
+    ax.plot(aux.press, level4.eps.mean("nshear"), "r", label="turban", marker="o")
     ax.set_xlabel("Pressure (dbar)")
     ax.set_ylabel("Dissipation rate (W/kg)")
     ax.set_yscale("log")

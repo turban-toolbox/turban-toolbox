@@ -230,7 +230,7 @@ class Processing(ABC):
     # def to_xarray(self):
 
 
-def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict]:
+def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
     has_key = {k: v for k, v in dct.items() if k in keys}
     has_key_not = {k: v for k, v in dct.items() if k not in keys}
     return has_key, has_key_not
