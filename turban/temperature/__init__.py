@@ -9,14 +9,14 @@ import xarray as xr
 from turban.temperature.temperature import temperature_gradient_spectra
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TempLevel1:
     pspd: Float[ndarray, "time"]
     temp: Float[ndarray, "ntemp time"]
     cfg: TempConfig
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TempLevel2:
     pspd: Float[ndarray, "time"]
     dtemp_dt: Float[ndarray, "ntemp time"]
@@ -41,7 +41,7 @@ class TempLevel2:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TempLevel3:
     Pk: Float[ndarray, "ntemp time wavenumber"]
     k: Float[ndarray, "time wavenumber"]
@@ -106,7 +106,7 @@ class TempLevel3:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TempLevel4:
     eps: Float[ndarray, "ntemp time"]
     cfg: TempConfig
