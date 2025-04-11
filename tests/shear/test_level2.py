@@ -11,7 +11,31 @@ from turban.shear.level2 import (
 from turban.shear import ShearLevel1, ShearLevel2
 from tests.fixtures import atomix_nc_filename
 
+
 def test_despike_benchmark(atomix_nc_filename):
+
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
+    ds1 = level1.to_xarray()
+
+    # level2_bm = ShearLevel2.from_atomix_netcdf(atomix_nc_filename)
+    # ds2_bm = level2_bm.to_xarray()
+
+    # ds2 = ShearLevel2.from_level_below(level1).to_xarray()
+
+    ti = slice(50_300, 50_800)
+    # ti = slice(51_000, 51_500)
+    # ti = slice(0, -1)
+    # ti = slice(105_600, 106_000)
+    # ti = slice(122_000, 125_000)
+    # ti = slice(103_000, 107_000)
+
+    isel = dict(n_shear=0, time=ti)
+    # currently, no spike is detected in this segment!
+    x = ds1.isel(**isel).shear.values
+    assert np.any(detect_shear_spikes(x, 1024.0, 8.0))
+
+
+def test_despike_benchmark_plot(atomix_nc_filename):
 
     level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
     ds1 = level1.to_xarray()
@@ -36,15 +60,10 @@ def test_despike_benchmark(atomix_nc_filename):
     ds1.isel(**isel).shear.plot(**plotarg)
     ds2.isel(**isel).shear.plot(**plotarg)
     ds2_bm.isel(**isel).shear.plot(**plotarg)
-    ax.legend(['L1', 'L2 turban', 'L2 benchmark'])
+    ax.legend(["L1", "L2 turban", "L2 benchmark"])
     ax.grid()
     ax.set_title(f"Samples {ti.start}..{ti.stop}")
-    fig.savefig('out/tests/level2-despike.png')
-
-    x = ds1.isel(**isel).shear.values
-
-    # currently, no spike is detected in this segment!
-    assert np.any(detect_shear_spikes(x, 1024.0, 8.0))
+    fig.savefig("out/tests/level2-despike.png")
 
 
 def test_enlarge_bool():

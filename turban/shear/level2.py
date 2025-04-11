@@ -161,6 +161,7 @@ def detect_shear_spikes(
         sampling_freq=sampling_freq,
         btype="lp",
     )
+    print(sh_abs / sh_lp)
     spikes = (sh_abs / sh_lp) > spike_threshold  # boolean array
     spikes = enlarge_bool(spikes, spike_include_before, spike_include_after)
     return np.array(spikes)
