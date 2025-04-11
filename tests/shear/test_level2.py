@@ -9,14 +9,14 @@ from turban.shear.level2 import (
     enlarge_bool,
 )
 from turban.shear import ShearLevel1, ShearLevel2
+from tests.fixtures import atomix_nc_filename
 
+def test_despike_benchmark(atomix_nc_filename):
 
-def test_despike_benchmark():
-
-    level1 = ShearLevel1.from_atomix_netcdf("data/mss/MSS_Baltic.nc")
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
     ds1 = level1.to_xarray()
 
-    level2_bm = ShearLevel2.from_atomix_netcdf("data/mss/MSS_Baltic.nc")
+    level2_bm = ShearLevel2.from_atomix_netcdf(atomix_nc_filename)
     ds2_bm = level2_bm.to_xarray()
 
     ds2 = ShearLevel2.from_level_below(level1).to_xarray()
