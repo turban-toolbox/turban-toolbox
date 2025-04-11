@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from turban.shear.level2 import (
     boolarr_to_sections,
     sections_to_marker,
@@ -7,6 +8,43 @@ from turban.shear.level2 import (
     rollpad1,
     enlarge_bool,
 )
+from turban.shear import ShearLevel1, ShearLevel2
+
+
+def test_despike_benchmark():
+
+    level1 = ShearLevel1.from_atomix_netcdf("data/mss/MSS_Baltic.nc")
+    ds1 = level1.to_xarray()
+
+    level2_bm = ShearLevel2.from_atomix_netcdf("data/mss/MSS_Baltic.nc")
+    ds2_bm = level2_bm.to_xarray()
+
+    ds2 = ShearLevel2.from_level_below(level1).to_xarray()
+
+    ti = slice(50_300, 50_800)
+    # ti = slice(51_000, 51_500)
+    # ti = slice(0, -1)
+    # ti = slice(105_600, 106_000)
+    # ti = slice(122_000, 125_000)
+    # ti = slice(103_000, 107_000)
+
+    fig = plt.figure(figsize=(9, 9))
+    ax = fig.subplots()
+    plotarg = dict(marker=".", lw=0.1, ax=ax)
+    isel = dict(n_shear=0, time=ti)
+
+    ds1.isel(**isel).shear.plot(**plotarg)
+    ds2.isel(**isel).shear.plot(**plotarg)
+    ds2_bm.isel(**isel).shear.plot(**plotarg)
+    # ax.legend(['L1', 'L2 turban', 'L2 benchmark'])
+    ax.grid()
+    ax.set_title(f"Samples {ti.start}..{ti.stop}")
+    fig.savefig('out/tests/level2-despike.png')
+
+    x = ds1.isel(**isel).shear.values
+
+    # currently, no spike is detected in this segment!
+    assert np.any(detect_shear_spikes(x, 1024.0, 8.0))
 
 
 def test_enlarge_bool():
