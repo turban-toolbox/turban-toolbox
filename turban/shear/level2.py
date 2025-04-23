@@ -22,13 +22,13 @@ def process_level2(
     section_markers: Int[ndarray, "time"],
     sampling_freq: float,
     fft_length: int,
-    cutoff_freq_lp: float = 0.5,
-    spike_threshold: float = 8.0,
-    max_tries: int = 8,
-    spike_replace_before: int = 512,
-    spike_replace_after: int = 512,
-    spike_include_before: int = 10,
-    spike_include_after: int = 20,
+    cutoff_freq_lp: float,
+    spike_threshold: float,
+    max_tries: int,
+    spike_replace_before: int,
+    spike_replace_after: int,
+    spike_include_before: int,
+    spike_include_after: int,
 ) -> tuple[
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
@@ -152,10 +152,10 @@ def enlarge_bool(x, before, after):
 def detect_shear_spikes(
     sh: Float[ndarray, "time"],
     sampling_freq: float,
-    spike_threshold: float = 8.0,
-    spike_include_before: int = 10,
-    spike_include_after: int = 20,
-    cutoff_freq_lp: float = 0.5,
+    spike_threshold: float,
+    spike_include_before: int,
+    spike_include_after: int,
+    cutoff_freq_lp: float,
 ) -> Bool[ndarray, "time"]:
     sh_hp = butterfilt(
         signal=sh,
@@ -178,13 +178,13 @@ def detect_shear_spikes(
 def clean_shear(
     sh: Float[ndarray, "time"],
     sampling_freq: float,
-    spike_threshold: float = 8.0,
-    max_tries: int = 10,
-    spike_replace_before: int = 512,
-    spike_replace_after: int = 512,
-    spike_include_before: int = 10,
-    spike_include_after: int = 20,
-    cutoff_freq_lp: float = 0.5,
+    spike_threshold: float,
+    max_tries: int,
+    spike_replace_before: int,
+    spike_replace_after: int,
+    spike_include_before: int,
+    spike_include_after: int,
+    cutoff_freq_lp: float,
 ) -> tuple[
     Float[ndarray, "time"],  # despiked shear
     Int[ndarray, "time"],  # number of despike iterations on each sample
@@ -262,7 +262,7 @@ def replace_spike(
         sh[max(start - spike_replace_before, 0) : start]
     )
     context_mean_after = nanmean_empty(
-        sh[stop: min(len(sh), stop + spike_replace_after)]
+        sh[stop : min(len(sh), stop + spike_replace_after)]
     )
 
     sh[start:stop] = nanmean_two(context_mean_before, context_mean_after)

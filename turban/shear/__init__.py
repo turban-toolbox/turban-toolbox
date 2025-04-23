@@ -45,11 +45,19 @@ class ShearLevel2(Level2):
         data: ShearLevel1,
     ):
         level1 = data
+        cfg = level1.cfg
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_marker,
-            level1.cfg.sampling_freq,
-            level1.cfg.fft_length,  # TODO: from own utility or user-supplied
+            cfg.sampling_freq,
+            cfg.fft_length,
+            cfg.cutoff_freq_lp,
+            cfg.spike_threshold,
+            cfg.max_tries,
+            cfg.spike_replace_before,
+            cfg.spike_replace_after,
+            cfg.spike_include_before,
+            cfg.spike_include_after,
         )
 
         return cls(
