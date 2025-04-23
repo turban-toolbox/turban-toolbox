@@ -35,7 +35,7 @@ def test_despike_benchmark(atomix_nc_filename):
     isel = dict(n_shear=0, time=ti)
     # currently, no spike is detected in this segment!
     x = ds1.isel(**isel).shear.values
-    assert np.any(detect_shear_spikes(x, 1024.0, 8.0))
+    assert np.any(detect_shear_spikes(x, 1024.0, 8.0, 512, 512, 0.5))
 
 
 def test_despike_benchmark_plot(atomix_nc_filename):
@@ -160,6 +160,7 @@ def test_despike():
         spike_threshold,
         spike_include_before=10,
         spike_include_after=10,
+        cutoff_freq_lp=0.5,
     )
 
     spike_sections = boolarr_to_sections(spikes)
