@@ -202,18 +202,15 @@ def clean_shear(
     )
     ctr = np.zeros_like(sh, dtype=int)
     while np.any(spikes) and np.all(ctr <= max_tries):
-        sh_previous = sh.copy()
         spike_sections = boolarr_to_sections(spikes)
         spike_markers = sections_to_marker(spike_sections, N)
-
         replace_spikes(
             sh,
             spike_markers,
             spike_replace_before=spike_replace_before,
             spike_replace_after=spike_replace_after,
         )
-
-        ctr[sh != sh_previous] += 1
+        ctr[spikes] += 1
         spikes = detect_shear_spikes(
             sh,
             sampling_freq,
