@@ -37,7 +37,7 @@ _vars = {
     "sampling_freq/atomix_name": "fs",
     "sampling_freq/explanation": "Number of samples per second",
     "sampling_freq/unit": "Hz",
-    "sh/atomix_name": "SH",
+    "shear/atomix_name": "SH",
     "temp/": "",
     "temp/standard_name": "sea_water_temperature",
     "temp/unit": "degC",
