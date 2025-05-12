@@ -22,6 +22,13 @@ def process_level2(
     section_markers: Int[ndarray, "time"],
     sampling_freq: float,
     fft_length: int,
+    cutoff_freq_lp: float,
+    spike_threshold: float,
+    max_tries: int,
+    spike_replace_before: int,
+    spike_replace_after: int,
+    spike_include_before: int,
+    spike_include_after: int,
 ) -> tuple[
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
@@ -36,12 +43,13 @@ def process_level2(
             sh, ctr = clean_shear(
                 sh,
                 sampling_freq=sampling_freq,
-                spike_threshold=8.0,
-                max_tries=8,
-                spike_replace_before=512,
-                spike_replace_after=512,
-                spike_include_before=10,
-                spike_include_after=20,
+                spike_threshold=spike_threshold,
+                max_tries=max_tries,
+                spike_replace_before=spike_replace_before,
+                spike_replace_after=spike_replace_after,
+                spike_include_before=spike_include_before,
+                spike_include_after=spike_include_after,
+                cutoff_freq_lp=cutoff_freq_lp,
             )
 
             # after removal of spikes, can high-pass filter
@@ -144,9 +152,10 @@ def enlarge_bool(x, before, after):
 def detect_shear_spikes(
     sh: Float[ndarray, "time"],
     sampling_freq: float,
-    spike_threshold: float = 8.0,
-    spike_include_before: int = 10,
-    spike_include_after: int = 20,
+    spike_threshold: float,
+    spike_include_before: int,
+    spike_include_after: int,
+    cutoff_freq_lp: float,
 ) -> Bool[ndarray, "time"]:
     sh_hp = butterfilt(
         signal=sh,
@@ -157,7 +166,7 @@ def detect_shear_spikes(
     sh_abs = np.abs(sh_hp)
     sh_lp = butterfilt(
         signal=sh_abs,
-        cutoff_freq_Hz=1,
+        cutoff_freq_Hz=cutoff_freq_lp,
         sampling_freq=sampling_freq,
         btype="lp",
     )
@@ -169,12 +178,13 @@ def detect_shear_spikes(
 def clean_shear(
     sh: Float[ndarray, "time"],
     sampling_freq: float,
-    spike_threshold: float = 8.0,
-    max_tries: int = 10,
-    spike_replace_before: int = 512,
-    spike_replace_after: int = 512,
-    spike_include_before: int = 10,
-    spike_include_after: int = 20,
+    spike_threshold: float,
+    max_tries: int,
+    spike_replace_before: int,
+    spike_replace_after: int,
+    spike_include_before: int,
+    spike_include_after: int,
+    cutoff_freq_lp: float,
 ) -> tuple[
     Float[ndarray, "time"],  # despiked shear
     Int[ndarray, "time"],  # number of despike iterations on each sample
@@ -188,27 +198,26 @@ def clean_shear(
         spike_threshold=spike_threshold,
         spike_include_before=spike_include_before,
         spike_include_after=spike_include_after,
+        cutoff_freq_lp=cutoff_freq_lp,
     )
     ctr = np.zeros_like(sh, dtype=int)
     while np.any(spikes) and np.all(ctr <= max_tries):
-        sh_previous = sh.copy()
         spike_sections = boolarr_to_sections(spikes)
         spike_markers = sections_to_marker(spike_sections, N)
-
         replace_spikes(
             sh,
             spike_markers,
             spike_replace_before=spike_replace_before,
             spike_replace_after=spike_replace_after,
         )
-
-        ctr[sh != sh_previous] += 1
+        ctr[spikes] += 1
         spikes = detect_shear_spikes(
             sh,
             sampling_freq,
             spike_threshold=spike_threshold,
             spike_include_before=spike_include_before,
             spike_include_after=spike_include_after,
+            cutoff_freq_lp=cutoff_freq_lp,
         )
 
     return sh, ctr
@@ -253,7 +262,7 @@ def replace_spike(
         sh[max(start - spike_replace_before, 0) : start]
     )
     context_mean_after = nanmean_empty(
-        sh[stop + 1 : min(len(sh), stop + spike_replace_after + 1)]
+        sh[stop : min(len(sh), stop + spike_replace_after)]
     )
 
     sh[start:stop] = nanmean_two(context_mean_before, context_mean_after)
@@ -267,5 +276,5 @@ def replace_spikes(sh, spike_markers, spike_replace_before, spike_replace_after)
             continue
         (spike,) = np.where(spike_markers == marker)
         start = min(spike)
-        stop = max(spike)
+        stop = max(spike) + 1
         replace_spike(sh, start, stop, spike_replace_before, spike_replace_after)
