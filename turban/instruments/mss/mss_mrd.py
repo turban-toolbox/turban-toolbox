@@ -508,7 +508,11 @@ class mrd():
                     config['MSS']['name'] = devicename
                     # Get the binary offset (data is either calibrated against int16 or uint16)
                     if (devicename == 'MSS038') or (devicename == 'MSS38'):
-                        offset = -32768
+                        offset = -32768 # to get from int16 to uint16...
+                        # Beware:
+                        # np.uint16(0)-32768 raises overflow warning
+                        # np.uint16(0)+(-32768) raises overflow error!
+                        # That's we rather cast to int64 in raw_to_units
                     else:
                         offset = 0
 
@@ -703,7 +707,7 @@ class mrd():
 
         """
         funcname = 'raw_to_units():'
-        rawdatac = rawdata['channels']
+        rawdatac = rawdata['channels'].astype(int)
         if config is None:
             logger.debug(funcname + ': Using internal configuration')
             config = self.config
