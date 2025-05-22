@@ -52,6 +52,28 @@ def process_level3(
     _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
 
+    # Ugly variance preserving procedure
+    shear_reshape = shear[..., ii]  # reshape to fft length windows
+    print('Shape shear orig', np.shape(shear))
+    print('Shape shear', np.shape(shear_reshape))
+    if True:
+        for ishear in range(np.shape(Pk)[0]):    
+            for isegment in range(np.shape(Pk)[1]):
+                dk = k[ishear,1] - k[ishear,0]
+                shear_flat = shear_reshape[ishear,isegment,:,:].flatten()
+                #print('shear_flat',np.shape(shear_flat))
+                
+                varPk = sum(Pk[ishear,isegment,:]) * dk
+                varscale = np.var(shear_flat) / varPk
+                #print('k',k)
+                #print('dk',dk)
+                #print('Shear',shear)
+                #print('len Shear',np.shape(shear),sum(np.isnan(shear)),'sh',np.shape(Pk),'k',np.shape(k))
+                #print('varpk',varPk)
+                #print('Varscale',varscale)
+                Pk[ishear,isegment,:] *= varscale
+                #break
+
     return k, Pk, Pf, freq, pspda, section_marker_slow
 
 
