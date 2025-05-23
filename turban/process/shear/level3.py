@@ -53,30 +53,7 @@ def process_level3(
         _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
 
-    # Ugly variance preserving procedure
-    shear_reshape = shear[..., ii]  # reshape to fft length windows
-    print('Shape shear orig', np.shape(shear))
-    print('Shape shear', np.shape(shear_reshape))
-    if True:
-        for ishear in range(np.shape(Pk)[0]):    
-            for isegment in range(np.shape(Pk)[1]):
-                dk = k[ishear,1] - k[ishear,0]
-                shear_flat = shear_reshape[ishear,isegment,:,:].flatten()
-                #print('shear_flat', shear_flat)
-                #print('shear_flat shape',np.shape(shear_flat))
-                #print('Pk data',Pk[ishear,isegment,:])
-                # In PkPk[ishear,isegment,0] is an inf, ignore that
-                varPk = sum(Pk[ishear,isegment,1:]) * dk
-                varshear = np.var(shear_flat)
-                varscale = varshear / varPk
-                #print('k',k)
-                #print('dk',dk)
-                #print('Shear',shear)
-                #print('len Shear',np.shape(shear),sum(np.isnan(shear)),'sh',np.shape(Pk),'k',np.shape(k))
-                #print('varpk',varPk,'varshear',varshear)
-                #print('Varscale',varscale)
-                Pk[ishear,isegment,:] *= varscale
-                #break
+    apply_var_conserve(Pk, k, shear, ii)
 
     return k, Pk, Pf, freq, pspda, section_marker_slow
 
@@ -101,3 +78,19 @@ def apply_compensation_highpass(
     correction_factor = (1.0 + (freq_highpass / freq) ** 2.0) ** 2.0
     x *= correction_factor[newaxis, :]
     return correction_factor
+
+
+def apply_var_conserve(
+    Pk: Float[ndarray, "n_shear time_slow waveno"],
+    k: Float[ndarray, "time_slow k"],
+    shear: Float[ndarray, "n_shear time_fast"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+) -> Float[ndarray, 'n_shear time_slow']:
+    dk = k[..., 1] - k[..., 0]
+    varPk = Pk[..., 1:].sum(axis=-1) * dk[newaxis, :] # disregard first wavelength
+    sr = shear[:, reshape_index]
+    srf = sr.reshape(sr.shape[:-2] + (sr.shape[-2]*sr.shape[-1],)) # flatten last two axes
+    srf = np.ascontiguousarray(srf) # performance enhancement for np.var
+    corr_factor = np.var(srf, axis=-1) / varPk
+    Pk *= corr_factor[..., newaxis]
+    return corr_factor
