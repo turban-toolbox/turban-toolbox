@@ -46,10 +46,11 @@ def process_level3(
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
 
     # apply corrections
-    correction_factor_spatial = apply_compensation_spatial_response(
-        Pk, k, spatial_response_wavenum
-    )
-    _ = apply_compensation_highpass(Pk, freq, freq_highpass)
+    if False:
+        correction_factor_spatial = apply_compensation_spatial_response(
+            Pk, k, spatial_response_wavenum
+        )
+        _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
 
     # Ugly variance preserving procedure
@@ -61,15 +62,18 @@ def process_level3(
             for isegment in range(np.shape(Pk)[1]):
                 dk = k[ishear,1] - k[ishear,0]
                 shear_flat = shear_reshape[ishear,isegment,:,:].flatten()
-                #print('shear_flat',np.shape(shear_flat))
-                
-                varPk = sum(Pk[ishear,isegment,:]) * dk
-                varscale = np.var(shear_flat) / varPk
+                #print('shear_flat', shear_flat)
+                #print('shear_flat shape',np.shape(shear_flat))
+                #print('Pk data',Pk[ishear,isegment,:])
+                # In PkPk[ishear,isegment,0] is an inf, ignore that
+                varPk = sum(Pk[ishear,isegment,1:]) * dk
+                varshear = np.var(shear_flat)
+                varscale = varshear / varPk
                 #print('k',k)
                 #print('dk',dk)
                 #print('Shear',shear)
                 #print('len Shear',np.shape(shear),sum(np.isnan(shear)),'sh',np.shape(Pk),'k',np.shape(k))
-                #print('varpk',varPk)
+                #print('varpk',varPk,'varshear',varshear)
                 #print('Varscale',varscale)
                 Pk[ishear,isegment,:] *= varscale
                 #break

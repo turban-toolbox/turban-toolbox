@@ -10,7 +10,7 @@ print('Opening file: {}'.format(atomix_nc_filename))
 nc = netCDF4.Dataset(atomix_nc_filename)
 
 print('Processing')
-p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, load_levels=(1,))
+p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, level=1)
 
 L1_nc_p = nc.groups['L1_converted']['PRES'][:]
 L1_nc_sh = nc.groups['L1_converted']['SHEAR'][:]
@@ -51,7 +51,7 @@ kmax = nc.groups['L4_dissipation'].variables['KMAX'][0,ik]
 pl.figure(3)
 pl.clf()
 pnc = pl.plot(L3_nc_k[:,ik],L3_nc_Pk[0,:,ik])
-ptu = pl.plot(p.level3.k[ik,:],p.level3.Pk[0,ik,:])
+ptu = pl.plot(p.level3.waveno[ik,:],p.level3.Pk[0,ik,:])
 YL = pl.ylim()
 p3 = pl.plot([kmin]*2,YL,'-k')
 p4 = pl.plot([kmax]*2,YL,'-r')
