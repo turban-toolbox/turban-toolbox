@@ -96,3 +96,8 @@ Markdown documents with python snippets can be tested as well, e.g.:
 ```bash
 python -m pytest --markdown-docs README.md
 ```
+
+To generate a test coverage report:
+```bash
+python -m pytest --markdown-docs README.md --cov=turban --cov-report html
+```

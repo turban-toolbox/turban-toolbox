@@ -47,7 +47,6 @@ include-package-data = false
 "*" = ["VERSION"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=turban --cov-report html"
 filterwarnings = "always::UserWarning"
 
 [tool.black]
