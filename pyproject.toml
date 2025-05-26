@@ -8,24 +8,18 @@ authors = [
 ]
 license = { text = "GPLv03" }
 dependencies = [
-  'beartype',
-  'datashader',
   'gsw',
-  'hvplot',
   'jaxtyping',
   'matplotlib',
   'netCDF4',
   'numba',
   'numpy',
   'pandas',
-  'panel',
   'pydantic',
-  'pytest-cov',
-  'pytest',
   'scipy',
   'setuptools',
   'xarray',
-]
+] # for end user only - for developers, see environment-dev.yml
 requires-python = ">=3.9"
 readme = "README.md"
 classifiers = [
@@ -53,7 +47,7 @@ include-package-data = false
 "*" = ["VERSION"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=<project-name> --cov-report html"
+addopts = "--cov=turban --cov-report html"
 filterwarnings = "always::UserWarning"
 
 [tool.black]

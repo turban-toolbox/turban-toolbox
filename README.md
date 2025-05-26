@@ -9,7 +9,6 @@
 ### Using the high-level ShearProcessing pipeline
 Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear.api`.
 
-<!-- name: test_quickstart_shear_pipeline -->
 ```python
 from turban.process.shear.api import ShearProcessing
 
@@ -29,7 +28,6 @@ ds.plot.scatter(x="press", y="eps", yscale="log")
 
 If no suitable `ShearProcessing.from_*` method exists, you can configure one manually like this (use `time`, `shear`, etc. from anywhere):
 
-<!-- name: test_quickstart_shear_manual -->
 ```python
 import numpy as np
 import xarray as xr
@@ -85,3 +83,16 @@ TURBAN uses extensive type annotations. Types are currently (for easier developm
 ## PEP8
 
 TURBAN uses black for the code style. Settings are given in `pyproject.toml` (and should be auto-discovered by black). Code editors like VSCode have extensions that can format files individually, another option is running black on the command line: `$ black .`.
+
+## Tests
+
+TURBAN uses `pytest` for unit testing:
+```bash
+python -m pytest
+```
+Settings are defined in `pyproject.toml`.
+
+Markdown documents with python snippets can be tested as well, e.g.:
+```bash
+python -m pytest --markdown-docs README.md
+```

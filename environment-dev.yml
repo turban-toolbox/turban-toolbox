@@ -1,21 +1,19 @@
-# These are the current dependencies/versions for debugging purposes
+# These are the current dependencies for developing TURBAN
 
-name: turban
+name: turban2
 channels:
   - conda-forge
 dependencies:
   - beartype
   - black
-  - datashader # get rid of this eventually
   - gsw
-  - hvplot # get rid of this eventually
   - jaxtyping
   - matplotlib
   - netCDF4
   - numba
   - numpy
   - pandas
-  - panel # get rid of this eventually
+  - pip
   - pydantic
   - pytest
   - pytest-cov
@@ -23,4 +21,5 @@ dependencies:
   - setuptools
   - xarray
   - pip:
-    - markdown-pytest
+    - pytest-markdown-docs
+    
