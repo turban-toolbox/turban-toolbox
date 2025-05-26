@@ -1,7 +1,7 @@
 import numpy as np
 from tests.fixtures import mss_mrd_filename
 from turban.instruments.mss import MSS
-from turban.process.shear import ShearConfig
+from turban.process.shear.api import ShearConfig
 
 
 def test_mss(mss_mrd_filename):

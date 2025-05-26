@@ -11,7 +11,7 @@ from turban.process.shear.level2 import (
     clean_shear,
     butterfilt,
 )
-from turban.process.shear import ShearLevel1, ShearLevel2
+from turban.process.shear.api import ShearLevel1, ShearLevel2
 from tests.fixtures import atomix_nc_filename
 
 

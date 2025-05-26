@@ -48,7 +48,7 @@ def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
 
 
 def test_load_atomix_netcdf(atomix_nc_filename):
-    from turban.process.shear import ShearProcessing
+    from turban.process.shear.api import ShearProcessing
 
     for level in [1, 2, 3]:
         p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, level=level)
@@ -57,7 +57,7 @@ def test_load_atomix_netcdf(atomix_nc_filename):
 
 def test_baltic_benchmark(atomix_nc_filename):
     import xarray as xr
-    from turban.process.shear import (
+    from turban.process.shear.api import (
         ShearProcessing,
         ShearLevel1,
         ShearLevel2,

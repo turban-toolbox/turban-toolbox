@@ -6,11 +6,11 @@
 
 ## Quickstart
 
-Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear`.
+Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear.api`.
 
 <!-- name: test_quickstart_shear -->
 ```python
-from turban.process.shear import ShearProcessing
+from turban.process.shear.api import ShearProcessing
 
 # Process a level 1 dataset all the way to level 4
 p = ShearProcessing.from_atomix_netcdf("data/mss/MSS_Baltic.nc", level=1)

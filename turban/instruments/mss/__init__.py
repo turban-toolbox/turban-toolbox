@@ -14,7 +14,7 @@ from turban.process.temperature.temperature import deconvolute_mss_ntchp
 from turban.utils.util import channel_mapping
 
 from turban.instruments import Dropsonde
-from turban.process.shear import ShearLevel1, ShearProcessing
+from turban.process.shear.api import ShearLevel1, ShearProcessing
 from turban.process.shear.config import ShearConfig
 from turban.utils.util import get_vsink, fft_grad
 from turban.instruments.mss.mss_mrd import mrd
