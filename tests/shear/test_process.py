@@ -27,26 +27,6 @@ from tests.fixtures import atomix_nc_filename
 # data["pspd"], data["pressure_lp"] = get_vsink(data["PRESSURE"], 1024.0)
 # pspda = np.nanmedian(data["pspd"])
 
-
-def plot_spectra(datasets: dict, canvas_kwarg, shade_kwarg):
-
-    import datashader as dsh
-
-    df = pd.concat(
-        ds.to_dataframe().reset_index().assign(source=source)
-        for source, ds in datasets.items()
-    )
-    df["source"] = df["source"].astype("category")
-    df = df.drop(df[df.Pk.isna() & df.k > 0].index)
-
-    cvs = dsh.Canvas(**canvas_kwarg)
-
-    agg = cvs.line(source=df, x="k", y="Pk", agg=dsh.by("source"))
-    im = dsh.transfer_functions.shade(agg, how="eq_hist", **shade_kwarg)
-
-    return im
-
-
 def test_load_atomix_netcdf(atomix_nc_filename):
     from turban.process.shear.api import ShearProcessing
 
@@ -95,99 +75,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds3_turban.to_netcdf("out/tests/baltic_level3.nc")
     ds4_turban.to_netcdf("out/tests/baltic_level4.nc")
 
-    # _plot_level3(ds3, ds3_turban) # disable for now
     _plot_level4(ds4, aux, ds4_turban)  # TODO
-
-
-def _plot_despiking(ds1, level1, ds2, level2):
-    plt.plot(level1.shear[0])
-    plt.plot(level2.shear[0])
-
-    ds1.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
-    ds2.SHEAR.isel(N_SHEAR_SENSORS=0).plot()
-
-
-def _plot_level3(ds3, level3):
-    level3["k"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-    level3["Pk"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-    ds3["k"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-    ds3["Pk"].loc[
-        {
-            "wavenumber": 0,
-        }
-    ] = np.nan
-
-    # comparison plots
-    import datashader as dsh
-
-    canvas_kwarg = dict(
-        plot_height=500,
-        plot_width=500,
-        x_range=[10**0, 10**3],
-        y_range=[1e-10, 1e-1],
-        x_axis_type="log",
-        y_axis_type="log",
-    )
-    shade_kwarg = dict(color_key={"benchmark": "violet", "turban": "green"})
-    xticks, xticklabels = zip(
-        *[
-            (
-                canvas_kwarg["plot_width"]
-                / (
-                    np.log10(canvas_kwarg["x_range"][1])
-                    - np.log10(canvas_kwarg["x_range"][0])
-                )
-                * l,
-                10**l,
-            )
-            for l in np.arange(0, 3.1)
-        ]
-    )
-    yticks, yticklabels = zip(
-        *[
-            (
-                canvas_kwarg["plot_height"]
-                / (
-                    np.log10(canvas_kwarg["y_range"][1])
-                    - np.log10(canvas_kwarg["y_range"][0])
-                )
-                * (np.log10(canvas_kwarg["y_range"][1]) - l),
-                10.0**l,
-            )
-            for l in np.arange(-10, -0.9)
-        ]
-    )
-
-    for nshear in [0, 1]:
-        im = plot_spectra(
-            {
-                "benchmark": ds3.isel(nshear=nshear, N_SH_VIB_SPEC=nshear),
-                "turban": level3.isel(nshear=nshear),
-            },
-            canvas_kwarg=canvas_kwarg,
-            shade_kwarg=shade_kwarg,
-        )
-        fig = plt.figure(figsize=(9, 9))
-        ax = fig.subplots()
-        ax.imshow(im.to_pil())
-        ax.set_xticks(xticks, xticklabels)
-        ax.set_yticks(yticks, yticklabels)
-        ax.set_xlabel("wavenumber")
-        ax.set_ylabel("Power spectral density")
-        ax.set_title(f"{shade_kwarg['color_key']}")
-        fig.savefig(f"out/tests/baltic-level3-shear-{nshear}.png")
 
 
 def _plot_level4(ds4, aux, level4):

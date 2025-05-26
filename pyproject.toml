@@ -9,7 +9,6 @@ authors = [
 license = { text = "GPLv03" }
 dependencies = [
   'beartype',
-  'datashader',
   'gsw',
   'hvplot',
   'jaxtyping',

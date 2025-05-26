@@ -6,7 +6,6 @@ channels:
 dependencies:
   - beartype
   - black
-  - datashader # get rid of this eventually
   - gsw
   - hvplot # get rid of this eventually
   - jaxtyping
