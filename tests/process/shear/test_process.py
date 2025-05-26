@@ -10,23 +10,6 @@ import matplotlib.pyplot as plt
 from tests.fixtures import atomix_nc_filename
 
 
-# raw, _ = convert_mrd_to_parquet(
-#     "/home/doppler/data/MSS/youngsound2015/raw/CAST1755.MRD",
-# )
-
-# raw = pd.read_parquet("CAST1755.pq").values
-
-# data = level1(
-#     raw,
-#     probeconf_fname="probeconf_mss053_2024.json",
-#     lon=-20.0,
-#     lat=70.0,
-#     sampling_freq=1024.0,
-# )
-
-# data["pspd"], data["pressure_lp"] = get_vsink(data["PRESSURE"], 1024.0)
-# pspda = np.nanmedian(data["pspd"])
-
 def test_load_atomix_netcdf(atomix_nc_filename):
     from turban.process.shear.api import ShearProcessing
 
