@@ -6,9 +6,10 @@
 
 ## Quickstart
 
+### Using the high-level ShearProcessing pipeline
 Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear.api`.
 
-<!-- name: test_quickstart_shear -->
+<!-- name: test_quickstart_shear_pipeline -->
 ```python
 from turban.process.shear.api import ShearProcessing
 
@@ -24,7 +25,58 @@ ds = p.level4.to_xarray().merge(ds_slow)
 ds.plot.scatter(x="press", y="eps", yscale="log")
 ```
 
+### Manual configuration
+
+If no suitable `ShearProcessing.from_*` method exists, you can configure one manually like this (use `time`, `shear`, etc. from anywhere):
+
+<!-- name: test_quickstart_shear_manual -->
+```python
+import numpy as np
+import xarray as xr
+from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
+
+atomix_nc_filename = "data/mss/MSS_Baltic.nc"
+
+cfg = ShearConfig(
+    sampling_freq=1024.0,
+    fft_length=2048,
+    fft_overlap=1024,
+    diss_length=5120,
+    diss_overlap=2560,
+    freq_cutoff_antialias=999.0,
+    freq_cutoff_corrupt=999.0,
+    freq_highpass=0.15,
+    spatial_response_wavenum=50.0,
+    waveno_cutoff_spatial_corr=999.0,
+    spike_threshold=8.0,
+    max_tries=10,
+    spike_replace_before=512,
+    spike_replace_after=512,
+    spike_include_before=10,
+    spike_include_after=20,
+    cutoff_freq_lp=0.5,
+)
+
+ds1 = xr.load_dataset(atomix_nc_filename, group="L1_converted")
+ds2 = xr.load_dataset(atomix_nc_filename, group="L2_cleaned")
+
+time = ds1.TIME.values.astype("datetime64[s]").astype(
+    np.float64
+)  # time in seconds since epoch
+level1 = ShearLevel1(
+    time=time,
+    pspd=ds1.PSPD_REL.values,
+    cfg=cfg,
+    shear=ds1.SHEAR.values,
+    section_marker=ds2.SECTION_NUMBER.values.astype(int),
+)
+
+p = ShearProcessing(level1, level=1)
+```
+
+
 In general, `tests/` and in particular `tests/shear/test_process.py` contain more examples of how to use the high-level data structures.
+
 
 ## Type checking
 
