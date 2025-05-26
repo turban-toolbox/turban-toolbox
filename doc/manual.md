@@ -56,3 +56,43 @@ Fx = np.fft.rfft(xr) # FFT(x). Now the last dimension contains the frequency axi
 ```
 
 Similarly, one can easily calculate segment- or chunkwise variance, trends, or other. The same logic is also used for aggregating variables from "fast" to "slow" time.
+
+## Customising TURBAN
+
+### Configuration objects
+
+TURBAN operates with several kinds of high-level objects, each of which have their own settings:
+1. Instruments, child classes of `turban.instruments.generic.api.Instrument`, are configured through instances of (child classes of) `turban.instruments.generic.config.InstrumentConfig`
+2. Processing pipelines, defined in `turban/process`, e.g. `ShearProcessing` or one of its levels (e.g., `ShearLevel1` through `ShearLevel4`), are configured using `turban.process.generic.config.SegmentConfig`
+
+Both allow/require the user to make various parameter choices.
+
+### Changing algorithms
+
+When a user needs to change an alorithm beyond a simple parameter, there are two options. 
+1. Of course, the source code may be modified.
+2. Python allows "monkey patching" individual functions (i.e. replacing them with our own implementations), as in:
+```python
+from turban.process.shear import level3 
+
+def my_apply_compensation_highpass(
+    x: Float[ndarray, "n_shear time_slow f"],
+    freq: Float[ndarray, "f"],
+    freq_highpass: float,
+) -> Float[ndarray, "f"]:
+    correction_factor = np.ones_like(freq) # No highpass frequency compensation
+    x *= correction_factor[newaxis, :]
+    return correction_factor
+
+level3.apply_compensation_highpass = my_apply_compensation_highpass # TURBAN will now use the user-defined function instead
+```
+In fact, this method can be used as long as the function signatures of the old and the new functions are the same.
+
+## Code base overview
+
+TURBAN handles a variety of instruments and a variety of methods of analysing them.
+- `turban/instruments/`: Instruments provide a way of getting raw data from an instrument up to level 1 (converted to physical units).
+- `turban/process/`: Analysis methods provide a way of getting data from level 1 to level 4
+- `turban/.../generic/`: Each of `instruments/` and `process/` has one folder `generic` for base and helper classes, in addition to one folder per instrument or process type.
+- `turban/.../.../api.py`: Define high-level objects that handle data loading, writing, and processing between levels. These are the objects the end user preferably works with.
+- `turban/.../.../config.py`: Define configuration objects that store parameters about processing pipelines or instruments such as sampling rate, high-pass filter cutoff frequencies, and the like.
