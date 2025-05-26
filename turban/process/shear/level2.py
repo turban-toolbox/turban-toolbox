@@ -19,9 +19,9 @@ data_and_bounds_type = list[
 
 def process_level2(
     shear: Float[ndarray, "n_shear time"],
-    section_markers: Int[ndarray, "time"],
+    section_numbers: Int[ndarray, "time"],
     sampling_freq: float,
-    fft_length: int,
+    segment_length: int,
     cutoff_freq_lp: float,
     spike_threshold: float,
     max_tries: int,
@@ -33,7 +33,7 @@ def process_level2(
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
 ]:
-    segments = split_data(shear, section_markers)
+    segments = split_data(shear, section_numbers)
     sh_clean_agg = np.nan * np.zeros_like(shear)
     ctr_agg = np.zeros_like(shear, dtype=int)
 
@@ -56,12 +56,12 @@ def process_level2(
             # Eq. 17
             sh_clean = butterfilt(
                 signal=sh,
-                cutoff_freq_Hz=0.5 / (fft_length / sampling_freq),
+                cutoff_freq_Hz=0.5 / (segment_length / sampling_freq),
                 sampling_freq=sampling_freq,
                 btype="high",
             )
-            ctr_agg[k, section_markers == marker] = ctr
-            sh_clean_agg[k, section_markers == marker] = sh_clean
+            ctr_agg[k, section_numbers == marker] = ctr
+            sh_clean_agg[k, section_numbers == marker] = sh_clean
 
     return sh_clean_agg, ctr_agg
 

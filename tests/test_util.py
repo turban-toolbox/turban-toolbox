@@ -11,7 +11,7 @@ from turban.utils.util import (
     agg_fast_to_slow,
     get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
-    fast_to_slow_reshape_index,
+    get_chunking_index,
 )
 
 
@@ -23,8 +23,8 @@ def test_get_cleaned_fraction():
         x,
         xc,
         data_len=len(x),
-        fft_length=4,
-        fft_overlap=2,
+        segment_length=4,
+        segment_overlap=2,
         diss_length=10,
         diss_overlap=0,
     )
@@ -32,10 +32,10 @@ def test_get_cleaned_fraction():
 
 
 def test_diss_chunk_wise_reshape_index():
-    ii = fast_to_slow_reshape_index(
+    ii = get_chunking_index(
         data_len=20,
-        fft_length=4,
-        fft_overlap=2,
+        segment_length=4,
+        segment_overlap=2,
         diss_length=10,
         diss_overlap=0,
     )
@@ -138,8 +138,8 @@ def test_average_fast_to_slow():
     y = agg_fast_to_slow(
         x,
         data_len=x.shape[-1],
-        fft_length=4,
-        fft_overlap=2,
+        segment_length=4,
+        segment_overlap=2,
         diss_length=6,
         diss_overlap=2,
     )
@@ -152,8 +152,8 @@ def test_agg_fast_to_slow():
     xm = agg_fast_to_slow(
         x,
         data_len=len(x),
-        fft_length=4,
-        fft_overlap=2,
+        segment_length=4,
+        segment_overlap=2,
         diss_length=10,
         diss_overlap=0,
         agg_method="max",

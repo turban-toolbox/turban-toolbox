@@ -55,7 +55,7 @@ def test_despike_benchmark_plot(atomix_nc_filename):
 
     sampling_freq = cfg.sampling_freq
 
-    fft_length = cfg.fft_length
+    segment_length = cfg.segment_length
 
     sh, ctr = clean_shear(
         sh,
@@ -73,7 +73,7 @@ def test_despike_benchmark_plot(atomix_nc_filename):
     # Eq. 17
     sh_clean = butterfilt(
         signal=sh,
-        cutoff_freq_Hz=0.5 / (fft_length / sampling_freq),
+        cutoff_freq_Hz=0.5 / (segment_length / sampling_freq),
         sampling_freq=sampling_freq,
         btype="high",
     )

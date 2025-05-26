@@ -19,7 +19,7 @@ def microtemp(
     pspd: Float[ndarray, "time_fast"],
     section_select_idx: list[list[int]],
     sampling_freq: float,
-    fft_length: int,
+    segment_length: int,
     chunklen: int = 5,
     chunkoverlap: int = 2,
     outfile: str | None = None,
@@ -49,7 +49,7 @@ def microtemp(
             pspd=pspd_segment,
             chunklen=chunklen,
             chunkoverlap=chunkoverlap,
-            fft_length=fft_length,
+            segment_length=segment_length,
             sampling_freq=sampling_freq,
         )
 
@@ -88,7 +88,7 @@ def temperature_dissipation(
     pspd: Float[ndarray, "time_fast"],
     chunklen: int,
     chunkoverlap: int,
-    fft_length: int,
+    segment_length: int,
     sampling_freq: float,
     wavenumber_limit_upper: float = 500.0,
 ) -> tuple[
@@ -105,7 +105,7 @@ def temperature_dissipation(
         pspd,
         chunklen,
         chunkoverlap,
-        fft_length,
+        segment_length,
         sampling_freq,
     )
 
@@ -214,25 +214,25 @@ def temperature_gradient_spectra(
     pspd: Float[ndarray, "time_fast"],
     chunklen: int,
     chunkoverlap: int,
-    fft_length: int,
+    segment_length: int,
     sampling_freq: float,
 ) -> tuple[
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "time_slow wavenumber"],
     Float[ndarray, "1 wavenumber"],
 ]:
-    yr: Float[ndarray, "time_slow freq"] = reshape_halfoverlap_last(dTdt, fft_length)
+    yr: Float[ndarray, "time_slow freq"] = reshape_halfoverlap_last(dTdt, segment_length)
     yr -= yr.mean(axis=1)[:, np.newaxis]
-    yr *= np.hanning(fft_length)[np.newaxis, :]
+    yr *= np.hanning(segment_length)[np.newaxis, :]
 
-    freq: Float[ndarray, "1 freq"] = np.fft.rfftfreq(fft_length, d=1 / sampling_freq)[
+    freq: Float[ndarray, "1 freq"] = np.fft.rfftfreq(segment_length, d=1 / sampling_freq)[
         np.newaxis, :
     ]
     Fyr = np.fft.rfft(yr)[:, :]
     Pf: Float[ndarray, "time_slow freq"] = (Fyr.conj() * Fyr).real
 
     pspda: Float[ndarray, "time_slow 1"] = reshape_any_first(
-        reshape_halfoverlap_last(pspd, fft_length).mean(axis=1)[:, np.newaxis],
+        reshape_halfoverlap_last(pspd, segment_length).mean(axis=1)[:, np.newaxis],
         chunklen,
         chunkoverlap,
     ).mean(axis=1)
@@ -247,7 +247,7 @@ def temperature_gradient_spectra(
     # Pf = Pf * correction
 
     k = freq / pspda
-    Pk: Float[ndarray, "time_slow freq"] = Pf * pspda / fft_length / (sampling_freq / 2)
+    Pk: Float[ndarray, "time_slow freq"] = Pf * pspda / segment_length / (sampling_freq / 2)
 
     Pnoise = get_noise(Pk)
     # Pk -= Pnoise

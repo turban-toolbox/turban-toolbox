@@ -11,27 +11,27 @@ import xarray as xr
 
 def ensure_reshape_index(func):
     """Make sure that `func` has `reshape_index` available by alternatively supplying
-    fft_length etc."""
+    segment_length etc."""
 
     @wraps(func)
     def decorated(
         *argv,
         data_len: int = None,  # length of data vector
-        fft_length: int = None,
-        fft_overlap: int = None,
+        segment_length: int = None,
+        segment_overlap: int = None,
         diss_length: int = None,
         diss_overlap: int = None,
-        section_marker: Int[ndarray, "num_data"] = None,
+        section_number: Int[ndarray, "num_data"] = None,
         **kwarg,
     ):
         if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
-            kwarg["reshape_index"] = fast_to_slow_reshape_index(
+            kwarg["reshape_index"] = get_chunking_index(
                 data_len,
-                fft_length,
-                fft_overlap,
+                segment_length,
+                segment_overlap,
                 diss_length,
                 diss_overlap,
-                section_marker,
+                section_number,
             )
         return func(*argv, **kwarg)
 
@@ -90,34 +90,34 @@ def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
     y: Float[ndarray, "... time_fast"],
     sampling_freq: float,
-    fft_length: int = None,
-    fft_overlap: int = None,
+    segment_length: int = None,
+    segment_overlap: int = None,
     diss_length: int = None,
     diss_overlap: int = None,
-    section_marker: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] = None,
+    section_number: Int[ndarray, "time_fast"] = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] = None,
 ) -> Float[ndarray, "... time_slow"]:
     """
     Calculate the gradient of `y` with respect to `x`, averaged over each segment.
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
+        reshape_index = get_chunking_index(
             shear.shape[-1],
-            fft_length,
-            fft_overlap,
+            segment_length,
+            segment_overlap,
             diss_length,
             diss_overlap,
-            section_marker,
+            section_number,
         )
     else:
-        fft_length = reshape_index.shape[-1]
+        segment_length = reshape_index.shape[-1]
 
     x = x[..., reshape_index]
     y = y[..., reshape_index]
 
     # dummy time vector in seconds
-    time = np.linspace(1, fft_length / sampling_freq, fft_length)
+    time = np.linspace(1, segment_length / sampling_freq, segment_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
     dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
     dydx = dydt / dxdt
@@ -127,7 +127,7 @@ def fast_to_slow_grad_by_segment(
 @ensure_reshape_index
 def agg_fast_to_slow(
     x: Num[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
     agg_method: str = "mean",
 ) -> Num[ndarray, "*any time_slow"]:
     """
@@ -159,19 +159,19 @@ def fast_to_slow_avg_by_segment():
     pass
 
 
-def fast_to_slow_reshape_index(
+def get_chunking_index(
     data_len: int,
-    fft_length: int,
-    fft_overlap: int,
+    segment_length: int,
+    segment_overlap: int,
     diss_length: int,
     diss_overlap: int,
-    section_marker: Int[ndarray, "time_fast"] | None = None,
-) -> Int[ndarray, "diss_chunk fft_chunk fft_length"]:
+    section_number: Int[ndarray, "time_fast"] | None = None,
+) -> Int[ndarray, "diss_chunk fft_chunk segment_length"]:
 
-    if section_marker is None:
-        section_marker = np.ones(data_len, dtype=int)
+    if section_number is None:
+        section_number = np.ones(data_len, dtype=int)
 
-    sections = split_data(np.arange(data_len), section_marker)
+    sections = split_data(np.arange(data_len), section_number)
 
     reshape_segments = []
     for data in sections.values():
@@ -180,9 +180,9 @@ def fast_to_slow_reshape_index(
         ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
             diss_length, diss_overlap, len(data)
         )
-        # reshape fft dimension into chunks of length fft_length
-        ii_fft: Int[ndarray, "fft_chunk fft_length"] = reshape_overlap_index(
-            fft_length, fft_overlap, ii_diss.shape[-1]
+        # reshape fft dimension into chunks of length segment_length
+        ii_fft: Int[ndarray, "fft_chunk segment_length"] = reshape_overlap_index(
+            segment_length, segment_overlap, ii_diss.shape[-1]
         )
         reshape_segments.append(ii_diss[:, ii_fft] + data[0])
 
@@ -192,15 +192,15 @@ def fast_to_slow_reshape_index(
 
 def split_data(
     data: Num[ndarray, "... time"],
-    section_markers: Int[ndarray, "... time"],
+    section_numbers: Int[ndarray, "... time"],
 ) -> dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
     """Split array of data into segments based on section markers.
     section marker "0" is neglected and not included in the output."""
 
-    markers = set(section_markers)
+    markers = set(section_numbers)
     # sections = select_sections(data_and_bounds)
     sections = {
-        marker: data[..., section_markers == marker]
+        marker: data[..., section_numbers == marker]
         for marker in markers
         if marker != 0
     }
@@ -366,7 +366,7 @@ def integrate(
 def get_cleaned_fraction(
     x: Float[ndarray, "*any time_fast"],
     x_clean: Float[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
 ) -> Float[ndarray, "*any time_slow"]:
     is_cleaned = x != x_clean
     ii = diss_chunk_wise_reshape_index(reshape_index)
@@ -377,7 +377,7 @@ def get_cleaned_fraction(
 
 
 def diss_chunk_wise_reshape_index(
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
 ) -> Int[ndarray, "diss_chunk diss_length"]:
     """Flatten the last two dimensions into one, making sure only unique indices appear
     for each `diss_chunk`.

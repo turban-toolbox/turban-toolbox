@@ -37,8 +37,8 @@ atomix_nc_filename = "data/mss/MSS_Baltic.nc"
 
 cfg = ShearConfig(
     sampling_freq=1024.0,
-    fft_length=2048,
-    fft_overlap=1024,
+    segment_length=2048,
+    segment_overlap=1024,
     diss_length=5120,
     diss_overlap=2560,
     freq_cutoff_antialias=999.0,
@@ -66,7 +66,7 @@ level1 = ShearLevel1(
     pspd=ds1.PSPD_REL.values,
     cfg=cfg,
     shear=ds1.SHEAR.values,
-    section_marker=ds2.SECTION_NUMBER.values.astype(int),
+    section_number=ds2.SECTION_NUMBER.values.astype(int),
 )
 
 p = ShearProcessing(level1, level=1)

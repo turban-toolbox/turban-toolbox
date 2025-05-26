@@ -21,7 +21,7 @@ class TempLevel2:
     pspd: Float[ndarray, "time"]
     dtemp_dt: Float[ndarray, "ntemp time"]
     # n_despiked: Int[ndarray, "ntemp time"] | None
-    section_marker: Int[ndarray, "time"] | None
+    section_number: Int[ndarray, "time"] | None
     cfg: TempConfig
 
     @classmethod
@@ -48,7 +48,7 @@ class TempLevel3:
     Pf: Float[ndarray, "ntemp time wavenumber"] | None
     freq: Float[ndarray, "wavenumber"] | None
     platform_speed: Float[ndarray, "time"]
-    section_marker: Int[ndarray, "time"] | None
+    section_number: Int[ndarray, "time"] | None
     cfg: TempConfig
 
     @classmethod
@@ -63,19 +63,19 @@ class TempLevel3:
             level2.pspd,
             level2.cfg.diss_length,
             level2.cfg.diss_overlap,
-            level2.cfg.fft_length,
+            level2.cfg.segment_length,
             level2.cfg.sampling_freq,
         )
 
         k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
-            section_marker=level1.section_marker,
-            fft_length=level2.cfg.fft_length,
+            section_number=level1.section_number,
+            segment_length=level2.cfg.segment_length,
             sampling_freq=level2.cfg.sampling_freq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
-            fft_overlap=level2.cfg.fft_overlap,
+            segment_overlap=level2.cfg.segment_overlap,
             diss_length=level2.cfg.diss_length,
             diss_overlap=level2.cfg.diss_overlap,
         )
@@ -86,7 +86,7 @@ class TempLevel3:
             Pf=Pf,
             freq=freq,
             platform_speed=platform_speed,
-            section_marker=None,
+            section_number=None,
             cfg=level2.cfg,
         )
 

@@ -7,8 +7,8 @@ class SegmentConfig(BaseModel):
     """Configures segment-wise processing of timeseries."""
 
     sampling_freq: float  # [Hz]
-    fft_length: int
-    fft_overlap: int
+    segment_length: int
+    segment_overlap: int
     diss_length: int
     diss_overlap: int
 
@@ -17,8 +17,8 @@ class SegmentConfig(BaseModel):
         with Dataset(fname) as f:
             return dict(
                 sampling_freq=f.fs_fast,
-                fft_length=int(f.fft_length),
-                fft_overlap=int(f.fft_length / 2),
+                segment_length=int(f.fft_length),
+                segment_overlap=int(f.fft_length / 2),
                 diss_length=int(f.diss_length),
                 diss_overlap=int(f.overlap),
             )
@@ -33,7 +33,7 @@ class SegmentConfig(BaseModel):
         """N_f in the ATOMIX paper"""
         fft_segment_start = np.arange(
             0,
-            self.diss_length - self.fft_length + 1,
-            self.fft_length - self.fft_overlap,
+            self.diss_length - self.segment_length + 1,
+            self.segment_length - self.segment_overlap,
         )  # start of each fft segment within a spectrum segment
         return len(fft_segment_start)

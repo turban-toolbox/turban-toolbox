@@ -37,7 +37,7 @@ class MSS(Dropsonde):
         self.mrd = mrd(str(fname))  # TODO make mrd uppercase (PEP8)
 
     def to_shear_level1(
-        self, section_marker: Int[ndarray, "time"], cfg: ShearConfig
+        self, section_number: Int[ndarray, "time"], cfg: ShearConfig
     ) -> ShearLevel1:
         pressure_raw = self.mrd.level0["PRESS"]
         shear_raw = np.concatenate(
@@ -53,18 +53,18 @@ class MSS(Dropsonde):
         return ShearLevel1(
             pspd=pspd,
             shear=shear_phys,
-            section_marker=section_marker,
+            section_number=section_number,
             cfg=cfg,
         )
 
     def to_shear_processing(
         self,
-        section_marker: Int[ndarray, "time"],
+        section_number: Int[ndarray, "time"],
         cfg: ShearConfig,
     ) -> ShearProcessing:
         """Convert to shear processing pipeline."""
         return ShearProcessing(
-            self.to_shear_level1(section_marker, cfg),
+            self.to_shear_level1(section_number, cfg),
             None,
             None,
             None,

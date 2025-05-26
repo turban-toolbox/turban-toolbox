@@ -185,16 +185,16 @@ def get_noise(spectra: ndarray) -> ndarray:
 
 
 @jit
-def power_spectrum(x: ndarray, fft_length: int, sampling_freq: float):
-    assert fft_length % 2 == 0
+def power_spectrum(x: ndarray, segment_length: int, sampling_freq: float):
+    assert segment_length % 2 == 0
     data_length = len(x)
     # half-overlapping windows
-    N = 2 * (data_length // fft_length) - 1
+    N = 2 * (data_length // segment_length) - 1
     # collect power density spectra
-    spectra = np.zeros((N, int(fft_length / 2 + 1)))
+    spectra = np.zeros((N, int(segment_length / 2 + 1)))
     for i in range(N):
-        i0 = i * int(fft_length / 2)
-        i1 = i0 + fft_length
+        i0 = i * int(segment_length / 2)
+        i1 = i0 + segment_length
         xc = x[i0:i1]
         xc = detrend(xc)
         xc = apply_cosine_window(xc)
@@ -202,7 +202,7 @@ def power_spectrum(x: ndarray, fft_length: int, sampling_freq: float):
             F = np.fft.rfft(xc)
         spectra[i, :] = (F.conj() * F).real
 
-    return mean_axis0(spectra) / fft_length / (sampling_freq / 2)
+    return mean_axis0(spectra) / segment_length / (sampling_freq / 2)
 
 
 from numba import float64, int32
@@ -214,26 +214,26 @@ def process_temperature_series(
     # platform_speed: ndarray,
     wavenumber_limit_upper: float,
     chunk_length: int,
-    fft_length: int,
+    segment_length: int,
     sampling_freq: float,
 ):
     assert chunk_length % 2 == 0
     assert x.ndim == 1
     # number of half-overlapping windows
     N = 2 * (len(x) // chunk_length) - 1
-    spec_length = int(fft_length / 2 + 1)
+    spec_length = int(segment_length / 2 + 1)
     spectra = np.zeros((N, spec_length))
     pspd = np.zeros(N)
     for i in range(N):
         i0 = i * int(chunk_length / 2)
         i1 = i0 + chunk_length
         xc = x[i0:i1]
-        spectra[i, :] = power_spectrum(xc, fft_length, sampling_freq)
+        spectra[i, :] = power_spectrum(xc, segment_length, sampling_freq)
         # pspd[i] = np.mean(platform_speed[i0:i1])
 
     Pnoise = get_noise(spectra)
     with nb.objmode(freq="float64[:]"):
-        freq = np.fft.rfftfreq(fft_length)
+        freq = np.fft.rfftfreq(segment_length)
 
     chi = np.zeros(N)
     k_batchelor = np.zeros(N)
@@ -258,7 +258,7 @@ if __name__ == "__main__":
         x,
         wavenumber_limit_upper=1e3,
         chunk_length=5024,
-        fft_length=1024,
+        segment_length=1024,
         sampling_freq=1 / 1024.0,
     )
     print(res)

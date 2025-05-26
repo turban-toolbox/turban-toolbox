@@ -18,18 +18,18 @@ from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, P
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
     shear: Float[ndarray, "n_shear time"]
-    section_marker: Int[ndarray, "time"]
+    section_number: Int[ndarray, "time"]
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L1_converted")
-        # TODO: handle section_marker through level 2
+        # TODO: handle section_number through level 2
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
             pspd=ds.PSPD_REL.values,
             shear=ds.SHEAR.values,
-            section_marker=ds2["SECTION_NUMBER"].values.astype(int),
+            section_number=ds2["SECTION_NUMBER"].values.astype(int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
         )
 
@@ -48,9 +48,9 @@ class ShearLevel2(Level2):
         cfg = level1.cfg
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
-            level1.section_marker,
+            level1.section_number,
             cfg.sampling_freq,
-            cfg.fft_length,
+            cfg.segment_length,
             cfg.cutoff_freq_lp,
             cfg.spike_threshold,
             cfg.max_tries,
@@ -86,7 +86,7 @@ class ShearLevel3(Level3):
     Pk: Float[ndarray, "nshear time wavenumber"]
     Pf: Float[ndarray, "nshear time wavenumber"]
     # TODO load from atomix netcdf
-    section_marker: Int[ndarray, "time"]
+    section_number: Int[ndarray, "time"]
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
 
@@ -97,15 +97,15 @@ class ShearLevel3(Level3):
     ) -> "ShearLevel3":
         level2 = data
         level1 = data.level_below
-        k, Pk, Pf, freq, platform_speed, section_marker = process_level3(
+        k, Pk, Pf, freq, platform_speed, section_number = process_level3(
             shear=level2.shear,
             pspd=level2.pspd,
-            section_marker=level1.section_marker,
-            fft_length=level2.cfg.fft_length,
+            section_number=level1.section_number,
+            segment_length=level2.cfg.segment_length,
             sampling_freq=level2.cfg.sampling_freq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
-            fft_overlap=level2.cfg.fft_overlap,
+            segment_overlap=level2.cfg.segment_overlap,
             diss_length=level2.cfg.diss_length,
             diss_overlap=level2.cfg.diss_overlap,
         )
@@ -114,21 +114,21 @@ class ShearLevel3(Level3):
             x=level1.shear,
             x_clean=level2.shear,
             data_len=level1.shear.shape[-1],
-            fft_length=level2.cfg.fft_length,
-            fft_overlap=level2.cfg.fft_overlap,
+            segment_length=level2.cfg.segment_length,
+            segment_overlap=level2.cfg.segment_overlap,
             diss_length=level2.cfg.diss_length,
             diss_overlap=level2.cfg.diss_overlap,
-            section_marker=level1.section_marker,
+            section_number=level1.section_number,
         )
 
         max_despike_iter = agg_fast_to_slow(
             level2.num_despike_iter,
             data_len=level2.num_despike_iter.shape[-1],
-            fft_length=level2.cfg.fft_length,
-            fft_overlap=level2.cfg.fft_overlap,
+            segment_length=level2.cfg.segment_length,
+            segment_overlap=level2.cfg.segment_overlap,
             diss_length=level2.cfg.diss_length,
             diss_overlap=level2.cfg.diss_overlap,
-            section_marker=level1.section_marker,
+            section_number=level1.section_number,
             agg_method="max",
         )
 
@@ -139,7 +139,7 @@ class ShearLevel3(Level3):
             Pf=Pf,
             freq=freq,
             platform_speed=platform_speed,
-            section_marker=section_marker,
+            section_number=section_number,
             spike_fraction=spike_fraction,
             max_despike_iter=max_despike_iter,
             level_below=data,
@@ -158,7 +158,7 @@ class ShearLevel3(Level3):
             Pf=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
             platform_speed=ds["PSPD_REL"].values,
-            section_marker=ds["SECTION_NUMBER"].values.astype(int),
+            section_number=ds["SECTION_NUMBER"].values.astype(int),
             spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
             max_despike_iter=9999
             * np.ones_like(ds["SH_SPEC"].values[:, :, 0], dtype=int),
