@@ -36,18 +36,16 @@ chunk_overlap = 1
 
 ### Implementation
 
-In order to use numpy's vectorized routines for time series analysis, we use the function `get_chunking_index`. It takes in the parameters `segment_len`, `segment_overlap`, `chunk_len`, `chunk_overlap`, and `section_marker`, in addition to the length of the time series `samples_len`, and return an array of indices (see sketch), called `[ii]`. 
+In order to use numpy's vectorized routines for time series analysis, we use the function `get_chunking_index`. It takes in the parameters `segment_len`, `segment_overlap`, `chunk_len`, `chunk_overlap`, and `section_marker`, in addition to the length of the time series `samples_len`, and return an array of indices (see sketch), in the following called `idx`. 
 
-TODO find names for function_name and `ii`.
-
-Index `ii`, when used to index an axis of length `samples_len` of any array, will trigger expansion of the time axis into three axes, that are, in turn: 
+Index `idx`, when used to index an axis of length `samples_len` of any array, will trigger expansion of the time axis into three axes, that are, in turn: 
 1. The slow/reduced/aggregated time axis, i.e. counting chunks.
 2. Inside each chunk, counting the number of segments.
 3. Inside each segment, counting the samples attributed to each segment.
 
 For instance, given a an array `x` whose last axis has length `samples_len`, we can calculate the FFT over all segments without any loop:
 ```python
-xr = x[..., ii] # reshape time axis. Now the last dimension contains the FFT segments
+xr = x[..., idx] # reshape time axis. Now the last dimension contains the FFT segments
 xr -= xr.mean(axis=-1)[..., newaxis]  # subtract mean
 xr *= np.hanning(fft_length)[newaxis, newaxis, :]  # hanning window
 Fx = np.fft.rfft(xr) # FFT(x). Now the last dimension contains the frequency axis
