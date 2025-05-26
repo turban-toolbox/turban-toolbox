@@ -13,7 +13,6 @@ dependencies:
   - numba
   - numpy
   - pandas
-  - panel # get rid of this eventually
   - pydantic
   - pytest
   - pytest-cov

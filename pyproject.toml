@@ -16,7 +16,6 @@ dependencies = [
   'numba',
   'numpy',
   'pandas',
-  'panel',
   'pydantic',
   'pytest-cov',
   'pytest',
