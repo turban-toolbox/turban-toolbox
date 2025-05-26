@@ -46,11 +46,14 @@ def process_level3(
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
 
     # apply corrections
-    correction_factor_spatial = apply_compensation_spatial_response(
-        Pk, k, spatial_response_wavenum
-    )
-    _ = apply_compensation_highpass(Pk, freq, freq_highpass)
+    if False:
+        correction_factor_spatial = apply_compensation_spatial_response(
+            Pk, k, spatial_response_wavenum
+        )
+        _ = apply_compensation_highpass(Pk, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
+
+    apply_var_conserve(Pk, k, shear, ii)
 
     return k, Pk, Pf, freq, pspda, section_marker_slow
 
@@ -75,3 +78,19 @@ def apply_compensation_highpass(
     correction_factor = (1.0 + (freq_highpass / freq) ** 2.0) ** 2.0
     x *= correction_factor[newaxis, :]
     return correction_factor
+
+
+def apply_var_conserve(
+    Pk: Float[ndarray, "n_shear time_slow waveno"],
+    k: Float[ndarray, "time_slow k"],
+    shear: Float[ndarray, "n_shear time_fast"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+) -> Float[ndarray, 'n_shear time_slow']:
+    dk = k[..., 1] - k[..., 0]
+    varPk = Pk[..., 1:].sum(axis=-1) * dk[newaxis, :] # disregard first wavelength
+    sr = shear[:, reshape_index]
+    srf = sr.reshape(sr.shape[:-2] + (sr.shape[-2]*sr.shape[-1],)) # flatten last two axes
+    srf = np.ascontiguousarray(srf) # performance enhancement for np.var
+    corr_factor = np.var(srf, axis=-1) / varPk
+    Pk *= corr_factor[..., newaxis]
+    return corr_factor
