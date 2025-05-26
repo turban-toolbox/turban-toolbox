@@ -22,3 +22,5 @@ dependencies:
   - scipy
   - setuptools
   - xarray
+  - pip:
+    - markdown-pytest

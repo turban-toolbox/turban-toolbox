@@ -8,7 +8,8 @@
 
 Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear`.
 
-```
+<!-- name: test_quickstart_shear -->
+```python
 from turban.process.shear import ShearProcessing
 
 # Process a level 1 dataset all the way to level 4
