@@ -1,4 +1,4 @@
-# These are the current dependencies/versions for debugging purposes
+# These are the current dependencies for developing TURBAN
 
 name: turban
 channels:
@@ -16,8 +16,8 @@ dependencies:
   - pydantic
   - pytest
   - pytest-cov
+  - pytest-markdown-docs
   - scipy
   - setuptools
   - xarray
-  - pip:
-    - markdown-pytest
+    
