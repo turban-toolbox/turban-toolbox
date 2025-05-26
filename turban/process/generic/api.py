@@ -111,12 +111,12 @@ class AggAux:
         data_len: int,
         diss_length: int,
         diss_overlap: int,
-        section_marker: Int[ndarray, "... data_len"] | None = None,
+        section_number: Int[ndarray, "... data_len"] | None = None,
     ) -> None:
-        if section_marker is None:
-            self.section_marker = np.ones((data_len), dtype=int)
+        if section_number is None:
+            self.section_number = np.ones((data_len), dtype=int)
         else:
-            self.section_marker = section_marker
+            self.section_number = section_number
 
         self._data_len = data_len
         self._diss_length = diss_length
@@ -127,7 +127,7 @@ class AggAux:
             0,
             diss_length,
             diss_overlap,
-            section_marker,
+            section_number,
         )
 
     def agg(
@@ -184,7 +184,7 @@ class Processing(ABC):
             self.data_len_fast,
             self.cfg.diss_length,
             self.cfg.diss_overlap,
-            self.level1.section_marker,
+            self.level1.section_number,
         )
         if data_aux is not None and coords_aux is not None:
             agg.agg(data_aux, coords_aux)

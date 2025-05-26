@@ -9,29 +9,29 @@ from turban.utils.spectra import power_spectrum
 def process_level3(
     shear: Float[ndarray, "n_shear time_fast"],
     pspd: Float[ndarray, "time_fast"],
-    fft_length: int,
-    fft_overlap: int,
+    segment_length: int,
+    segment_overlap: int,
     diss_length: int,
     diss_overlap: int,
     sampling_freq: float,
     spatial_response_wavenum: float,
     freq_highpass: float,
-    section_marker: Int[ndarray, "time_fast"],
+    section_number: Int[ndarray, "time_fast"],
 ) -> tuple[
     Float[ndarray, "time_slow k"],  # k
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pk
     Float[ndarray, "n_shear time_slow wavenumber"],  # Pf
     Float[ndarray, "wavenumber"],  # freq
     Float[ndarray, "time_slow"],  # pspda
-    Int[ndarray, "time_slow"],  # section_marker_slow
+    Int[ndarray, "time_slow"],  # section_number_slow
 ]:
     ii = get_chunking_index(
         shear.shape[-1],
-        fft_length,
-        fft_overlap,
+        segment_length,
+        segment_overlap,
         diss_length,
         diss_overlap,
-        section_marker,
+        section_number,
     )
 
     Pf, freq = power_spectrum(shear, sampling_freq, reshape_index=ii)
@@ -39,10 +39,10 @@ def process_level3(
     # platform speed
     pspda = agg_fast_to_slow(pspd, reshape_index=ii)
 
-    section_marker_slow = section_marker[..., ii].max(axis=-1).max(axis=-1)
+    section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
 
     # to wavenumber domain
-    Pk = Pf * pspda[newaxis, :, newaxis] / fft_length / (sampling_freq / 2)
+    Pk = Pf * pspda[newaxis, :, newaxis] / segment_length / (sampling_freq / 2)
     k: Float[ndarray, "time_slow k"] = freq[newaxis, :] / pspda[:, newaxis]
 
     # apply corrections
@@ -55,7 +55,7 @@ def process_level3(
 
     apply_var_conserve(Pk, k, shear, ii)
 
-    return k, Pk, Pf, freq, pspda, section_marker_slow
+    return k, Pk, Pf, freq, pspda, section_number_slow
 
 
 def apply_compensation_spatial_response(
@@ -84,7 +84,7 @@ def apply_var_conserve(
     Pk: Float[ndarray, "n_shear time_slow waveno"],
     k: Float[ndarray, "time_slow k"],
     shear: Float[ndarray, "n_shear time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"],
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
 ) -> Float[ndarray, 'n_shear time_slow']:
     dk = k[..., 1] - k[..., 0]
     varPk = Pk[..., 1:].sum(axis=-1) * dk[newaxis, :] # disregard first wavelength
