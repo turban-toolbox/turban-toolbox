@@ -7,7 +7,6 @@ dependencies:
   - beartype
   - black
   - gsw
-  - hvplot # get rid of this eventually
   - jaxtyping
   - matplotlib
   - netCDF4

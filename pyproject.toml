@@ -10,7 +10,6 @@ license = { text = "GPLv03" }
 dependencies = [
   'beartype',
   'gsw',
-  'hvplot',
   'jaxtyping',
   'matplotlib',
   'netCDF4',
