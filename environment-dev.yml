@@ -1,6 +1,6 @@
 # These are the current dependencies for developing TURBAN
 
-name: turban2
+name: turban
 channels:
   - conda-forge
 dependencies:
