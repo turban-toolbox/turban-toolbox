@@ -12,7 +12,6 @@ from turban.temperature.temperature import (
 )
 
 
-
 def process(
     data: dict[str, Float[ndarray, "time"]],
     sampling_freq: float,
@@ -164,5 +163,3 @@ def process(
     ds4.to_netcdf(outfile, mode="a", group="level4")
 
     return ds0, ds3, ds4, dst
-
-

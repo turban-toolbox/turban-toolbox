@@ -101,7 +101,7 @@ def test_replace_spike():
     sh[4:6] = 1
     # replace data at indices [4, 5] with average over data
     # at indices [2, 3, 6, 7]
-    r = (2 + 3 + 6 + 7) / 4. / 100
+    r = (2 + 3 + 6 + 7) / 4.0 / 100
     replace_spike(sh, 4, 6, 2, 2)
     assert np.all(sh == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09]))
 
@@ -112,7 +112,7 @@ def test_replace_spikes():
     spike_markers = np.zeros(10, dtype=int)
     spike_markers[4:6] = 1
     replace_spikes(sh, spike_markers, 2, 2)
-    r = (2 + 3 + 6 + 7) / 4. / 100
+    r = (2 + 3 + 6 + 7) / 4.0 / 100
     assert np.all(sh == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09]))
 
 

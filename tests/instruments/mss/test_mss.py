@@ -3,6 +3,7 @@ from tests.fixtures import mss_mrd_filename
 from turban.instruments.mss import MSS
 from turban.shear import ShearConfig
 
+
 def test_mss(mss_mrd_filename):
     mss = MSS()
 

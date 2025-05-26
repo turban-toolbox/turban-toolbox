@@ -96,7 +96,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds4_turban.to_netcdf("out/tests/baltic_level4.nc")
 
     # _plot_level3(ds3, ds3_turban) # disable for now
-    _plot_level4(ds4, aux, ds4_turban) # TODO
+    _plot_level4(ds4, aux, ds4_turban)  # TODO
 
 
 def _plot_despiking(ds1, level1, ds2, level2):

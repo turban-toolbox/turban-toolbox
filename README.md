@@ -1,3 +1,5 @@
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 # Turbulence Analysis Toolbox (Turban-Toolbox)
 
 
@@ -26,3 +28,7 @@ In general, `tests/` and in particular `tests/shear/test_process.py` contain mor
 ## Type checking
 
 TURBAN uses extensive type annotations. Types are currently (for easier development) runtime-checked with `beartype`. This can easily be disabled by commenting out the two lines in `turban/__init__.py`.
+
+## PEP8
+
+TURBAN uses black for the code style. Settings are given in `pyproject.toml` (and should be auto-discovered by black). Code editors like VSCode have extensions that can format files individually, another option is running black on the command line: `$ black .`.
