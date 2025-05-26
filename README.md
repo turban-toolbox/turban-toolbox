@@ -9,7 +9,6 @@
 ### Using the high-level ShearProcessing pipeline
 Currently, only shear processing is functional. The high-level API can be imported from `turban.process.shear.api`.
 
-<!-- name: test_quickstart_shear_pipeline -->
 ```python
 from turban.process.shear.api import ShearProcessing
 
@@ -29,7 +28,6 @@ ds.plot.scatter(x="press", y="eps", yscale="log")
 
 If no suitable `ShearProcessing.from_*` method exists, you can configure one manually like this (use `time`, `shear`, etc. from anywhere):
 
-<!-- name: test_quickstart_shear_manual -->
 ```python
 import numpy as np
 import xarray as xr

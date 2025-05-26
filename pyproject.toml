@@ -47,7 +47,7 @@ include-package-data = false
 "*" = ["VERSION"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=<project-name> --cov-report html"
+addopts = "--cov=<project-name> --cov-report html --markdown-docs"
 filterwarnings = "always::UserWarning"
 
 [tool.black]
