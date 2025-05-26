@@ -3,7 +3,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Complex
 
-from turban.utils.util import fast_to_slow_reshape_index
+from turban.utils.util import get_chunking_index
 
 
 def power_spectrum(
@@ -53,7 +53,7 @@ def cospectrum(
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
+        reshape_index = get_chunking_index(
             x.shape[-1],
             fft_length,
             fft_overlap,

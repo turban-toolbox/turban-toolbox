@@ -2,7 +2,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
 
-from turban.utils.util import agg_fast_to_slow, fast_to_slow_reshape_index
+from turban.utils.util import agg_fast_to_slow, get_chunking_index
 from turban.utils.spectra import power_spectrum
 
 
@@ -25,7 +25,7 @@ def process_level3(
     Float[ndarray, "time_slow"],  # pspda
     Int[ndarray, "time_slow"],  # section_marker_slow
 ]:
-    ii = fast_to_slow_reshape_index(
+    ii = get_chunking_index(
         shear.shape[-1],
         fft_length,
         fft_overlap,

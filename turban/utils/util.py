@@ -25,7 +25,7 @@ def ensure_reshape_index(func):
         **kwarg,
     ):
         if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
-            kwarg["reshape_index"] = fast_to_slow_reshape_index(
+            kwarg["reshape_index"] = get_chunking_index(
                 data_len,
                 fft_length,
                 fft_overlap,
@@ -102,7 +102,7 @@ def fast_to_slow_grad_by_segment(
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
+        reshape_index = get_chunking_index(
             shear.shape[-1],
             fft_length,
             fft_overlap,
@@ -159,7 +159,7 @@ def fast_to_slow_avg_by_segment():
     pass
 
 
-def fast_to_slow_reshape_index(
+def get_chunking_index(
     data_len: int,
     fft_length: int,
     fft_overlap: int,

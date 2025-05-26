@@ -12,7 +12,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.utils.util import agg_fast_to_slow, fast_to_slow_reshape_index
+from turban.utils.util import agg_fast_to_slow, get_chunking_index
 
 _AuxDataTypehint = dict[
     str,
@@ -121,7 +121,7 @@ class AggAux:
         self._data_len = data_len
         self._diss_length = diss_length
         self._diss_overlap = diss_overlap
-        self._agg_index = fast_to_slow_reshape_index(
+        self._agg_index = get_chunking_index(
             data_len,
             diss_length,
             0,

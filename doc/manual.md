@@ -20,7 +20,7 @@ While sections in practice are mutually exclusive, both segments and chunks ofte
 |Section|`int` | `chunk_overlap`|Overlap (number of samples) of consecutive chunks |
 |Section|`int` array| `section_marker`|Unique identifier per section, `0` means discard|
 
-As example, let us consider a timeseries `x` of 13 samples. (We choose few samples in order to be able to write out arrays.) Of these, the first and the last two samples are to be discarded. This is achieved by
+As example, let us consider a timeseries `x` of 13 samples. (We choose few samples in order to be able to write out arrays.) Of these, the first sample and the last two samples are to be discarded. This is achieved by
 ```python
 import numpy as np
 section_marker = np.zeros_like(x, dtype=int)
@@ -36,7 +36,7 @@ chunk_overlap = 1
 
 ### Implementation
 
-In order to use numpy's vectorized routines for time series analysis, we use the function `[function_name]`. It takes in the parameters `segment_len`, `segment_overlap`, `chunk_len`, `chunk_overlap`, and `section_marker`, in addition to the length of the time series `samples_len`, and return an array of indices (see sketch), called `[ii]`. 
+In order to use numpy's vectorized routines for time series analysis, we use the function `get_chunking_index`. It takes in the parameters `segment_len`, `segment_overlap`, `chunk_len`, `chunk_overlap`, and `section_marker`, in addition to the length of the time series `samples_len`, and return an array of indices (see sketch), called `[ii]`. 
 
 TODO find names for function_name and `ii`.
 

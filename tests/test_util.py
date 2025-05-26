@@ -11,7 +11,7 @@ from turban.utils.util import (
     agg_fast_to_slow,
     get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
-    fast_to_slow_reshape_index,
+    get_chunking_index,
 )
 
 
@@ -32,7 +32,7 @@ def test_get_cleaned_fraction():
 
 
 def test_diss_chunk_wise_reshape_index():
-    ii = fast_to_slow_reshape_index(
+    ii = get_chunking_index(
         data_len=20,
         fft_length=4,
         fft_overlap=2,
