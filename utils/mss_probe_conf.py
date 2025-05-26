@@ -68,11 +68,11 @@ if __name__ == "__main__":
     # TODO set real values
     add_shear_probe_sensitivity(cfg, "SHEAR_1", 4.40e-4)
     cfg["sensors"]["SHEAR_1"]["serial_number"] = "032"
-    cfg["sensors"]["SHEAR_1"]["reference_temperature"] = 21.
+    cfg["sensors"]["SHEAR_1"]["reference_temperature"] = 21.0
     cfg["sensors"]["SHEAR_1"]["calibration_date"] = "2023-09-15"
     add_shear_probe_sensitivity(cfg, "SHEAR_2", 4.86e-4)
     cfg["sensors"]["SHEAR_2"]["serial_number"] = "033"
-    cfg["sensors"]["SHEAR_2"]["reference_temperature"] = 21.
+    cfg["sensors"]["SHEAR_2"]["reference_temperature"] = 21.0
     cfg["sensors"]["SHEAR_2"]["calibration_date"] = "2023-09-18"
 
     with open("probeconf_mss046.json", "w") as f:
@@ -83,11 +83,11 @@ if __name__ == "__main__":
 
     add_shear_probe_sensitivity(cfg, "SHEAR_1", 3.32e-4)
     cfg["sensors"]["SHEAR_1"]["serial_number"] = "116"
-    cfg["sensors"]["SHEAR_1"]["reference_temperature"] = 21.
+    cfg["sensors"]["SHEAR_1"]["reference_temperature"] = 21.0
     cfg["sensors"]["SHEAR_1"]["calibration_date"] = "2023-09-15"
     add_shear_probe_sensitivity(cfg, "SHEAR_2", 3.17e-4)
     cfg["sensors"]["SHEAR_2"]["serial_number"] = "149"
-    cfg["sensors"]["SHEAR_2"]["reference_temperature"] = 21.
+    cfg["sensors"]["SHEAR_2"]["reference_temperature"] = 21.0
     cfg["sensors"]["SHEAR_2"]["calibration_date"] = ""
 
     with open("probeconf_mss053.json", "w") as f:

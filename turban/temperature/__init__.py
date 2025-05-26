@@ -57,7 +57,7 @@ class TempLevel3:
         level1: TempLevel1,
         level2: TempLevel2,
     ) -> "TempLevel3":
-        
+
         k, Pk, Pnoise = temperature_gradient_spectra(
             level2.dtemp_dt,
             level2.pspd,

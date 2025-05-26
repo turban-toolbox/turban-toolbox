@@ -8,5 +8,4 @@ FIXED_NAMES = {
     "Cmdc": "fast response conductivity (low-pass filter to get conductivity)",
     "Cmac": "fluctuation from fast response conductivity (gradient gives mC gradients)",
     "COND": "Precision conductivity",
-
 }

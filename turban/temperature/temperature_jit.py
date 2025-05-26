@@ -206,7 +206,9 @@ def power_spectrum(x: ndarray, fft_length: int, sampling_freq: float):
 
 
 from numba import float64, int32
-@jit(float64[:](float64[:],float64,int32,int32,float64))
+
+
+@jit(float64[:](float64[:], float64, int32, int32, float64))
 def process_temperature_series(
     x: ndarray[float],
     # platform_speed: ndarray,
