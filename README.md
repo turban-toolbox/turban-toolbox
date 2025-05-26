@@ -31,4 +31,4 @@ TURBAN uses extensive type annotations. Types are currently (for easier developm
 
 ## PEP8
 
-TURBAN uses black for the code style. Settings are given in `pyproject.toml` (and should be auto-discovered by black). Code editors like VSCode have extensions that can format individual files individually, another option is running black on the command line: `$ black .`.
+TURBAN uses black for the code style. Settings are given in `pyproject.toml` (and should be auto-discovered by black). Code editors like VSCode have extensions that can format files individually, another option is running black on the command line: `$ black .`.
