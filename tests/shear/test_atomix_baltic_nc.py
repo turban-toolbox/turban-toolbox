@@ -1,4 +1,4 @@
-from turban.shear import ShearProcessing
+from turban.process.shear.api import ShearProcessing
 import netCDF4
 import pylab as pl
 from numpy import *
