@@ -3,7 +3,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Bool
 
-from turban.util import integrate
+from turban.utils.util import integrate
 
 
 def process_level4(

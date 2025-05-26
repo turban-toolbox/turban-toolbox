@@ -8,11 +8,11 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow, get_cleaned_fraction
-from turban.shear.level2 import process_level2
-from turban.shear.level3 import process_level3
-from turban.shear.level4 import process_level4, get_quality_metric
-from turban.api import AggAux, Level1, Level2, Level3, Level4, Processing
+from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
+from turban.process.shear.level2 import process_level2
+from turban.process.shear.level3 import process_level3
+from turban.process.shear.level4 import process_level4, get_quality_metric
+from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, Processing
 
 
 @dataclass(kw_only=True)

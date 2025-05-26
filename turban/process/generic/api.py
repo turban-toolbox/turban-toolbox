@@ -7,12 +7,12 @@ from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int, AbstractArray, Num
-from turban.config import SegmentConfig
+from turban.process.generic.config import SegmentConfig
 from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
+from turban.utils.util import agg_fast_to_slow, fast_to_slow_reshape_index
 
 _AuxDataTypehint = dict[
     str,

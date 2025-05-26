@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from turban.shear.level2 import (
+from turban.process.shear.level2 import (
     boolarr_to_sections,
     sections_to_marker,
     detect_shear_spikes,
@@ -11,7 +11,7 @@ from turban.shear.level2 import (
     clean_shear,
     butterfilt,
 )
-from turban.shear import ShearLevel1, ShearLevel2
+from turban.process.shear.api import ShearLevel1, ShearLevel2
 from tests.fixtures import atomix_nc_filename
 
 

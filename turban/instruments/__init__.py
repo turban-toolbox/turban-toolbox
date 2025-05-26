@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from turban.instruments.config import InstrumentConfig
-from turban.shear import ShearLevel1
+from turban.process.shear.api import ShearLevel1
 
 
 class Instrument(ABC):

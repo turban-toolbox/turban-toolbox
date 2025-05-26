@@ -3,7 +3,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Complex
 
-from turban.util import fast_to_slow_reshape_index
+from turban.utils.util import fast_to_slow_reshape_index
 
 
 def power_spectrum(

@@ -2,8 +2,7 @@ import gsw
 import numpy as np
 from numpy import ndarray
 from jaxtyping import Float, Int
-
-from .temperature import *
+from turban.utils.util import reshape_halfoverlap_last
 
 
 def calc_ctd(

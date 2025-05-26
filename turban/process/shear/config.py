@@ -1,5 +1,5 @@
 from netCDF4 import Dataset
-from turban.config import SegmentConfig
+from turban.process.generic.config import SegmentConfig
 
 
 class ShearConfig(SegmentConfig):
