@@ -1,12 +1,12 @@
 from typing import Literal
 from dataclasses import dataclass
 from jaxtyping import Float, Int
-from turban.temperature.config import TempConfig
-from turban.util import fft_grad
+from turban.process.temperature.config import TempConfig
+from turban.utils.util import fft_grad
 from numpy import nan, ndarray
 import numpy as np
 import xarray as xr
-from turban.temperature.temperature import temperature_gradient_spectra
+from turban.process.temperature.temperature import temperature_gradient_spectra
 
 
 @dataclass(kw_only=True)

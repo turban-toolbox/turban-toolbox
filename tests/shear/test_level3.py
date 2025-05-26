@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from turban.shear.level3 import power_spectrum
-from turban.util import agg_fast_to_slow, reshape_overlap_index
+from turban.process.shear.level3 import power_spectrum
+from turban.utils.util import agg_fast_to_slow, reshape_overlap_index
 
 
 def test_spectra_arr_shape():

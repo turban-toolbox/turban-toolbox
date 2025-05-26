@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from turban.util import (
+from turban.utils.util import (
     fft_grad,
     reshape_overlap_index,
     reshape_any_first,

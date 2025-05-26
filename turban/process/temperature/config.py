@@ -1,4 +1,4 @@
-from turban.config import SegmentConfig
+from turban.process.generic.config import SegmentConfig
 
 
 class TempConfig(SegmentConfig):

@@ -3,7 +3,7 @@ import numpy as np
 from numpy import newaxis
 import matplotlib.pyplot as plt
 
-from turban.shear.level4 import (
+from turban.process.shear.level4 import (
     unwrap_quality_metric,
     model_spectrum,
     model_spectrum_lueck,

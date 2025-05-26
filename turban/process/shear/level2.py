@@ -1,9 +1,9 @@
 import numpy as np
 
-from turban.util import butterfilt
+from turban.utils.util import butterfilt
 from jaxtyping import Float, Bool, Int
 from numpy import ndarray
-from turban.util import split_data
+from turban.utils.util import split_data
 
 
 data_and_bounds_type = list[

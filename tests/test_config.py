@@ -1,5 +1,5 @@
-from turban.config import SegmentConfig
-from turban.shear.config import ShearConfig
+from turban.process.generic.config import SegmentConfig
+from turban.process.shear.config import ShearConfig
 from tests.fixtures import atomix_nc_filename
 
 

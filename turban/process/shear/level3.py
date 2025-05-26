@@ -2,7 +2,7 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int
 
-from turban.util import agg_fast_to_slow, fast_to_slow_reshape_index
+from turban.utils.util import agg_fast_to_slow, fast_to_slow_reshape_index
 from turban.utils.spectra import power_spectrum
 
 

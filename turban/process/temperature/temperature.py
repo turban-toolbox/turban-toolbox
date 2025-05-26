@@ -4,7 +4,7 @@ from numpy import ndarray, newaxis
 from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 
-from turban.util import integrate, reshape_any_first, reshape_halfoverlap_last
+from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_last
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
@@ -469,7 +469,7 @@ def _try_sigma_derivative(df):
 
     import gsw
     from level1 import get_vsink
-    from util import butterfilt, fft_grad
+    from turban.utils.util import butterfilt, fft_grad
 
     def derivative(func, arg, x, dx):
         return (func(**{arg: x + dx}) - func(**{arg: x - dx})) / 2 / dx
