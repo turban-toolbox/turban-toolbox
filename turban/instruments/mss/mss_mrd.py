@@ -901,7 +901,7 @@ class mrd():
         """ Parsing the header of the MRD file and saving the results in a config dictionary
         """
         funcname = __name__ + '.parse_header():'
-        config = {'MSS': {}}
+        config = {'mss': {}}
         config['fs'] = 1024 # standard sampling frequency of a MSS
         ind_ship = header.find('Ship    :   ') + len('Ship    :   ')
         ship = header[ind_ship:ind_ship+8]
@@ -946,30 +946,30 @@ class mrd():
                 self.logger.debug(funcname + 'Found sensor')
                 sensor_str.append(hs[i])
                 devicename = hsp[1].replace(' ', '')
-                if('MSS' in devicename): # Treat the MSS here
-                    config['MSS']['name'] = devicename
+                if('MSS' in devicename): # Treat the mss here
+                    config['mss']['name'] = devicename
                     # Get the binary offset (data is either calibrated against int16 or uint16)
                     if (devicename == 'MSS038') or (devicename == 'MSS38'):
                         offset = -32768
                     else:
                         offset = 0
 
-                    config['MSS']['offset'] = offset
-                    config['MSS']['devicenum'] = devicenum
+                    config['mss']['offset'] = offset
+                    config['mss']['devicenum'] = devicenum
                     channelnum = int(hsp[2].replace(' ',''))
                     channel    = hsp[4].replace(' ','')
                     unit       = hsp[5].replace(' ','')
                     caltype    = hsp[3].replace(' ','')
-                    config['MSS'][channelnum] = {}
-                    config['MSS'][channelnum]['unit']    = unit
-                    config['MSS'][channelnum]['name']    = channel
-                    config['MSS'][channelnum]['caltype'] = caltype
+                    config['mss'][channelnum] = {}
+                    config['mss'][channelnum]['unit']    = unit
+                    config['mss'][channelnum]['name']    = channel
+                    config['mss'][channelnum]['caltype'] = caltype
                     poly = []
                     # There are 6 coefficients for each channel
                     for val in hsp[6:12]:
                         poly.append(float(val))
 
-                    config['MSS'][channelnum]['coeff'] = numpy.asarray(poly)
+                    config['mss'][channelnum]['coeff'] = numpy.asarray(poly)
                     #print(devicename,channelnum,channel)
                     #if(hs[i].upper().find('COUNT') >=0):
                     #    mss = hs[i].split(' ')[1]
@@ -1171,11 +1171,11 @@ class mrd():
         data_units = {}
         nchannels = numpy.shape(rawdatac)[1]
         for i in range(nchannels):
-            caltype     = config['MSS'][i+1]['caltype']
-            coeff       = config['MSS'][i+1]['coeff']
-            unit        = config['MSS'][i + 1]['unit']
-            channelname = config['MSS'][i+1]['name'].upper()
-            offset      = config['MSS']['offset']
+            caltype     = config['mss'][i+1]['caltype']
+            coeff       = config['mss'][i+1]['coeff']
+            unit        = config['mss'][i + 1]['unit']
+            channelname = config['mss'][i+1]['name'].upper()
+            offset      = config['mss']['offset']
             data_units[channelname] = unit
             # Overwrite with postconfig value
             try:
