@@ -2,7 +2,50 @@ import numpy as np
 import scipy.signal
 
 
-def calc_vsink(press, fs):
+def calc_shear(shear, vsink, density, fs):
+    """
+    Calculates the physical shear by
+    * 1 Hz high pass sensor data
+    * calculate its time gradient
+    * shear = A / (density x Vsink ^ 2)
+
+    Returns
+    -------
+
+    """
+    dt = 1 / fs
+    degree = 4
+    cutoff_Fs = 1  # 1 Hz
+    cutoff = cutoff_Fs / (fs / 2)  # non - dim with Nyquist freq.
+    [b, a] = scipy.signal.butter(degree, cutoff, 'high')
+
+    shear_hp = scipy.signal.filtfilt(b, a, shear)
+    # calculate time gradient of raw shear
+    dshdt = np.gradient(shear_hp, dt)
+    # screen for spikes
+    dshdt_desp = despike_std(dshdt, 1024, 4)
+    # dshdt_desp = dshdt
+
+    vsink_tmp = vsink.copy()
+    vsink_tmp[vsink_tmp == 0] = np.nan
+
+    shear = dshdt_desp * (density ** (-1)) * (vsink_tmp ** (-2))
+    return shear
+
+def calc_vsink(press, fs, f_low = 0.2):
+    dt = 1 / fs
+    # Low pass the pressure signal
+    degree = 4
+    cutoff_freq = f_low  # Hz
+    cutoff = cutoff_freq / (fs / 2)  # non - dim
+    # with Nyquist freq.
+    [b, a] = scipy.signal.butter(degree, cutoff)
+    press_low = scipy.signal.filtfilt(b, a, press)
+    vsink = np.gradient(press_low, dt)
+    return vsink
+
+
+def calc_vsink_legacy(press, fs):
     """
     Calculates the sinking velocity by differentiating the pressure record
 
@@ -99,7 +142,7 @@ def identify_spikes_std(x, win=1024, fac_std=3, max_spike_len=5):
     return ind_spike_all
 
 
-def gradient(x, dt):
+def gradient_legacy(x, dt):
     """
     Calculates a a finite difference gradient with an order of dt**2
     see also https://en.wikipedia.org/wiki/Finite_difference#Relation_with_derivatives
@@ -115,6 +158,13 @@ def gradient(x, dt):
     """
 
     dxdt = np.zeros((len(x)))
+    print(np.asarray(x))
+    print(np.shape(x))
+    print(np.shape(dxdt))
+    print(np.shape(x[2:]),np.shape(x[1:-1]),np.shape(x[0:-2]))
+    print(np.shape(dxdt[2:]))
+    print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)))
+    print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2])))
     # dxdt(i:len)=(-x(i:len)+ 4.*x(i-1:len-1) - 3.*x(i-2:len-2))./(2*dt)
     dxdt[2:] = (-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)
     dxdt[0] = (x[1] - x[0]) / dt
