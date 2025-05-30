@@ -1,8 +1,8 @@
 from tests.fixtures import mss_mrd_filename
 import turban
 from turban.instruments.mss import mss
-from turban.shear import ShearLevel1, ShearProcessing, ShearConfig
-
+from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
+import numpy as np
 
 def test_read_mrd(mss_mrd_filename):
     mrddata = turban.instruments.mss.mss_mrd.mrd(mss_mrd_filename)
@@ -33,13 +33,31 @@ print('Saving level1 data to netcdf')
 data_level1.to_netcdf(dataset + '_level1.nc')
 
 #
-shear_config = ShearConfig(sampling_freq=1024,fft_length= 1024,fft_overlap=512,diss_length=1024,diss_overlap=512)
-section_marker = arange(1,len(data_level1['PSPD_REL']))
+shear_config = ShearConfig(
+    sampling_freq=1024.0,
+    segment_length=2048,
+    segment_overlap=1024,
+    diss_length=5120,
+    diss_overlap=2560,
+    freq_cutoff_antialias=999.0,
+    freq_cutoff_corrupt=999.0,
+    freq_highpass=0.15,
+    spatial_response_wavenum=50.0,
+    waveno_cutoff_spatial_corr=999.0,
+    spike_threshold=8.0,
+    max_tries=10,
+    spike_replace_before=512,
+    spike_replace_after=512,
+    spike_include_before=10,
+    spike_include_after=20,
+    cutoff_freq_lp=0.5,
+)
+section_number= np.asarray(data_level1['time_count'] * 0 + 1,dtype=int)
 ShearLevel1(
-            time=asarray(data_level1['time_count']),
-            pspd=asarray(data_level1['PSPD_REL']),
-            shear=asarray(data_level1['SHEAR']),
-            section_marker=section_marker,
+            time=np.asarray(data_level1['time_count']),
+            pspd=np.asarray(data_level1['PSPD_REL']),
+            shear=np.asarray(data_level1['SHEAR']),
+            section_number=section_number,
             cfg=shear_config,
         )
 
