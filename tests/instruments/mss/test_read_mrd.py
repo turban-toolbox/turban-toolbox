@@ -52,8 +52,9 @@ shear_config = ShearConfig(
     spike_include_after=20,
     cutoff_freq_lp=0.5,
 )
-section_number= np.asarray(data_level1['time_count'] * 0 + 1,dtype=int)
-ShearLevel1(
+section_number= np.asarray(data_level1['time_count'] * 0,dtype=int)
+section_number[2677:172620] = int(1)
+shear_level1 = ShearLevel1(
             time=np.asarray(data_level1['time_count']),
             pspd=np.asarray(data_level1['PSPD_REL']),
             shear=np.asarray(data_level1['SHEAR']),
@@ -61,4 +62,4 @@ ShearLevel1(
             cfg=shear_config,
         )
 
-p = ShearProcessing(ShearLevel1, level=1)
+p = ShearProcessing(shear_level1, level=1)
