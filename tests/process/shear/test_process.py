@@ -58,7 +58,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     level2 = p.level2
     level3 = p.level3
     level4 = p.level4
-    aux, _ = p.aux.to_xarray()
+    aux = p.aux.slow_to_xarray()
     assert isinstance(level1, ShearLevel1)
     assert isinstance(level2, ShearLevel2)
     assert isinstance(level3, ShearLevel3)
@@ -76,8 +76,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     )  # for consistency with turban level 3
     ds4 = xr.load_dataset(atomix_nc_filename, group="L4_dissipation")
 
-    ds3_turban = level3.to_xarray()
-    ds4_turban = level4.to_xarray()
+    ds1_turban, ds2_turban, ds3_turban, ds4_turban = p.to_xarray()
 
     ds3_turban.to_netcdf("out/tests/baltic_level3.nc")
     ds4_turban.to_netcdf("out/tests/baltic_level4.nc")

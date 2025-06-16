@@ -139,9 +139,9 @@ class AggAux:
         """Aggregates data in one of two forms:
         The complete form is:
             {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}
-        The simplified form (for user convenience) is: 
+        The simplified form (for user convenience) is:
             {variable_name_fast: ndarray}.
-            
+
         The simplified form will be expanded to the complete one, using chunk-wise mean values.
         The two forms may be mixed in the same dictionary."""
         slow = {}
@@ -151,7 +151,7 @@ class AggAux:
             if not isinstance(agg_instruct, tuple):
                 data[varname] = (
                     ["time"],
-                    agg_instruct, # this is an array
+                    agg_instruct,  # this is an array
                     {"mean": varname},
                 )
 
@@ -169,12 +169,14 @@ class AggAux:
         self._fast = {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
         self._coords = coords
 
-    def to_xarray(self):
+    def slow_to_xarray(self):
         coords, data_vars = _split_dict_by(self._slow, self._coords)
-        slow = xr.Dataset(data_vars=data_vars, coords=coords)
+        return xr.Dataset(data_vars=data_vars, coords=coords)
+
+    def fast_to_xarray(self):
         coords, data_vars = _split_dict_by(self._fast, self._coords)
         fast = xr.Dataset(data_vars=data_vars, coords=coords)
-        return slow, fast
+        return fast
 
 
 class Processing(ABC):
@@ -244,13 +246,21 @@ class Processing(ABC):
         else:
             return self.level2.time.shape[-1]
 
-    @property
-    def aux_fast(self):
-        return self.aux._fast
+    def to_xarray(self):
+        """Export """
+        out_data = []
+        for i, data in enumerate([self.level1, self.level2, self.level3, self.level4]):
+            level = i + 1
+            if data is None:
+                out = None
+            else:
+                if level <= 2:
+                    out = xr.merge((data.to_xarray(), self.aux.fast_to_xarray()))
+                elif level >= 3:
+                    out = xr.merge((data.to_xarray(), self.aux.slow_to_xarray()))
+            out_data.append(out)
+        return out_data
 
-    @property
-    def aux_slow(self):
-        return self.aux._slow
 
 def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
     has_key = {k: v for k, v in dct.items() if k in keys}
