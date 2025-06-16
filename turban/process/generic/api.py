@@ -14,7 +14,7 @@ import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 
-_AuxDataTypehint = dict[
+AggAuxDataTypehint = dict[
     str,
     tuple[
         list[str],
@@ -133,7 +133,7 @@ class AggAux:
 
     def agg(
         self,
-        data: _AuxDataTypehint,
+        data: AggAuxDataTypehint,
         coords: list[str],
     ) -> None:
         """Aggregates data in one of two forms:
@@ -190,7 +190,7 @@ class Processing(ABC):
         self,
         data: TimeseriesLevel,
         level: Literal[1, 2, 3, 4],
-        data_aux: _AuxDataTypehint | None = None,
+        data_aux: AggAuxDataTypehint | None = None,
         coords_aux: list[str] | None = None,
         cls_aux: type = AggAux,
     ):

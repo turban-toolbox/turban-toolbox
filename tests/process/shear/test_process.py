@@ -26,9 +26,41 @@ def test_baltic_benchmark(atomix_nc_filename):
         ShearLevel2,
         ShearLevel3,
         ShearLevel4,
+        AtomixNetcdfLoader,
     )
 
-    p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, level=1)
+    aux_vars = ["time", "press", "temp", "cond"]
+    arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(atomix_nc_filename, aux_vars)))
+    data_aux = {
+        "time": (
+            ["time"],
+            arr["time"],
+            {"mean": "time_slow"},
+        ),
+        "press": (
+            ["time"],
+            arr["press"],
+            {"mean": "press"},
+        ),
+        "temp": (
+            ["time"],
+            arr["temp"][0, :],
+            {"mean": "temp"},
+        ),
+        "cond": (
+            ["time"],
+            arr["cond"],
+            {"mean": "cond"},
+        ),
+    }
+    coords_aux = ["time", "time_slow"]
+
+    p = ShearProcessing.from_atomix_netcdf(
+        atomix_nc_filename,
+        level=1,
+        data_aux=data_aux,
+        coords_aux=coords_aux,
+    )
 
     level1 = p.level1
     level2 = p.level2

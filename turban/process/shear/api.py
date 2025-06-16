@@ -12,7 +12,7 @@ from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
-from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, Processing
+from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, Processing, AggAuxDataTypehint
 
 
 @dataclass(kw_only=True)
@@ -284,34 +284,10 @@ class ShearProcessing(Processing):
         cls,
         fname: str,
         level: Literal[1, 2, 3, 4],
+        data_aux: AggAuxDataTypehint | None = None,
+        coords_aux: list[str] | None = None,
     ):
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-
-        aux_vars = ["time", "press", "temp", "cond"]
-        arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(fname, aux_vars)))
-        data_aux = {
-            "time": (
-                ["time"],
-                arr["time"],
-                {"mean": "time_slow"},
-            ),
-            "press": (
-                ["time"],
-                arr["press"],
-                {"mean": "press"},
-            ),
-            "temp": (
-                ["time"],
-                arr["temp"][0, :],
-                {"mean": "temp"},
-            ),
-            "cond": (
-                ["time"],
-                arr["cond"],
-                {"mean": "cond"},
-            ),
-        }
-        coords_aux = ["time", "time_slow"]
         return cls(data, level, data_aux, coords_aux)
 
 
