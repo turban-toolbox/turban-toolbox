@@ -29,11 +29,11 @@ class SegmentConfig(BaseModel):
         return cls(**kwarg)
 
     @property
-    def number_fft_windows_per_spectrum(self):
+    def number_fft_windows_per_chunk(self):
         """N_f in the ATOMIX paper"""
         fft_segment_start = np.arange(
             0,
             self.chunk_length - self.segment_length + 1,
             self.segment_length - self.segment_overlap,
-        )  # start of each fft segment within a spectrum segment
+        )  # start of each fft segment within a chunk
         return len(fft_segment_start)

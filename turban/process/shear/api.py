@@ -178,7 +178,7 @@ class ShearLevel3(Level3):
             5
             / 4
             * (
-                self.cfg.number_fft_windows_per_spectrum
+                self.cfg.number_fft_windows_per_chunk
                 - self.number_signals_vibration_removal
             )
             ** (-7 / 9)
