@@ -2,7 +2,7 @@
 
 from functools import wraps
 from logging import warnings
-from typing import get_type_hints
+from typing import get_type_hints, ClassVar
 from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
@@ -20,7 +20,8 @@ _AuxDataTypehint = dict[
         list[str],
         Num[ndarray, "*any time_fast"],
         dict[str, str | None],
-    ],
+    ]
+    | Num[ndarray, "*any time_fast"],  # simplified API
 ]
 
 
@@ -28,7 +29,7 @@ _AuxDataTypehint = dict[
 class TimeseriesLevel:
     time: Float[ndarray, "time"]
 
-    _coords = ["time"]
+    _coords: ClassVar[list[str]] = ["time"]
 
     def arrays_as_dict(self):
         return {
@@ -135,9 +136,25 @@ class AggAux:
         data: _AuxDataTypehint,
         coords: list[str],
     ) -> None:
-        """Aggregates data in the form
-        {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}"""
+        """Aggregates data in one of two forms:
+        The complete form is:
+            {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}
+        The simplified form (for user convenience) is: 
+            {variable_name_fast: ndarray}.
+            
+        The simplified form will be expanded to the complete one, using chunk-wise mean values.
+        The two forms may be mixed in the same dictionary."""
         slow = {}
+
+        # create complete API from simpler API
+        for varname, agg_instruct in data.items():
+            if not isinstance(agg_instruct, tuple):
+                data[varname] = (
+                    ["time"],
+                    agg_instruct, # this is an array
+                    {"mean": varname},
+                )
+
         for varname, (dims, arr, rename_dict) in data.items():
             for agg_method, varname_new in rename_dict.items():
                 if varname_new is None:
@@ -227,8 +244,13 @@ class Processing(ABC):
         else:
             return self.level2.time.shape[-1]
 
-    # def to_xarray(self):
+    @property
+    def aux_fast(self):
+        return self.aux._fast
 
+    @property
+    def aux_slow(self):
+        return self.aux._slow
 
 def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
     has_key = {k: v for k, v in dct.items() if k in keys}
