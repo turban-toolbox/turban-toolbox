@@ -142,6 +142,7 @@ def agg_fast_to_slow(
     ii = diss_chunk_wise_reshape_index(reshape_index)
     xi = x[..., ii]
     return getattr(xi, agg_method)(axis=-1)
+    # return getattr(np, agg_method)(xi, axis=-1) # TODO implement
 
 
 def agg_fast_to_slow_batch(

@@ -37,20 +37,12 @@ def test_baltic_benchmark(atomix_nc_filename):
             arr["time"],
             {"mean": "time_slow"},
         ),
-        "press": (
-            ["time"],
-            arr["press"],
-            {"mean": "press"},
-        ),
-        "temp": (
-            ["time"],
-            arr["temp"][0, :],
-            {"mean": "temp"},
-        ),
+        "press": arr["press"], # simplified form
+        "temp": arr["temp"][0, :], # simplified form
         "cond": (
             ["time"],
             arr["cond"],
-            {"mean": "cond"},
+            {"max": "cond"},
         ),
     }
     coords_aux = ["time", "time_slow"]
