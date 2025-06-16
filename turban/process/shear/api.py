@@ -18,7 +18,6 @@ from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, P
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
     shear: Float[ndarray, "n_shear time"]
-    section_number: Int[ndarray, "time"]
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):

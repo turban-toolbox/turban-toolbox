@@ -2,7 +2,7 @@
 
 from functools import wraps
 from logging import warnings
-from typing import get_type_hints
+from typing import get_type_hints, ClassVar
 from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
@@ -19,7 +19,7 @@ _AuxDataTypehint = dict[
     tuple[
         list[str],
         Num[ndarray, "*any time_fast"],
-        dict[str, str | None],
+        dict[str, str],
     ],
 ]
 
@@ -28,7 +28,9 @@ _AuxDataTypehint = dict[
 class TimeseriesLevel:
     time: Float[ndarray, "time"]
 
-    _coords = ["time"]
+    aux: dict[str, Float[ndarray, "time"]]
+
+    _coords: ClassVar[list[str]] = ["time"]
 
     def arrays_as_dict(self):
         return {
@@ -77,10 +79,19 @@ class HasLevelBelow(TimeseriesLevel):
         else:
             self._cfg = value
 
+    def get_aux_from_below(self):
+        """Propagates auxiliary variables from level below to this level"""
+        if self.level_below is None:
+            warnings.warn("No level below to propagate auxiliary variables from.")
+            return {}
+        else:
+            return self.level_below.aux
+
 
 @dataclass(kw_only=True)
 class Level1(TimeseriesLevel):
     pspd: Float[ndarray, "time"]
+    section_number: Int[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
 
 
@@ -97,6 +108,30 @@ class Level3(HasLevelBelow, TimeseriesLevel):
 
     _coords = ["time", "freq"]
 
+    def get_aux_from_below(self):
+        """Aggregate auxiliary variables from level 2 to level 3 as chunk-wise averages."""
+        if self.level_below is None:
+            warnings.warn("No level below to propagate auxiliary variables from.")
+            return {}
+        else:
+            data = self.level_below
+            agg = AggAux(
+                data_len=data.cfg.segment_length,
+                diss_length=data.cfg.diss_length,
+                diss_overlap=data.cfg.diss_overlap,
+                section_number=data.section_number,
+            )
+            data_aux = {
+                varname: (
+                    ["time"],
+                    arr,
+                    {"mean": varname},
+                )
+                for varname, arr in self.aux.items()
+            }
+            agg.agg(data_aux, self._coords)
+            return agg._fast
+
 
 @dataclass(kw_only=True)
 class Level4(HasLevelBelow, TimeseriesLevel):
@@ -104,7 +139,8 @@ class Level4(HasLevelBelow, TimeseriesLevel):
 
 
 class AggAux:
-    """Aggregates auxiliary variables from fast to slow timesteps"""
+    """Aggregates auxiliary variables from fast to slow timesteps
+    In practice, this happens between Level 2 and Level 3."""
 
     def __init__(
         self,
