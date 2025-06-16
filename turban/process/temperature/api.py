@@ -61,8 +61,8 @@ class TempLevel3:
         k, Pk, Pnoise = temperature_gradient_spectra(
             level2.dtemp_dt,
             level2.pspd,
-            level2.cfg.diss_length,
-            level2.cfg.diss_overlap,
+            level2.cfg.chunk_length,
+            level2.cfg.chunk_overlap,
             level2.cfg.segment_length,
             level2.cfg.sampling_freq,
         )
@@ -76,8 +76,8 @@ class TempLevel3:
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
         )
 
         return cls(

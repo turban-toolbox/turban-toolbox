@@ -109,8 +109,8 @@ class AggAux:
     def __init__(
         self,
         data_len: int,
-        diss_length: int,
-        diss_overlap: int,
+        chunk_length: int,
+        chunk_overlap: int,
         section_number: Int[ndarray, "... data_len"] | None = None,
     ) -> None:
         if section_number is None:
@@ -119,14 +119,14 @@ class AggAux:
             self.section_number = section_number
 
         self._data_len = data_len
-        self._diss_length = diss_length
-        self._diss_overlap = diss_overlap
+        self._chunk_length = chunk_length
+        self._chunk_overlap = chunk_overlap
         self._agg_index = get_chunking_index(
             data_len,
-            diss_length,
+            chunk_length,
             0,
-            diss_length,
-            diss_overlap,
+            chunk_length,
+            chunk_overlap,
             section_number,
         )
 
@@ -182,8 +182,8 @@ class Processing(ABC):
         self.data = data
         agg = cls_aux(
             self.data_len_fast,
-            self.cfg.diss_length,
-            self.cfg.diss_overlap,
+            self.cfg.chunk_length,
+            self.cfg.chunk_overlap,
             self.level1.section_number,
         )
         if data_aux is not None and coords_aux is not None:

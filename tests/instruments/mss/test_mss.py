@@ -13,8 +13,8 @@ def test_mss(mss_mrd_filename):
         sampling_freq=mss.cfg.sampling_freq,
         segment_length=2048,
         segment_overlap=1024,
-        diss_length=4 * 2048,
-        diss_overlap=1024,
+        chunk_length=4 * 2048,
+        chunk_overlap=1024,
     )
     p = mss.to_shear_processing(
         section_number=np.ones_like(mss.mrd.level0["PRESS"], dtype=int),

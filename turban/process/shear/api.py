@@ -106,8 +106,8 @@ class ShearLevel3(Level3):
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
         )
 
         spike_fraction = get_cleaned_fraction(
@@ -116,8 +116,8 @@ class ShearLevel3(Level3):
             data_len=level1.shear.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
             section_number=level1.section_number,
         )
 
@@ -126,8 +126,8 @@ class ShearLevel3(Level3):
             data_len=level2.num_despike_iter.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
             section_number=level1.section_number,
             agg_method="max",
         )
@@ -199,7 +199,7 @@ class ShearLevel3(Level3):
     @property
     def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
-        tau_eps = self.cfg.diss_length / self.cfg.sampling_freq
+        tau_eps = self.cfg.chunk_length / self.cfg.sampling_freq
         return tau_eps * self.platform_speed
 
 
