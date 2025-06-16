@@ -11,8 +11,8 @@ def process_level3(
     pspd: Float[ndarray, "time_fast"],
     segment_length: int,
     segment_overlap: int,
-    diss_length: int,
-    diss_overlap: int,
+    chunk_length: int,
+    chunk_overlap: int,
     sampling_freq: float,
     spatial_response_wavenum: float,
     freq_highpass: float,
@@ -29,8 +29,8 @@ def process_level3(
         shear.shape[-1],
         segment_length,
         segment_overlap,
-        diss_length,
-        diss_overlap,
+        chunk_length,
+        chunk_overlap,
         section_number,
     )
 

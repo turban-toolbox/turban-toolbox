@@ -11,8 +11,8 @@ def power_spectrum(
     sampling_freq: float,
     segment_length: int | None = None,
     segment_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
 ) -> tuple[
@@ -25,8 +25,8 @@ def power_spectrum(
         sampling_freq,
         segment_length,
         segment_overlap,
-        diss_length,
-        diss_overlap,
+        chunk_length,
+        chunk_overlap,
         section_number,
         reshape_index,
     )
@@ -39,8 +39,8 @@ def cospectrum(
     sampling_freq: float,
     segment_length: int | None = None,
     segment_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
     window: Literal["hanning"] | None = "hanning",
@@ -57,8 +57,8 @@ def cospectrum(
             x.shape[-1],
             segment_length,
             segment_overlap,
-            diss_length,
-            diss_overlap,
+            chunk_length,
+            chunk_overlap,
             section_number,
         )
     else:

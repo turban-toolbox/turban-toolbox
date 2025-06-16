@@ -14,11 +14,11 @@ def test_spectra_arr_shape():
     segment_length = 6
     segment_overlap = 3
     sampling_freq = 1.0
-    diss_length = 12
-    diss_overlap = 9
+    chunk_length = 12
+    chunk_overlap = 9
 
     y1, f = power_spectrum(
-        x, sampling_freq, segment_length, segment_overlap, diss_length, diss_overlap
+        x, sampling_freq, segment_length, segment_overlap, chunk_length, chunk_overlap
     )
     # platform speed
     y2 = agg_fast_to_slow(
@@ -26,8 +26,8 @@ def test_spectra_arr_shape():
         data_len=N,
         segment_length=segment_length,
         segment_overlap=segment_overlap,
-        diss_length=diss_length,
-        diss_overlap=diss_overlap,
+        chunk_length=chunk_length,
+        chunk_overlap=chunk_overlap,
     )
 
     assert f.shape == (segment_length / 2 + 1,), "Wrong number of frequencies"
