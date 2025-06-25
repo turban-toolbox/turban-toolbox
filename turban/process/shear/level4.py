@@ -7,9 +7,9 @@ from turban.utils.util import integrate
 
 
 def process_level4(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    wavenumber: Float[ndarray, "time wavenumber"],
-    platform_speed: Float[ndarray, "time"],
+    psi: Float[ndarray, "nshear time waveno"],
+    waveno: Float[ndarray, "time waveno"],
+    senspeed: Float[ndarray, "time"],
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
@@ -30,29 +30,29 @@ def process_level4(
     """
     eps_crit = 1e-5
     # nu = get_seawater_viscosity(999.)
-    mol_visc = np.array(1.6e-6)[
+    molvisc = np.array(1.6e-6)[
         newaxis
     ]  # TODO: get from temperature (aggregate in level3)
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
     # 1st estimate
-    eps1 = get_eps_first_estimate(psi, wavenumber, mol_visc)
+    eps1 = get_eps_first_estimate(psi, waveno, molvisc)
 
     # Inertial subrange integration
     eps_specint, resolved_var_frac, waveno_cutoff_specint = spectrum_integration(
         psi,
-        wavenumber,
+        waveno,
         eps1,
-        mol_visc,
-        platform_speed,
+        molvisc,
+        senspeed,
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
     )
 
-    k_kolmogorov = (eps1 / mol_visc**3) ** 0.25
-    eps_isrfit, waveno_cutoff_isrfit = inertial_range_fit(psi, wavenumber, k_kolmogorov)
+    k_kolmogorov = (eps1 / molvisc**3) ** 0.25
+    eps_isrfit, waveno_cutoff_isrfit = inertial_range_fit(psi, waveno, k_kolmogorov)
 
     eps = np.where(eps1 < eps_crit, eps_specint, eps_isrfit)
     eps_source_flag = np.where(eps1 < eps_crit, 1, 2)
@@ -63,10 +63,10 @@ def process_level4(
         waveno_cutoff_isrfit,
     )
     # do not count first element: psi(0)=0
-    num_spec_points = (wavenumber[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]).sum(
+    num_spec_points = (waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]).sum(
         axis=-1
     ) - 1
-    kolm_length = (mol_visc[newaxis, :] ** 3 / eps) ** 0.25
+    kolm_length = (molvisc[newaxis, :] ** 3 / eps) ** 0.25
 
     log_diss_var = get_log_diss_var(
         eps_source_flag,
@@ -77,11 +77,11 @@ def process_level4(
         log_psi_var,
     )
 
-    psi_model = model_spectrum(wavenumber, eps, mol_visc)
-    use_wavenumber = wavenumber[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
+    psi_model = model_spectrum(waveno, eps, molvisc)
+    use_waveno = waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
     fom, log_diss_mad, num_spec_points_fom = figure_of_merit(
-        np.where(use_wavenumber, psi, np.nan)[..., 1:],
-        np.where(use_wavenumber, psi_model, np.nan)[..., 1:],
+        np.where(use_waveno, psi, np.nan)[..., 1:],
+        np.where(use_waveno, psi_model, np.nan)[..., 1:],
         log_psi_var,
     )
     assert np.all(np.equal(num_spec_points, num_spec_points_fom))  # Sanity check
@@ -178,8 +178,8 @@ def get_log_diss_var(
 
 
 def figure_of_merit(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    psi_model: Float[ndarray, "nshear time wavenumber"],
+    psi: Float[ndarray, "nshear time waveno"],
+    psi_model: Float[ndarray, "nshear time waveno"],
     log_psi_var: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],
@@ -195,13 +195,13 @@ def figure_of_merit(
 
 
 def inertial_range_fit(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    wavenumber: Float[ndarray, "time wavenumber"],
+    psi: Float[ndarray, "nshear time waveno"],
+    waveno: Float[ndarray, "time waveno"],
     k_kolmogorov: Float[ndarray, "nshear time"],
     a_kolmogorov: float = 8.19,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # epsilon
-    Float[ndarray, "nshear time"],  # wavenumber cutoff
+    Float[ndarray, "nshear time"],  # waveno cutoff
 ]:
     """
     See Eq. 28. This assumes a known Kolmogorov constant, as opposed to linear
@@ -211,11 +211,11 @@ def inertial_range_fit(
     spectra C1=0.53.
     """
     ln_epsilon = 1.5 * (
-        np.log(psi) - np.log(a_kolmogorov) - np.log(wavenumber[newaxis, ...]) / 3
+        np.log(psi) - np.log(a_kolmogorov) - np.log(waveno[newaxis, ...]) / 3
     )
     waveno_cutoff = 0.01 * k_kolmogorov
     ln_epsilon_fitrange = np.where(
-        wavenumber[newaxis, ...] < waveno_cutoff[:, :, newaxis],
+        waveno[newaxis, ...] < waveno_cutoff[:, :, newaxis],
         ln_epsilon,
         np.nan,
     )
@@ -224,11 +224,11 @@ def inertial_range_fit(
 
 
 def spectrum_integration(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    wavenumber: Float[ndarray, "time wavenumber"],
+    psi: Float[ndarray, "nshear time waveno"],
+    waveno: Float[ndarray, "time waveno"],
     eps1: Float[ndarray, "nshear time"],
-    mol_visc: Float[ndarray, "time"],
-    platform_speed: Float[ndarray, "time"],
+    molvisc: Float[ndarray, "time"],
+    senspeed: Float[ndarray, "time"],
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
@@ -240,10 +240,10 @@ def spectrum_integration(
     # 2nd estimate
     (eps2, waveno_cutoff) = get_eps_second_estimate(
         psi,
-        wavenumber,
+        waveno,
         eps1,
-        mol_visc,
-        platform_speed,
+        molvisc,
+        senspeed,
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
@@ -258,26 +258,26 @@ def spectrum_integration(
         eps_previous = eps
         # raise ValueError (waveno_cutoff.shape)
         eps /= get_spectral_variance_resolved_fraction(
-            waveno_cutoff, kolmogorov_length(eps, mol_visc)
+            waveno_cutoff, kolmogorov_length(eps, molvisc)
         )
         eps_increase = eps / eps_previous
 
     resolved_var_frac = get_spectral_variance_resolved_fraction(
-        waveno_cutoff, kolmogorov_length(eps, mol_visc)
+        waveno_cutoff, kolmogorov_length(eps, molvisc)
     )
     return eps, resolved_var_frac, waveno_cutoff
 
 
 def get_eps_first_estimate(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    wavenumber: Float[ndarray, "time wavenumber"],
+    psi: Float[ndarray, "nshear time waveno"],
+    waveno: Float[ndarray, "time waveno"],
     nu: Float[ndarray, "time"],
 ) -> Float[ndarray, "nshear time_slow"]:  # eps estimate
     # integrate to 10 cpm
     eps10 = (
         7.5
         * nu
-        * integrate(psi, wavenumber, np.array(0.0)[newaxis], np.array(10.0)[newaxis])
+        * integrate(psi, waveno, np.array(0.0)[newaxis], np.array(10.0)[newaxis])
     )
     # Eq. 24
     a = 1.25e-9 * nu**3
@@ -287,24 +287,24 @@ def get_eps_first_estimate(
 
 
 def get_eps_second_estimate(
-    psi: Float[ndarray, "nshear time wavenumber"],
-    wavenumber: Float[ndarray, "time wavenumber"],
-    eps1: Float[ndarray, "nshear time"],
-    nu: Float[ndarray, "time"],
-    platform_speed: Float[ndarray, "time"],
+    psi: Float[ndarray, "nshear time waveno"],
+    waveno: Float[ndarray, "time waveno"],
+    eps: Float[ndarray, "nshear time"],  # from first estimate
+    molvisc: Float[ndarray, "time"],
+    senspeed: Float[ndarray, "time"],
     waveno_cutoff_spatial_corr: float,
     freq_cutoff_antialias: float,
     freq_cutoff_corrupt: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
-    Float[ndarray, "nshear time"],  # cutoff wavenumber
+    Float[ndarray, "nshear time"],  # cutoff waveno
 ]:
-    k95: Float[ndarray, "nshear time"] = 0.12 * (eps1 / nu**3) ** 0.25
+    k95: Float[ndarray, "nshear time"] = 0.12 * (eps / molvisc**3) ** 0.25
     waveno_spectral_min = 9999.0  # TODO
     waveno_cutoff_antialias: Float[ndarray, "time"] = (
-        0.9 * freq_cutoff_antialias / platform_speed
+        0.9 * freq_cutoff_antialias / senspeed
     )
-    waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / platform_speed
+    waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / senspeed
     ku: Float[ndarray, "nshear time"] = np.min(
         np.stack(
             np.broadcast_arrays(
@@ -319,54 +319,54 @@ def get_eps_second_estimate(
         axis=-1,
     )
     return (
-        7.5 * nu * integrate(psi, wavenumber, np.array(0.0)[newaxis, newaxis], ku),
+        7.5 * molvisc * integrate(psi, waveno, np.array(0.0)[newaxis, newaxis], ku),
         ku,
     )
 
 
 def get_spectral_variance_resolved_fraction(
     waveno: Float[ndarray, "nshear time"],
-    length_kolmogorov: Float[ndarray, "nshear time"],
+    kolmlen: Float[ndarray, "nshear time"],
 ) -> Float[ndarray, "nshear time"]:
     # Eq. 11; I_L (3rd model)
-    k43 = (waveno * length_kolmogorov) ** (4.0 / 3.0)
+    k43 = (waveno * kolmlen) ** (4.0 / 3.0)
     return np.tanh(65.5 * k43) - 9.0 * k43 * np.exp((-54.5 * k43))
 
 
 def kolmogorov_length(
     eps: Float[ndarray, "*any"],
-    mol_visc: Float[ndarray, "*any"],
+    molvisc: Float[ndarray, "*any"],
 ) -> Float[ndarray, "*any"]:
     """The Kolmogorov length scale"""
-    return (mol_visc**3 / eps) ** 0.25
+    return (molvisc**3 / eps) ** 0.25
 
 
 def psi_nondim_factor(
     eps: Float[ndarray, "*any"],
-    mol_visc: Float[ndarray, "*any"],
+    molvisc: Float[ndarray, "*any"],
 ) -> Float[ndarray, "*any"]:
     """To pass from non-dimensional to dimensional shear spectra, see Eq. 6"""
-    return (eps**3 / mol_visc) ** 0.25
+    return (eps**3 / molvisc) ** 0.25
 
 
 def model_spectrum(
-    k: Float[ndarray, "*any waveno"],
+    waveno: Float[ndarray, "*any waveno"],
     eps: Float[ndarray, "*any"],
-    mol_visc: Float[ndarray, "*any"],
+    molvisc: Float[ndarray, "*any"],
 ) -> Float[ndarray, "*any waveno"]:
     """Uses the Lueck spectrum (Eq. 9) - consistent with
     `get_spectral_variance_resolved_fraction`"""
-    k_nondim = k * kolmogorov_length(eps, mol_visc)[..., newaxis]
+    k_nondim = waveno * kolmogorov_length(eps, molvisc)[..., newaxis]
     psi_nondim = model_spectrum_lueck(k_nondim)
-    return psi_nondim * psi_nondim_factor(eps, mol_visc)[..., newaxis]
+    return psi_nondim * psi_nondim_factor(eps, molvisc)[..., newaxis]
 
 
 def model_spectrum_lueck(
-    kn: Float[ndarray, "*any waveno"],  # nondimensional wavenumber
+    waveno_nondim: Float[ndarray, "*any waveno"],  # nondimensional waveno
 ) -> Float[ndarray, "*any waveno"]:
     """Non-dimensional form, Eq. 9"""
-    y = (kn / 0.015) ** 2
-    fac1 = 8.048 * kn ** (1 / 3) / (1 + (21.7 * kn) ** 3)
-    fac2 = 1 / (1 + (6.6 * kn) ** 2.5)
+    y = (waveno_nondim / 0.015) ** 2
+    fac1 = 8.048 * waveno_nondim ** (1 / 3) / (1 + (21.7 * waveno_nondim) ** 3)
+    fac2 = 1 / (1 + (6.6 * waveno_nondim) ** 2.5)
     fac3 = 1 + 0.36 * y / ((y - 1) ** 2 + 2 * y)
     return fac1 * fac2 * fac3

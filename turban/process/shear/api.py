@@ -27,7 +27,7 @@ class ShearLevel1(Level1):
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
-            pspd=ds.PSPD_REL.values,
+            senspeed=ds.senspeed_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
@@ -63,7 +63,7 @@ class ShearLevel2(Level2):
         return cls(
             time=level1.time,
             shear=sh_cleaned,
-            pspd=level1.pspd,
+            senspeed=level1.senspeed,
             num_despike_iter=num_despike_iter,
             level_below=level1,
         )
@@ -74,7 +74,7 @@ class ShearLevel2(Level2):
         return cls(
             time=ds.TIME.values.astype(float),
             shear=ds.SHEAR.values,
-            pspd=ds.PSPD_REL.values,
+            senspeed=ds.senspeed_REL.values,
             # TODO: apparently not exported in benchmark files...?
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
@@ -83,8 +83,8 @@ class ShearLevel2(Level2):
 
 @dataclass(kw_only=True)
 class ShearLevel3(Level3):
-    Pk: Float[ndarray, "nshear time wavenumber"]
-    Pf: Float[ndarray, "nshear time wavenumber"]
+    Pk: Float[ndarray, "nshear time waveno"]
+    Pf: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
     section_number: Int[ndarray, "time"]
     spike_fraction: Float[ndarray, "nshear time"]
@@ -97,9 +97,9 @@ class ShearLevel3(Level3):
     ) -> "ShearLevel3":
         level2 = data
         level1 = data.level_below
-        k, Pk, Pf, freq, platform_speed, section_number = process_level3(
+        k, Pk, Pf, freq, senspeed, section_number = process_level3(
             shear=level2.shear,
-            pspd=level2.pspd,
+            senspeed=level2.senspeed,
             section_number=level1.section_number,
             segment_length=level2.cfg.segment_length,
             sampling_freq=level2.cfg.sampling_freq,
@@ -133,12 +133,12 @@ class ShearLevel3(Level3):
         )
 
         return cls(
-            time=np.ones_like(platform_speed),  # TODO get from level 2
+            time=np.ones_like(senspeed),  # TODO get from level 2
             Pk=Pk,
             waveno=k,
             Pf=Pf,
             freq=freq,
-            platform_speed=platform_speed,
+            senspeed=senspeed,
             section_number=section_number,
             spike_fraction=spike_fraction,
             max_despike_iter=max_despike_iter,
@@ -148,7 +148,7 @@ class ShearLevel3(Level3):
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L3_spectra").transpose(
-            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "WAVENUMBER"
+            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "waveno"
         )
 
         return cls(
@@ -157,7 +157,7 @@ class ShearLevel3(Level3):
             waveno=ds["KCYC"].values,
             Pf=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
-            platform_speed=ds["PSPD_REL"].values,
+            senspeed=ds["senspeed_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
             max_despike_iter=9999
@@ -185,7 +185,7 @@ class ShearLevel3(Level3):
         )
 
     @property
-    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]:
+    def Pk_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
         """95% confidence interval of power spectrum.
         Eq. 23 in the ATOMIX paper"""
         return np.concatenate(
@@ -200,7 +200,7 @@ class ShearLevel3(Level3):
     def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
         tau_eps = self.cfg.chunk_length / self.cfg.sampling_freq
-        return tau_eps * self.platform_speed
+        return tau_eps * self.senspeed
 
 
 @dataclass(kw_only=True)
@@ -231,8 +231,8 @@ class ShearLevel4(Level4):
             num_spec_points,
         ) = process_level4(
             psi=level3.Pk,
-            wavenumber=level3.waveno,
-            platform_speed=level3.platform_speed,
+            waveno=level3.waveno,
+            senspeed=level3.senspeed,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
@@ -252,7 +252,7 @@ class ShearLevel4(Level4):
         )
 
         return cls(
-            time=np.ones_like(level3.platform_speed),  # TODO get from level 2
+            time=np.ones_like(level3.senspeed),  # TODO get from level 2
             eps=eps,
             eps_source_flag=eps_source_flag,
             log_diss_var=log_diss_var,
@@ -320,7 +320,7 @@ class AtomixNetcdfLoader:
         "time": "L1_converted/TIME",
         # 'L1_converted/SHEAR',
         # 'L1_converted/TIME_CTD',
-        # 'L1_converted/PSPD_REL',
+        # 'L1_converted/senspeed_REL',
         "press": "L1_converted/PRES",
         # 'L1_converted/VIB',
         "temp": "L1_converted/TEMP",

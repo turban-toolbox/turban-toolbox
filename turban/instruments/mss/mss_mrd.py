@@ -247,7 +247,7 @@ class mrd:
         else:
             self.config["time_offset_unix"] = 0
 
-    def create_level1_data(self, level0=None, pspd_rel=None, pspd_rel_data=None):
+    def create_level1_data(self, level0=None, senspeed_rel=None, senspeed_rel_data=None):
         """
         Creates level1 compatible data.
         see variables names in:
@@ -323,41 +323,41 @@ class mrd:
             level1_units["DENS"] = "kg m-3"
             # Calculating sinking velocity
             try:
-                config_pspd_rel = self.config["pspd_rel"]
-                config_pspd_rel_data = self.config["pspd_rel_data"]
+                config_senspeed_rel = self.config["senspeed_rel"]
+                config_senspeed_rel_data = self.config["senspeed_rel_data"]
             except Exception as e:
                 # self.logger.exception(e)
-                config_pspd_rel = None
+                config_senspeed_rel = None
 
             # print('config', self.config)
-            # print('config2', config_pspd_rel,config_pspd_rel_data)
-            # if self.config['mss']['pspd_rel'] = 'external'
-            if (pspd_rel is None) and config_pspd_rel == "external":
+            # print('config2', config_senspeed_rel,config_senspeed_rel_data)
+            # if self.config['mss']['senspeed_rel'] = 'external'
+            if (senspeed_rel is None) and config_senspeed_rel == "external":
                 self.logger.debug(
                     funcname
-                    + "Using constant velocity {:f}".format(config_pspd_rel_data)
+                    + "Using constant velocity {:f}".format(config_senspeed_rel_data)
                 )
-                vsink = np.zeros(nsamples) + config_pspd_rel_data
-                level1["PSPD_REL"] = vsink
-                # vsink = config_pspd_rel_data
-            elif (pspd_rel is None) or (pspd_rel.upper() == "IOW"):
+                vsink = np.zeros(nsamples) + config_senspeed_rel_data
+                level1["senspeed_REL"] = vsink
+                # vsink = config_senspeed_rel_data
+            elif (senspeed_rel is None) or (senspeed_rel.upper() == "IOW"):
                 self.logger.debug(funcname + "Using IOW velocity")
                 vsink = mss_utils.calc_vsink(
                     press=level0[press_key], fs=self.config["fs"]
                 )
-                level1["PSPD_REL"] = vsink
-            elif pspd_rel.upper() == "DPDT":
+                level1["senspeed_REL"] = vsink
+            elif senspeed_rel.upper() == "DPDT":
                 self.logger.debug(funcname + "Using DPDT")
                 vsink = (level0[press_key][-1] - level0[press_key][0]) / Dt
                 vsink = level0[press_key] * 0 + vsink
-                level1["PSPD_REL"] = vsink
-            elif pspd_rel.upper() == "EXTERNAL":
+                level1["senspeed_REL"] = vsink
+            elif senspeed_rel.upper() == "EXTERNAL":
                 self.logger.debug(funcname + "Using external")
-                level1["PSPD_REL"] = pspd_rel_data
+                level1["senspeed_REL"] = senspeed_rel_data
             else:
                 self.logger.warning(funcname + " no method to get velocity past sensor")
 
-            level1_units["PSPD_REL"] = "m s-1"
+            level1_units["senspeed_REL"] = "m s-1"
             #
             level1["PRES"] = level0[press_key]
             level1_units["PRES"] = "dbar"
@@ -412,14 +412,14 @@ class mrd:
 
         if FLAG_interpolate_NAN:
             t = np.arange(0, Ntot)  # Fake time axis
-            vars_int = ["PSPD_REL", "TEMP", "PRES", "PSAL"]
+            vars_int = ["senspeed_REL", "TEMP", "PRES", "PSAL"]
             for var in vars_int:
                 self.logger.debug(funcname + "Interpolating {:s}".format(var))
                 # print('Hallo', level1)
                 # print('Hallo', level1[var])
                 nnan = sum(np.isnan(level1[var]))  # Count number of nans
                 if nnan:
-                    logger.debug("Interpolating nan {:d} pspd_rel".format(nnan))
+                    logger.debug("Interpolating nan {:d} senspeed_rel".format(nnan))
                     igood = ~np.isnan(level1[var])
                     if sum(igood) > (RATIO_BADDATA * Ntot):
                         level2[var] = np.interp(t, t[igood], level1[var][igood])

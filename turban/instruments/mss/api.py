@@ -48,10 +48,10 @@ class MSS(Dropsonde):
             ],
             axis=0,
         )
-        pspd, pressure_lp = get_vsink(pressure_raw, self.cfg.sampling_freq)
-        shear_phys = mss_shear_physical(pspd, shear_raw, self.cfg.sampling_freq)
+        senspeed, pressure_lp = get_vsink(pressure_raw, self.cfg.sampling_freq)
+        shear_phys = mss_shear_physical(senspeed, shear_raw, self.cfg.sampling_freq)
         return ShearLevel1(
-            pspd=pspd,
+            senspeed=senspeed,
             shear=shear_phys,
             section_number=section_number,
             cfg=cfg,

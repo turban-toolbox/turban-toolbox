@@ -23,7 +23,7 @@ def test_unwrap_quality_metric():
 def test_model_spectrum():
     waveno = np.linspace(0, 100)[newaxis, :]
     psi = model_spectrum(
-        k=waveno,
+        waveno=waveno,
         eps=np.array([1.1e-7]),
         mol_visc=np.array([1.6e-6]),
     )

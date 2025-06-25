@@ -16,7 +16,7 @@ q_b = 3.7
 
 def microtemp(
     temp_emph: Float[ndarray, "time_fast"],
-    pspd: Float[ndarray, "time_fast"],
+    senspeed: Float[ndarray, "time_fast"],
     section_select_idx: list[list[int]],
     sampling_freq: float,
     segment_length: int,
@@ -34,11 +34,11 @@ def microtemp(
     dTdt = fft_grad(temp_emph, 1 / sampling_freq)
 
     dTdt_segments = [dTdt[..., inds] for inds in section_select_idx]
-    pspd_segments = [pspd[..., inds] for inds in section_select_idx]
+    senspeed_segments = [senspeed[..., inds] for inds in section_select_idx]
 
     out = []
 
-    for dTdt_segment, pspd_segment in zip(dTdt_segments, pspd_segments):
+    for dTdt_segment, senspeed_segment in zip(dTdt_segments, senspeed_segments):
         (
             k,
             Pk,
@@ -46,7 +46,7 @@ def microtemp(
             k_batchelor_estimate,
         ) = temperature_dissipation(
             dTdt=dTdt_segment,
-            pspd=pspd_segment,
+            senspeed=senspeed_segment,
             chunklen=chunklen,
             chunkoverlap=chunkoverlap,
             segment_length=segment_length,
@@ -56,9 +56,9 @@ def microtemp(
         out.append(
             xr.Dataset(
                 data_vars={
-                    "k": (["time_slow", "wavenumber"], k),
-                    "Pk": (["time_slow", "wavenumber"], Pk),
-                    # "Pnoise": (["time_slow", "wavenumber"], Pnoise),
+                    "k": (["time_slow", "waveno"], k),
+                    "Pk": (["time_slow", "waveno"], Pk),
+                    # "Pnoise": (["time_slow", "waveno"], Pnoise),
                     "chi": (["time_slow"], chi),
                     "k_batchelor_estimate": (["time_slow"], k_batchelor_estimate),
                 }
@@ -76,8 +76,8 @@ def microtemp(
 
 
 def tke_dissipation(
-    k: Float[ndarray, "time wavenumber"],
-    Pk: Float[ndarray, "time wavenumber"],
+    k: Float[ndarray, "time waveno"],
+    Pk: Float[ndarray, "time waveno"],
     k_batchelor_estimates: Float[ndarray, "time"],  # initial guess
 ):
     raise NotImplementedError
@@ -85,15 +85,15 @@ def tke_dissipation(
 
 def temperature_dissipation(
     dTdt: Float[ndarray, "time_fast"],
-    pspd: Float[ndarray, "time_fast"],
+    senspeed: Float[ndarray, "time_fast"],
     chunklen: int,
     chunkoverlap: int,
     segment_length: int,
     sampling_freq: float,
-    wavenumber_limit_upper: float = 500.0,
+    waveno_limit_upper: float = 500.0,
 ) -> tuple[
-    Float[ndarray, "time_slow wavenumber"],
-    Float[ndarray, "time_slow wavenumber"],
+    Float[ndarray, "time_slow waveno"],
+    Float[ndarray, "time_slow waveno"],
     Float[ndarray, "time_slow"],
     Float[ndarray, "time_slow"],
 ]:
@@ -102,14 +102,14 @@ def temperature_dissipation(
     """
     k, Pk, Pnoise = temperature_gradient_spectra(
         dTdt,
-        pspd,
+        senspeed,
         chunklen,
         chunkoverlap,
         segment_length,
         sampling_freq,
     )
 
-    chi = integrate_chi(k, Pk, Pnoise, wavenumber_limit_upper)
+    chi = integrate_chi(k, Pk, Pnoise, waveno_limit_upper)
 
     k_batchelor_estimates_1 = k_batchelor_mle(chi, k, Pk, Pnoise)
     # correct for unresolved variance
@@ -117,12 +117,12 @@ def temperature_dissipation(
     kstar = (
         0.04 * np.sqrt(diffusivity_temp / viscosity_kinematic) * k_batchelor_estimates_1
     )
-    # lower wavenumber integration limit
+    # lower waveno integration limit
     kLO = k[range(k.shape[0]), np.argmax(3 * kstar[:, newaxis] <= k, axis=1)]
     kLO = np.where(
         3 * kstar >= k[:, 1], kLO, k[:, 1]
     )  # where k[1] is smaller than 3*kstar, round up to kstar
-    # # higher wavenumber integration limit
+    # # higher waveno integration limit
     kUP = k[:, -1]
     chi_low = (
         6.0
@@ -174,9 +174,9 @@ def temperature_dissipation(
 
 def k_batchelor_mle(
     chi: Float[ndarray, "time_slow"],
-    k: Float[ndarray, "time_slow wavenumber"],
-    Pk: Float[ndarray, "time_slow wavenumber"],
-    Pnoise: Float[ndarray, "time_slow wavenumber"],
+    k: Float[ndarray, "time_slow waveno"],
+    Pk: Float[ndarray, "time_slow waveno"],
+    Pnoise: Float[ndarray, "time_slow waveno"],
 ) -> Float[ndarray, "time_slow"]:
     # MLE fitting
     kmax = 3.0 * np.nanmax(k)
@@ -211,15 +211,15 @@ def k_batchelor_mle(
 
 def temperature_gradient_spectra(
     dTdt: Float[ndarray, "time_fast"],
-    pspd: Float[ndarray, "time_fast"],
+    senspeed: Float[ndarray, "time_fast"],
     chunklen: int,
     chunkoverlap: int,
     segment_length: int,
     sampling_freq: float,
 ) -> tuple[
-    Float[ndarray, "time_slow wavenumber"],
-    Float[ndarray, "time_slow wavenumber"],
-    Float[ndarray, "1 wavenumber"],
+    Float[ndarray, "time_slow waveno"],
+    Float[ndarray, "time_slow waveno"],
+    Float[ndarray, "1 waveno"],
 ]:
     yr: Float[ndarray, "time_slow freq"] = reshape_halfoverlap_last(dTdt, segment_length)
     yr -= yr.mean(axis=1)[:, np.newaxis]
@@ -231,23 +231,23 @@ def temperature_gradient_spectra(
     Fyr = np.fft.rfft(yr)[:, :]
     Pf: Float[ndarray, "time_slow freq"] = (Fyr.conj() * Fyr).real
 
-    pspda: Float[ndarray, "time_slow 1"] = reshape_any_first(
-        reshape_halfoverlap_last(pspd, segment_length).mean(axis=1)[:, np.newaxis],
+    senspeeda: Float[ndarray, "time_slow 1"] = reshape_any_first(
+        reshape_halfoverlap_last(senspeed, segment_length).mean(axis=1)[:, np.newaxis],
         chunklen,
         chunkoverlap,
     ).mean(axis=1)
-    assert pspda.shape[1] == 1
+    assert senspeeda.shape[1] == 1
 
     correction = correction_frequency_response_bilinear(
         freq=freq, Fs=sampling_freq
-    ) * correction_frequency_response_vachon_lueck(freq=freq, pspd=pspda)
+    ) * correction_frequency_response_vachon_lueck(freq=freq, senspeed=senspeeda)
 
     # average spectra by chunks
     Pf = reshape_any_first(Pf, chunklen, chunkoverlap).mean(axis=1)
     # Pf = Pf * correction
 
-    k = freq / pspda
-    Pk: Float[ndarray, "time_slow freq"] = Pf * pspda / segment_length / (sampling_freq / 2)
+    k = freq / senspeeda
+    Pk: Float[ndarray, "time_slow freq"] = Pf * senspeeda / segment_length / (sampling_freq / 2)
 
     Pnoise = get_noise(Pk)
     # Pk -= Pnoise
@@ -256,17 +256,17 @@ def temperature_gradient_spectra(
 
 
 def integrate_chi(
-    k: Float[ndarray, "time_slow wavenumber"],
-    Pk: Float[ndarray, "time_slow wavenumber"],
-    Pnoise: Float[ndarray, "time_slow wavenumber"],
-    wavenumber_limit_upper: float = 500.0,
+    k: Float[ndarray, "time_slow waveno"],
+    Pk: Float[ndarray, "time_slow waveno"],
+    Pnoise: Float[ndarray, "time_slow waveno"],
+    waveno_limit_upper: float = 500.0,
 ) -> Float[ndarray, "time_slow"]:
     # find integration limits
     is_above_noise = Pk > 2 * Pnoise
-    wavenumber_above_noise = k[
+    waveno_above_noise = k[
         range(len(k)), -np.argmax(is_above_noise[:, ::-1], axis=1) - 1
     ]
-    ku = np.minimum(wavenumber_above_noise, wavenumber_limit_upper)
+    ku = np.minimum(waveno_above_noise, waveno_limit_upper)
     kl = k[:, 1]  # note that k[:, 0]==0 is dropped from integrals
 
     # first pass chi integration
@@ -277,8 +277,8 @@ def integrate_chi(
 
 
 def integrate_batchelor_theoretical(
-    wavenumber_from: Float[ndarray, "time"],
-    wavenumber_to: Float[ndarray, "time"],
+    waveno_from: Float[ndarray, "time"],
+    waveno_to: Float[ndarray, "time"],
     k_batchelor: Float[ndarray, "time"],
     k: Float[ndarray, "time frequency"],
     chi: Float[ndarray, "time"],
@@ -295,21 +295,21 @@ def integrate_batchelor_theoretical(
     ).squeeze(
         axis=0
     )  # get rid of kbatch axis (length 1)
-    return integrate(psi, k, wavenumber_from, wavenumber_to)
+    return integrate(psi, k, waveno_from, waveno_to)
 
 
 def get_k_batchelor_costfunc(
     k_batchelor_test: Float[ndarray, "kbatch"],
     chi: Float[ndarray, "time"],
-    wavenumber: Float[ndarray, "time wavenumber"],
-    psi: Float[ndarray, "time wavenumber"],
-    psi_noise: Float[ndarray, "time wavenumber"],
+    waveno: Float[ndarray, "time waveno"],
+    psi: Float[ndarray, "time waveno"],
+    psi_noise: Float[ndarray, "time waveno"],
     viscosity_kinematic: float,
     diffusivity_temp: float,
 ) -> Float[ndarray, "kbatch time"]:
     psi_theoretical = (
         theoretical_spectrum(
-            wavenumber,
+            waveno,
             np.repeat(k_batchelor_test[:, newaxis], chi.shape[0], axis=1),
             chi,
             viscosity_kinematic,
@@ -323,13 +323,13 @@ def get_k_batchelor_costfunc(
 
 
 def theoretical_spectrum(
-    wavenumber: Float[ndarray, "time wavenumber"],
+    waveno: Float[ndarray, "time waveno"],
     k_batchelor: Float[ndarray, "kbatch time"],
     chi: Float[ndarray, "time"],
     viscosity_kinematic: float,
     diffusivity_temp: float,
     qB: float = 3.7,  # batchelor spectrum constant
-) -> Float[ndarray, "kbatch time wavenumber"]:
+) -> Float[ndarray, "kbatch time waveno"]:
     # TODO double check that k in radian units
     # 1D temperature gradient spectrum (Batchelor)
     # Eqn. 7 in Peterson et al. 2014
@@ -342,14 +342,14 @@ def theoretical_spectrum(
         * np.sqrt(viscosity_kinematic / eps[:, :, newaxis])
         / k_batchelor[:, :, newaxis]
         * (
-            wavenumber[newaxis, ...] ** (2.0)
+            waveno[newaxis, ...] ** (2.0)
             * (
                 qB
                 * k_batchelor[:, :, newaxis]
-                / wavenumber[newaxis, ...]
+                / waveno[newaxis, ...]
                 * np.exp(
                     -qB
-                    * wavenumber[newaxis, ...] ** (2.0)
+                    * waveno[newaxis, ...] ** (2.0)
                     / k_batchelor[:, :, newaxis] ** (2.0)
                 )
                 + np.sqrt(np.pi)
@@ -357,7 +357,7 @@ def theoretical_spectrum(
                 * (
                     erf(
                         np.sqrt(qB)
-                        * wavenumber[newaxis, ...]
+                        * waveno[newaxis, ...]
                         / k_batchelor[:, :, newaxis]
                     )
                     - 1.0
@@ -375,8 +375,8 @@ def chisquared(x: Float[ndarray, "..."], dof: int):
 
 
 def costfunction_c11(
-    psi: Float[ndarray, "... time wavenumber"],  # observed spectrum
-    psi_theoretical: Float[ndarray, "... time wavenumber"],  # theoretical spectrum
+    psi: Float[ndarray, "... time waveno"],  # observed spectrum
+    psi_theoretical: Float[ndarray, "... time waveno"],  # theoretical spectrum
 ) -> Float[ndarray, "... time"]:
     dof = 6
     # degrees of freedom
@@ -447,9 +447,9 @@ def correction_frequency_response_bilinear(
 
 
 def correction_frequency_response_vachon_lueck(
-    freq: Float[ndarray, "1 frequency"], pspd: Float[ndarray, "time 1"]
+    freq: Float[ndarray, "1 frequency"], senspeed: Float[ndarray, "time 1"]
 ) -> Float[ndarray, "time frequency"]:
-    F_0 = 25 * np.sqrt(np.abs(pspd))  # cutoff freq
+    F_0 = 25 * np.sqrt(np.abs(senspeed))  # cutoff freq
     tau_therm = 1 / ((2 * np.pi * F_0) / np.sqrt(np.sqrt(2) - 1))  # time constant
     Hinv = (
         1 + (2 * np.pi * tau_therm * freq) ** 2
@@ -494,12 +494,12 @@ def _try_sigma_derivative(df):
         ]
     )
 
-    pspd = get_vsink(data_arrays["PRESSURE"], 1024)[0]
+    senspeed = get_vsink(data_arrays["PRESSURE"], 1024)[0]
     df["dCdt"] = fft_grad(df.Cmac, 1 / 1024)
     df["dCdt"] = butterfilt(df.dCdt, 50, 1024)
     df["dTdt"] = fft_grad(df.NTCHP, 1 / 1024)
     df["dsigmadt"] = df["dCdt"] * df["dsigmadC"] + df["dTdt"] * df["dsigmadT"]
-    df["dsigmadz"] = df.dsigmadt / pspd
+    df["dsigmadz"] = df.dsigmadt / senspeed
 
 
 def _k_batchelor_mle_round_2():
@@ -515,7 +515,7 @@ def _k_batchelor_mle_round_2():
     ]
     _mid = cfunc_values_1[allrows, k_batchelor_idx_1]
     assert np.max(cfunc_values_1[0]) == _mid[0]
-    # curvature of cost function values at batchelor wavenumber
+    # curvature of cost function values at batchelor waveno
     delta_k = (2 * range_) / np.sqrt(2 * _mid - _left - _right)
     print(delta_k)
     finalrange = np.maximum(delta_k, range_)
