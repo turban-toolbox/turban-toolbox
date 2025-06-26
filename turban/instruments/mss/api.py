@@ -120,8 +120,8 @@ def mss_shear_physical(
 
     # convert from MSS "shear" (i.e. a velocity) to time derivative (units m/s/s)
     shear_channels_phys = []
-    for i, sh in enumerate(shear_channels):
-        sh_phys = fft_grad(sh, 1 / sampfreq) / vsink**2 / 1025
+    for i, shear in enumerate(shear_channels):
+        sh_phys = fft_grad(shear, 1 / sampfreq) / vsink**2 / 1025
         shear_channels_phys.append(sh_phys)
 
     return np.array(shear_channels_phys)
