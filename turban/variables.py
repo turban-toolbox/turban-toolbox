@@ -5,14 +5,14 @@ _vars = {
     "cond/standard_name": "sea_water_conductivity",
     "eps/atomix_name": "EPSI",
     "eps/latex": r"$\eps$",
-    "eps/standard_name": "",
+    "eps/standard_name": "specific_turbulent_kinetic_energy_dissipation_in_sea_water",
     "eps/unit": "W kg-1",
     "freq/atomix_name": None,
     "freq/explanation": "Number of cycles per second",
     "freq/unit": "Hz",  # cps
     "kolmlen/explanation": "Kolmogorov length scale",
     "kolmlen/latex": r"$\eta$",
-    "molvisc/standard_name": "",  # TODO
+    "molvisc/long_name": "molecular_viscosity_of_seawater",  # TODO
     "molvisc/unit": "m2 s-1",
     "press/explanation": "Sea water pressure",
     "press/standard_name": "sea_water_pressure",
@@ -57,7 +57,7 @@ def to_dict(vars):
     dct = defaultdict(lambda: {})
     for k, v in vars.items():
         varname, attr = k.split("/")
-        dct[varname][attr] = k
+        dct[varname][attr] = v
     return dct
 
 
