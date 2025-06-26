@@ -27,7 +27,7 @@ class ShearLevel1(Level1):
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
-            senspeed=ds.senspeed_REL.values,
+            senspeed=ds.PSPD_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
             cfg=ShearConfig.from_atomix_netcdf(fname),
@@ -74,7 +74,7 @@ class ShearLevel2(Level2):
         return cls(
             time=ds.TIME.values.astype(float),
             shear=ds.SHEAR.values,
-            senspeed=ds.senspeed_REL.values,
+            senspeed=ds.PSPD_REL.values,
             # TODO: apparently not exported in benchmark files...?
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
@@ -148,7 +148,7 @@ class ShearLevel3(Level3):
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L3_spectra").transpose(
-            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "waveno"
+            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "WAVENUMBER"
         )
 
         return cls(
@@ -157,7 +157,7 @@ class ShearLevel3(Level3):
             waveno=ds["KCYC"].values,
             Pf=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
-            senspeed=ds["senspeed_REL"].values,
+            senspeed=ds["PSPD_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
             max_despike_iter=9999
@@ -320,7 +320,7 @@ class AtomixNetcdfLoader:
         "time": "L1_converted/TIME",
         # 'L1_converted/SHEAR',
         # 'L1_converted/TIME_CTD',
-        # 'L1_converted/senspeed_REL',
+        # 'L1_converted/PSPD_REL',
         "press": "L1_converted/PRES",
         # 'L1_converted/VIB',
         "temp": "L1_converted/TEMP",

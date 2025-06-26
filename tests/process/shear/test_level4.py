@@ -25,7 +25,7 @@ def test_model_spectrum():
     psi = model_spectrum(
         waveno=waveno,
         eps=np.array([1.1e-7]),
-        mol_visc=np.array([1.6e-6]),
+        molvisc=np.array([1.6e-6]),
     )
     fig = plt.figure(figsize=(9, 9))
     ax = fig.subplots()
