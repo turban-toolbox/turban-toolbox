@@ -29,7 +29,7 @@ class MSS(Dropsonde):
         else:
 
             class MockCfg:
-                sampling_freq = 1024.0
+                sampfreq = 1024.0
 
             self.cfg = MockCfg()
 
@@ -48,8 +48,8 @@ class MSS(Dropsonde):
             ],
             axis=0,
         )
-        senspeed, pressure_lp = get_vsink(pressure_raw, self.cfg.sampling_freq)
-        shear_phys = mss_shear_physical(senspeed, shear_raw, self.cfg.sampling_freq)
+        senspeed, pressure_lp = get_vsink(pressure_raw, self.cfg.sampfreq)
+        shear_phys = mss_shear_physical(senspeed, shear_raw, self.cfg.sampfreq)
         return ShearLevel1(
             senspeed=senspeed,
             shear=shear_phys,
@@ -76,7 +76,7 @@ def level1(
     probeconf_fname: str,
     lon: float,
     lat: float,
-    sampling_freq: float = 1024.0,
+    sampfreq: float = 1024.0,
 ) -> dict[str, Num[ndarray, "time"]]:
     """
     Convert raw MSS data to physical units
@@ -88,7 +88,7 @@ def level1(
     x_emph = raw[:, temp_emph_channel]
 
     raw[:, temp_emph_channel] = deconvolute_mss_ntchp(
-        x, x_emph, sampling_freq=sampling_freq
+        x, x_emph, sampfreq=sampfreq
     )
     data_lists = mx.convert_raw_mrd(raw, probeconf_fname)
 
@@ -108,7 +108,7 @@ def level1(
 def mss_shear_physical(
     vsink: Float[ndarray, "time"],
     shear_channels: Float[ndarray, "n_shear time"],
-    sampling_freq=1024.0,
+    sampfreq=1024.0,
 ) -> Float[ndarray, "n_shear time"]:
     """Calculates physical shear for the MSS shear probes.
     Returns:
@@ -121,7 +121,7 @@ def mss_shear_physical(
     # convert from MSS "shear" (i.e. a velocity) to time derivative (units m/s/s)
     shear_channels_phys = []
     for i, sh in enumerate(shear_channels):
-        sh_phys = fft_grad(sh, 1 / sampling_freq) / vsink**2 / 1025
+        sh_phys = fft_grad(sh, 1 / sampfreq) / vsink**2 / 1025
         shear_channels_phys.append(sh_phys)
 
     return np.array(shear_channels_phys)

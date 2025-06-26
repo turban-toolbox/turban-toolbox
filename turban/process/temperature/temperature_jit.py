@@ -185,7 +185,7 @@ def get_noise(spectra: ndarray) -> ndarray:
 
 
 @jit
-def power_spectrum(x: ndarray, segment_length: int, sampling_freq: float):
+def power_spectrum(x: ndarray, segment_length: int, sampfreq: float):
     assert segment_length % 2 == 0
     data_length = len(x)
     # half-overlapping windows
@@ -202,7 +202,7 @@ def power_spectrum(x: ndarray, segment_length: int, sampling_freq: float):
             F = np.fft.rfft(xc)
         spectra[i, :] = (F.conj() * F).real
 
-    return mean_axis0(spectra) / segment_length / (sampling_freq / 2)
+    return mean_axis0(spectra) / segment_length / (sampfreq / 2)
 
 
 from numba import float64, int32
@@ -215,7 +215,7 @@ def process_temperature_series(
     waveno_limit_upper: float,
     chunk_length: int,
     segment_length: int,
-    sampling_freq: float,
+    sampfreq: float,
 ):
     assert chunk_length % 2 == 0
     assert x.ndim == 1
@@ -228,7 +228,7 @@ def process_temperature_series(
         i0 = i * int(chunk_length / 2)
         i1 = i0 + chunk_length
         xc = x[i0:i1]
-        spectra[i, :] = power_spectrum(xc, segment_length, sampling_freq)
+        spectra[i, :] = power_spectrum(xc, segment_length, sampfreq)
         # senspeed[i] = np.mean(senspeed[i0:i1])
 
     Pnoise = get_noise(spectra)
@@ -259,6 +259,6 @@ if __name__ == "__main__":
         waveno_limit_upper=1e3,
         chunk_length=5024,
         segment_length=1024,
-        sampling_freq=1 / 1024.0,
+        sampfreq=1 / 1024.0,
     )
     print(res)

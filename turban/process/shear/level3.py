@@ -13,7 +13,7 @@ def process_level3(
     segment_overlap: int,
     chunk_length: int,
     chunk_overlap: int,
-    sampling_freq: float,
+    sampfreq: float,
     spatial_response_wavenum: float,
     freq_highpass: float,
     section_number: Int[ndarray, "time_fast"],
@@ -34,7 +34,7 @@ def process_level3(
         section_number,
     )
 
-    psi_f, freq = power_spectrum(shear, sampling_freq, reshape_index=ii)
+    psi_f, freq = power_spectrum(shear, sampfreq, reshape_index=ii)
 
     # platform speed
     senspeeda = agg_fast_to_slow(senspeed, reshape_index=ii)
@@ -43,7 +43,7 @@ def process_level3(
 
     # to waveno domain
     psi_k = (
-        psi_f * senspeeda[newaxis, :, newaxis] / segment_length / (sampling_freq / 2)
+        psi_f * senspeeda[newaxis, :, newaxis] / segment_length / (sampfreq / 2)
     )
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 

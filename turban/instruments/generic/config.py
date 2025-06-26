@@ -16,7 +16,7 @@ class ShearSensor(Sensor):
 
 
 class InstrumentConfig(BaseModel):
-    sampling_freq: float
+    sampfreq: float
     sensors: dict[str, Sensor]
 
 

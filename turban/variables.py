@@ -36,9 +36,9 @@ _vars = {
     "psi_k/explanation": "Generic power spectrum in units of cpm-1",
     "psi/explanation": "Generic power spectrum, in frequency or wavenumber domain",
     "sal/standard_name": "sea_water_salinity",  # TODO: absolute?
-    "sampling_freq/atomix_name": "fs",
-    "sampling_freq/explanation": "Number of samples per second",
-    "sampling_freq/unit": "Hz",
+    "sampfreq/atomix_name": "fs",
+    "sampfreq/explanation": "Number of samples per second",
+    "sampfreq/unit": "Hz",
     "senspeed/atomix_name": "PSPD",
     "senspeed/explanation": "Speed of the sensor relative to water",
     "shear/atomix_name": "SH",

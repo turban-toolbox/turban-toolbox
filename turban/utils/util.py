@@ -73,23 +73,23 @@ def convert_atomix_benchmark_to_turban_netcdf(fname: str):
     raise NotImplementedError
 
 
-def get_vsink(pressure_raw, sampling_freq=1024.0):
+def get_vsink(pressure_raw, sampfreq=1024.0):
     # lowpass filter pressure
     pressure_lp = butterfilt(
         signal=pressure_raw,
         cutoff_freq_Hz=0.5,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="low",
     )
     # sinking speed
-    vsink = fft_grad(pressure_lp, 1 / sampling_freq)
+    vsink = fft_grad(pressure_lp, 1 / sampfreq)
     return vsink, pressure_lp
 
 
 def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
     y: Float[ndarray, "... time_fast"],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int = None,
     segment_overlap: int = None,
     chunk_length: int = None,
@@ -117,7 +117,7 @@ def fast_to_slow_grad_by_segment(
     y = y[..., reshape_index]
 
     # dummy time vector in seconds
-    time = np.linspace(1, segment_length / sampling_freq, segment_length)
+    time = np.linspace(1, segment_length / sampfreq, segment_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
     dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
     dydx = dydt / dxdt
@@ -228,10 +228,10 @@ def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: tuple[int, ...
     return arr
 
 
-def butterfilt(signal, cutoff_freq_Hz, sampling_freq, **kwarg):
+def butterfilt(signal, cutoff_freq_Hz, sampfreq, **kwarg):
     """Apply first oder Butterworth filter. kwarg are passed into `butter`"""
     # nondimensionalize using Nyquist freq
-    cutoff_nondim = cutoff_freq_Hz / (sampling_freq / 2)
+    cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, **kwarg)
     return filtfilt(b, a, signal)
 

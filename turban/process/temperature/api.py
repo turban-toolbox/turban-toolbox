@@ -29,7 +29,7 @@ class TempLevel2:
         cls,
         level1: TempLevel1,
     ):
-        dtemp_dt = fft_grad(level1.temp, 1 / level1.cfg.sampling_freq)
+        dtemp_dt = fft_grad(level1.temp, 1 / level1.cfg.sampfreq)
 
         # cleaning routine for dtemp_dt
 
@@ -64,7 +64,7 @@ class TempLevel3:
             level2.cfg.chunk_length,
             level2.cfg.chunk_overlap,
             level2.cfg.segment_length,
-            level2.cfg.sampling_freq,
+            level2.cfg.sampfreq,
         )
 
         k, Pk, Pf, freq, senspeed, ancillary = process_level3(
@@ -72,7 +72,7 @@ class TempLevel3:
             senspeed=level2.senspeed,
             section_number=level1.section_number,
             segment_length=level2.cfg.segment_length,
-            sampling_freq=level2.cfg.sampling_freq,
+            sampfreq=level2.cfg.sampfreq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,

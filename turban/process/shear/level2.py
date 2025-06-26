@@ -20,7 +20,7 @@ data_and_bounds_type = list[
 def process_level2(
     shear: Float[ndarray, "n_shear time"],
     section_numbers: Int[ndarray, "time"],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int,
     cutoff_freq_lp: float,
     spike_threshold: float,
@@ -42,7 +42,7 @@ def process_level2(
         for k, sh in enumerate(data):
             sh, ctr = clean_shear(
                 sh,
-                sampling_freq=sampling_freq,
+                sampfreq=sampfreq,
                 spike_threshold=spike_threshold,
                 max_tries=max_tries,
                 spike_replace_before=spike_replace_before,
@@ -56,8 +56,8 @@ def process_level2(
             # Eq. 17
             sh_clean = butterfilt(
                 signal=sh,
-                cutoff_freq_Hz=0.5 / (segment_length / sampling_freq),
-                sampling_freq=sampling_freq,
+                cutoff_freq_Hz=0.5 / (segment_length / sampfreq),
+                sampfreq=sampfreq,
                 btype="high",
             )
             ctr_agg[k, section_numbers == marker] = ctr
@@ -151,7 +151,7 @@ def enlarge_bool(x, before, after):
 
 def detect_shear_spikes(
     sh: Float[ndarray, "time"],
-    sampling_freq: float,
+    sampfreq: float,
     spike_threshold: float,
     spike_include_before: int,
     spike_include_after: int,
@@ -160,14 +160,14 @@ def detect_shear_spikes(
     sh_hp = butterfilt(
         signal=sh,
         cutoff_freq_Hz=0.1,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="high",
     )
     sh_abs = np.abs(sh_hp)
     sh_lp = butterfilt(
         signal=sh_abs,
         cutoff_freq_Hz=cutoff_freq_lp,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="lp",
     )
     spikes = (sh_abs / sh_lp) > spike_threshold  # boolean array
@@ -177,7 +177,7 @@ def detect_shear_spikes(
 
 def clean_shear(
     sh: Float[ndarray, "time"],
-    sampling_freq: float,
+    sampfreq: float,
     spike_threshold: float,
     max_tries: int,
     spike_replace_before: int,
@@ -194,7 +194,7 @@ def clean_shear(
     ctr = 0
     spikes = detect_shear_spikes(
         sh,
-        sampling_freq,
+        sampfreq,
         spike_threshold=spike_threshold,
         spike_include_before=spike_include_before,
         spike_include_after=spike_include_after,
@@ -213,7 +213,7 @@ def clean_shear(
         ctr[spikes] += 1
         spikes = detect_shear_spikes(
             sh,
-            sampling_freq,
+            sampfreq,
             spike_threshold=spike_threshold,
             spike_include_before=spike_include_before,
             spike_include_after=spike_include_after,

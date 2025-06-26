@@ -18,7 +18,7 @@ def microtemp(
     temp_emph: Float[ndarray, "time_fast"],
     senspeed: Float[ndarray, "time_fast"],
     section_select_idx: list[list[int]],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int,
     chunklen: int = 5,
     chunkoverlap: int = 2,
@@ -31,7 +31,7 @@ def microtemp(
     intervals, i.e. 3*2048 samples.
     """
 
-    dTdt = fft_grad(temp_emph, 1 / sampling_freq)
+    dTdt = fft_grad(temp_emph, 1 / sampfreq)
 
     dTdt_segments = [dTdt[..., inds] for inds in section_select_idx]
     senspeed_segments = [senspeed[..., inds] for inds in section_select_idx]
@@ -50,7 +50,7 @@ def microtemp(
             chunklen=chunklen,
             chunkoverlap=chunkoverlap,
             segment_length=segment_length,
-            sampling_freq=sampling_freq,
+            sampfreq=sampfreq,
         )
 
         out.append(
@@ -89,7 +89,7 @@ def temperature_dissipation(
     chunklen: int,
     chunkoverlap: int,
     segment_length: int,
-    sampling_freq: float,
+    sampfreq: float,
     waveno_limit_upper: float = 500.0,
 ) -> tuple[
     Float[ndarray, "time_slow waveno"],
@@ -106,7 +106,7 @@ def temperature_dissipation(
         chunklen,
         chunkoverlap,
         segment_length,
-        sampling_freq,
+        sampfreq,
     )
 
     chi = integrate_chi(k, Pk, Pnoise, waveno_limit_upper)
@@ -215,7 +215,7 @@ def temperature_gradient_spectra(
     chunklen: int,
     chunkoverlap: int,
     segment_length: int,
-    sampling_freq: float,
+    sampfreq: float,
 ) -> tuple[
     Float[ndarray, "time_slow waveno"],
     Float[ndarray, "time_slow waveno"],
@@ -225,7 +225,7 @@ def temperature_gradient_spectra(
     yr -= yr.mean(axis=1)[:, np.newaxis]
     yr *= np.hanning(segment_length)[np.newaxis, :]
 
-    freq: Float[ndarray, "1 freq"] = np.fft.rfftfreq(segment_length, d=1 / sampling_freq)[
+    freq: Float[ndarray, "1 freq"] = np.fft.rfftfreq(segment_length, d=1 / sampfreq)[
         np.newaxis, :
     ]
     Fyr = np.fft.rfft(yr)[:, :]
@@ -239,7 +239,7 @@ def temperature_gradient_spectra(
     assert senspeeda.shape[1] == 1
 
     correction = correction_frequency_response_bilinear(
-        freq=freq, Fs=sampling_freq
+        freq=freq, Fs=sampfreq
     ) * correction_frequency_response_vachon_lueck(freq=freq, senspeed=senspeeda)
 
     # average spectra by chunks
@@ -247,7 +247,7 @@ def temperature_gradient_spectra(
     # Pf = Pf * correction
 
     k = freq / senspeeda
-    Pk: Float[ndarray, "time_slow freq"] = Pf * senspeeda / segment_length / (sampling_freq / 2)
+    Pk: Float[ndarray, "time_slow freq"] = Pf * senspeeda / segment_length / (sampfreq / 2)
 
     Pnoise = get_noise(Pk)
     # Pk -= Pnoise
@@ -411,12 +411,12 @@ def get_noise(
 def deconvolute_mss_ntchp(
     x: Int[ndarray, "time"],
     x_emph: Int[ndarray, "time"],
-    sampling_freq: float,
+    sampfreq: float,
     gain: float = 1.5,
 ):
     cutoff_freq_Hz = 1 / (2 * np.pi * gain)
     # cutoff_freq_Hz = 0.5
-    cutoff_nondim = cutoff_freq_Hz / (sampling_freq / 2)
+    cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, btype="low")
     zi = lfiltic(b, a, x[:1], x_emph[:1])  # initial conditions
     x_d, _ = lfilter(b, a, x_emph, zi=zi)  # deconvoluted

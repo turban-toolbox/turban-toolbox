@@ -49,7 +49,7 @@ class ShearLevel2(Level2):
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_number,
-            cfg.sampling_freq,
+            cfg.sampfreq,
             cfg.segment_length,
             cfg.cutoff_freq_lp,
             cfg.spike_threshold,
@@ -102,7 +102,7 @@ class ShearLevel3(Level3):
             senspeed=level2.senspeed,
             section_number=level1.section_number,
             segment_length=level2.cfg.segment_length,
-            sampling_freq=level2.cfg.sampling_freq,
+            sampfreq=level2.cfg.sampfreq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,
@@ -199,7 +199,7 @@ class ShearLevel3(Level3):
     @property
     def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
-        tau_eps = self.cfg.chunk_length / self.cfg.sampling_freq
+        tau_eps = self.cfg.chunk_length / self.cfg.sampfreq
         return tau_eps * self.senspeed
 
 

@@ -53,13 +53,13 @@ def test_despike_benchmark_plot(atomix_nc_filename):
 
     sh = level1.shear[0, ti].copy()
 
-    sampling_freq = cfg.sampling_freq
+    sampfreq = cfg.sampfreq
 
     segment_length = cfg.segment_length
 
     sh, ctr = clean_shear(
         sh,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         spike_threshold=8.0,
         max_tries=8,
         spike_replace_before=512,
@@ -73,8 +73,8 @@ def test_despike_benchmark_plot(atomix_nc_filename):
     # Eq. 17
     sh_clean = butterfilt(
         signal=sh,
-        cutoff_freq_Hz=0.5 / (segment_length / sampling_freq),
-        sampling_freq=sampling_freq,
+        cutoff_freq_Hz=0.5 / (segment_length / sampfreq),
+        sampfreq=sampfreq,
         btype="high",
     )
 
@@ -152,11 +152,11 @@ def test_despike():
     sh[80] = 200
     sh[[79, 81]] = 5
     result = np.ones(100)
-    sampling_freq = 1024.0
+    sampfreq = 1024.0
     spike_threshold = 8.0
     spikes = detect_shear_spikes(
         sh,
-        sampling_freq,
+        sampfreq,
         spike_threshold,
         spike_include_before=10,
         spike_include_after=10,
