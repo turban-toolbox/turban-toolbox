@@ -1,3 +1,14 @@
+"""
+Defines standard names of variables used in the code base. Code should deviate from
+these names only with good reason.
+
+Dictionary `VARIABLES`` is a nested structure of the form:
+{turban_standard_name: {attribute_name: attribute_value}}.
+
+To make alphabetic sorting easier, this is here coded as the simpler dictionary `_vars`:
+{turban_standard_name/attribute_name: attribute_value}
+"""
+
 from collections import defaultdict
 
 # Physical quantities used in the code base
