@@ -10,7 +10,7 @@ def test_mss(mss_mrd_filename):
     mss.read_mrd(mss_mrd_filename)
 
     shear_config = ShearConfig(
-        sampling_freq=mss.cfg.sampling_freq,
+        sampfreq=mss.cfg.sampfreq,
         segment_length=2048,
         segment_overlap=1024,
         chunk_length=4 * 2048,

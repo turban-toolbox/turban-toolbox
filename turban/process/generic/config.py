@@ -6,7 +6,7 @@ import numpy as np
 class SegmentConfig(BaseModel):
     """Configures segment-wise processing of timeseries."""
 
-    sampling_freq: float  # [Hz]
+    sampfreq: float  # [Hz]
     segment_length: int
     segment_overlap: int
     chunk_length: int
@@ -16,7 +16,7 @@ class SegmentConfig(BaseModel):
     def _attrs_from_atomix_netcdf(fname):
         with Dataset(fname) as f:
             return dict(
-                sampling_freq=f.fs_fast,
+                sampfreq=f.fs_fast,
                 segment_length=int(f.fft_length),
                 segment_overlap=int(f.fft_length / 2),
                 chunk_length=int(f.diss_length),

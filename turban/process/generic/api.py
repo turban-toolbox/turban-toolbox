@@ -80,20 +80,20 @@ class HasLevelBelow(TimeseriesLevel):
 
 @dataclass(kw_only=True)
 class Level1(TimeseriesLevel):
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
 
 
 @dataclass(kw_only=True)
 class Level2(HasLevelBelow, TimeseriesLevel):
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
 
 
 @dataclass(kw_only=True)
 class Level3(HasLevelBelow, TimeseriesLevel):
     waveno: Float[ndarray, "time waveno"]
     freq: Float[ndarray, "waveno"]
-    platform_speed: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
 
     _coords = ["time", "freq"]
 

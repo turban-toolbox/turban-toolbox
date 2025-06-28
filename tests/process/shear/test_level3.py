@@ -13,12 +13,12 @@ def test_spectra_arr_shape():
     assert x.shape == (3, N)
     segment_length = 6
     segment_overlap = 3
-    sampling_freq = 1.0
+    sampfreq = 1.0
     chunk_length = 12
     chunk_overlap = 9
 
     y1, f = power_spectrum(
-        x, sampling_freq, segment_length, segment_overlap, chunk_length, chunk_overlap
+        x, sampfreq, segment_length, segment_overlap, chunk_length, chunk_overlap
     )
     # platform speed
     y2 = agg_fast_to_slow(
