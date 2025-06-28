@@ -23,7 +23,7 @@ _vars = {
     "freq/unit": "Hz",  # cps
     "kolmlen/explanation": "Kolmogorov length scale",
     "kolmlen/latex": r"$\eta$",
-    "molvisc/long_name": "molecular_viscosity_of_seawater",  # TODO
+    "molvisc/long_name": "molecular_viscosity_of_seawater",
     "molvisc/unit": "m2 s-1",
     "press/explanation": "Sea water pressure",
     "press/standard_name": "sea_water_pressure",
@@ -46,7 +46,7 @@ _vars = {
     "psi_k_sh/unit": "s-2 cpm-1",
     "psi_k/explanation": "Generic power spectrum in units of cpm-1",
     "psi/explanation": "Generic power spectrum, in frequency or wavenumber domain",
-    "sal/standard_name": "sea_water_salinity",  # TODO: absolute?
+    "sal/standard_name": "sea_water_salinity",
     "sampfreq/atomix_name": "fs",
     "sampfreq/explanation": "Number of samples per second",
     "sampfreq/unit": "Hz",
@@ -57,7 +57,7 @@ _vars = {
     "shear/unit": "s-1",
     "temp/standard_name": "sea_water_temperature",
     "temp/unit": "degC",
-    "waveno/atomix_name": "KCYC",  # TODO
+    "waveno/atomix_name": "KCYC",
     "waveno/explanation": "Number of cycles per metre",
     "waveno/unit": "cpm",
     "x/explanation": "Generic signal",
