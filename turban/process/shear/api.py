@@ -12,7 +12,14 @@ from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
-from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, Processing
+from turban.process.generic.api import (
+    AggAux,
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Processing,
+)
 
 
 @dataclass(kw_only=True)
@@ -288,7 +295,7 @@ class ShearProcessing(Processing):
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
 
         aux_vars = ["time", "press", "temp", "cond"]
-        arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(fname, aux_vars)))
+        arr = dict(zip(aux_vars, NetcdfReader("atomix").read(fname, aux_vars)))
         data_aux = {
             "time": (
                 ["time"],
@@ -315,20 +322,31 @@ class ShearProcessing(Processing):
         return cls(data, level, data_aux, coords_aux)
 
 
-class AtomixNetcdfLoader:
-    _map = {
-        "time": "L1_converted/TIME",
-        # 'L1_converted/SHEAR',
-        # 'L1_converted/TIME_CTD',
-        # 'L1_converted/PSPD_REL',
-        "press": "L1_converted/PRES",
-        # 'L1_converted/VIB',
-        "temp": "L1_converted/TEMP",
-        # 'L1_converted/TEMP_CTD',
-        "cond": "L1_converted/CNDC",
-    }
+class NetcdfReader:
+    """Load any netcdf with variable mapping from turban standard name (see variables.py)
+    to name in the netcdf.
+    NB This class is still under construction.
+    
+    TODO Load the variable mapping directly from variables.py."""
+    def __init__(self, varmap: dict[str, str] | Literal["atomix"] | None = None):
+        if varmap is None:
+            self._map = {}
+        elif varmap == "atomix":
+            self._map = {
+                "time": "L1_converted/TIME",
+                # 'L1_converted/SHEAR',
+                # 'L1_converted/TIME_CTD',
+                # 'L1_converted/PSPD_REL',
+                "press": "L1_converted/PRES",
+                # 'L1_converted/VIB',
+                "temp": "L1_converted/TEMP",
+                # 'L1_converted/TEMP_CTD',
+                "cond": "L1_converted/CNDC",
+            }
+        else:
+            self._map = varmap
 
-    def load(self, fname: str, vars: list[str]):
+    def read(self, fname: str, vars: list[str]) -> list[ndarray]:
         with Dataset(fname) as ds:
             data = [ds[self._map[var]][:] for var in vars]
         return data
