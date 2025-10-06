@@ -31,6 +31,8 @@ class TimeseriesLevel:
 
     _coords: ClassVar[list[str]] = ["time"]
 
+    _aux_data: dict[str, Float[ndarray, "time"]]|None = None
+
     def arrays_as_dict(self):
         return {
             name: (
@@ -52,6 +54,8 @@ class TimeseriesLevel:
         if isinstance(attr, SegmentConfig):
             return getattr()
 
+    def add_aux_sensors(self, data: dict[str, Float[ndarray, "time"]]):
+        self._aux_data.update(**data)
 
 @dataclass(kw_only=True)
 class HasLevelBelow(TimeseriesLevel):
