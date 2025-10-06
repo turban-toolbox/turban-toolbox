@@ -9,25 +9,52 @@ import matplotlib.pyplot as plt
 
 from tests.fixtures import atomix_nc_filename
 
+import xarray as xr
+from turban.process.shear.api import (
+    ShearProcessing,
+    ShearLevel1,
+    ShearLevel2,
+    ShearLevel3,
+    ShearLevel4,
+    AtomixNetcdfLoader,
+)
+
+from turban.process.shear.api import ShearProcessing
+
 
 def test_load_atomix_netcdf(atomix_nc_filename):
-    from turban.process.shear.api import ShearProcessing
 
     for level in [1, 2, 3]:
         p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, level=level)
         assert isinstance(p.level4.eps, np.ndarray)
 
 
-def test_baltic_benchmark(atomix_nc_filename):
-    import xarray as xr
-    from turban.process.shear.api import (
-        ShearProcessing,
-        ShearLevel1,
-        ShearLevel2,
-        ShearLevel3,
-        ShearLevel4,
-        AtomixNetcdfLoader,
+def test_agg_aux(atomix_nc_filename):
+
+    aux_vars = ["temp"]
+    arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(atomix_nc_filename, aux_vars)))
+    data_aux = {
+        "temp": (
+            ["time"],
+            arr["temp"][0, :],
+            {"max": "temp_max"},
+        ),
+    }
+
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
+    level1.add_aux_data("temp", arr["temp"][0, :], "max", "temp_max")
+    p_from_level1 = ShearProcessing(level1, level=1)
+
+    p_from_atomix = ShearProcessing.from_atomix_netcdf(
+        atomix_nc_filename,
+        level=1,
+        data_aux=data_aux,
     )
+
+    assert p_from_level1.level4.to_xarray().equals(p_from_atomix.level4.to_xarray())
+
+
+def test_baltic_benchmark(atomix_nc_filename):
 
     aux_vars = ["time", "press", "temp", "cond"]
     arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(atomix_nc_filename, aux_vars)))
@@ -53,7 +80,6 @@ def test_baltic_benchmark(atomix_nc_filename):
             {"max": "cond"},
         ),
     }
-    coords_aux = ["time", "time_slow"]
 
     p = ShearProcessing.from_atomix_netcdf(
         atomix_nc_filename,
