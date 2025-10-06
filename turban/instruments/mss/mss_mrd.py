@@ -391,7 +391,6 @@ def level0_to_level1(mss_config, level0, pspd_rel=None):
         level1_dataset['PSAL'] = SP
         level1_dataset['PSAL'].attrs["units"] = '1'
         # Calculating absolute salinity
-        print(level0.longitude)
         try:
             lon = level0.longitude
         except:

@@ -3,6 +3,7 @@ import turban
 from turban.instruments.mss import mss
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 import numpy as np
+import matplotlib.pyplot as plt
 
 def test_read_mrd(mss_mrd_filename):
     mrddata = turban.instruments.mss.mss_mrd.mrd(mss_mrd_filename)
@@ -62,4 +63,41 @@ shear_level1 = ShearLevel1(
             cfg=shear_config,
         )
 
-p = ShearProcessing(shear_level1, level=1)
+
+#aux_vars = ["time", "press", "temp", "cond"]
+aux_vars = ["time", "P1000", "Temp", "Cond"]
+data_aux = {
+    "time": (
+        ["time"],
+        np.asarray(data_level1["time_count"]),
+        {"mean": "time_slow"},
+    ),
+    "press": (
+        ["time"],
+        np.asarray(data_level1["P1000"]),
+        {"mean": "press"},
+    ),
+    "temp": (
+        ["time"],
+        np.asarray(data_level1["Temp"]),
+        {"mean": "temp"},
+    ),
+    "cond": (
+        ["time"],
+        np.asarray(data_level1["Cond"]),
+        {"mean": "cond"},
+    ),
+}
+coords_aux = ["time", "time_slow"]
+p = ShearProcessing(shear_level1, level=1, data_aux=data_aux, coords_aux=coords_aux)
+level4 = p.level4.to_xarray()
+aux_data_processed, _ = p.aux.to_xarray()
+
+# Plot the results
+plt.figure(1)
+plt.clf()
+plt.plot(np.log10(level4['eps'][0,:]),aux_data_processed['press'])
+plt.plot(np.log10(level4['eps'][1,:]),aux_data_processed['press'])
+plt.ylim(100,0)
+plt.ylabel('Pressure [dbar]')
+plt.xlabel('Epsilon [W kg-1]')
