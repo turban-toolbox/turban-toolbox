@@ -65,6 +65,7 @@ def test_baltic_benchmark(atomix_nc_filename):
     level2 = p.level2
     level3 = p.level3
     level4 = p.level4
+
     assert isinstance(level1, ShearLevel1)
     assert isinstance(level2, ShearLevel2)
     assert isinstance(level3, ShearLevel3)

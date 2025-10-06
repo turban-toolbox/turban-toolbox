@@ -90,7 +90,7 @@ class AuxiliaryDataFast(TimeseriesLevel):
         self,
         name: str,
         data: Float[ndarray, "time"],
-        method: str = "mean",
+        agg_method: str = "mean",
         name_out: str | None = None,
     ):
         """Simplified API"""
@@ -99,7 +99,7 @@ class AuxiliaryDataFast(TimeseriesLevel):
         if name in self._agg_aux_data:
             raise ValueError(f"Aux data `{name}` already exists")
         # Construct the full aggregation instruction
-        self._agg_aux_data[name] = (["time"], data, {method: name_out})
+        self._agg_aux_data[name] = (["time"], data, {agg_method: name_out})
 
 
 @dataclass(kw_only=True)
@@ -124,12 +124,11 @@ class AuxiliaryDataSlow(TimeseriesLevel):
         name: str,
         data: Float[ndarray, "time"],
     ):
-        """Simplified API"""
+        """This simply adds entries"""
         # so linters understand we have a dict after __post_init__
         self._aux_data = cast(AuxDataTypehint, self._aux_data)
         if name in self._aux_data:
             raise ValueError(f"Aux data `{name}` already exists")
-        # Construct the full aggregation instruction
         self._aux_data[name] = (["time"], data)
 
 
@@ -139,8 +138,13 @@ class HasLevelBelow(TimeseriesLevel):
 
     @classmethod
     @abstractmethod
+    def _from_level_below_kwarg(cls, data: TimeseriesLevel | None) -> dict:
+        """Provides dictionary `kwarg` that can be passed into class constructor as cls(**kwarg)."""
+        return {}
+
+    @classmethod
     def from_level_below(cls, data: TimeseriesLevel | None):
-        pass
+        return cls(**cls._from_level_below_kwarg(data))
 
     @property
     def cfg(self):
@@ -163,11 +167,22 @@ class HasLevelBelow(TimeseriesLevel):
 class Level1(AuxiliaryDataFast):
     pspd: Float[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
+    section_number: Int[ndarray, "time"]
 
 
 @dataclass(kw_only=True)
 class Level2(HasLevelBelow, AuxiliaryDataFast):
     pspd: Float[ndarray, "time"]
+    section_number: Int[ndarray, "time"]
+
+    @classmethod
+    def _from_level_below_kwarg(cls, data: Level1) -> dict:
+        return dict(
+            time=data.time,
+            pspd=data.pspd,
+            section_number=data.section_number,
+            _agg_aux_data=data._agg_aux_data,
+        )
 
 
 @dataclass(kw_only=True)
@@ -175,22 +190,45 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
     waveno: Float[ndarray, "time waveno"]
     freq: Float[ndarray, "waveno"]
     platform_speed: Float[ndarray, "time"]
+    section_number: Int[ndarray, "time"]
 
     _coords = ["time", "freq"]
 
-    def agg(self, data: AggAuxDataTypehint) -> dict[str, Float[ndarray, "time"]]:
-        """Aggregates data from Level1/2 in the form:
+    @classmethod
+    def _from_level_below_kwarg(cls, data: Level2) -> dict:
+        return dict(
+            time=data.time,
+            _aux_data=cls.agg(
+                data=cast(AggAuxDataTypehint, data._agg_aux_data),
+                data_len=len(data.time),
+                diss_length=data.cfg.diss_length,
+                diss_overlap=data.cfg.diss_overlap,
+                section_number=data.section_number,
+            ),
+        )
+
+    @classmethod
+    def agg(
+        cls,
+        data: AggAuxDataTypehint,
+        data_len: int,
+        diss_length: int,
+        diss_overlap: int,
+        section_number: Int[ndarray, "time"],
+    ) -> AuxDataTypehint:
+        """Aggregates data from Level2 in the form:
         {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}
         """
         slow = {}
 
+        # sample_data = data[data.keys()[0]][1]
         cidx = get_chunking_index(
-            self.cfg.data_len,
-            self.cfg.diss_length,
+            data_len,
+            diss_length,
             0,
-            self.cfg.diss_length,
-            self.cfg.diss_overlap,
-            self.cfg.section_number,
+            diss_length,
+            diss_overlap,
+            section_number,
         )
 
         for varname, (dims, arr, rename_dict) in data.items():
@@ -206,7 +244,15 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
 
 @dataclass(kw_only=True)
 class Level4(HasLevelBelow, AuxiliaryDataSlow):
-    pass
+    section_number: Int[ndarray, "time"]
+
+    @classmethod
+    def _from_level_below_kwarg(cls, data: Level3) -> dict:
+        return dict(
+            time=data.time,
+            section_number=data.section_number,
+            _aux_data=data._aux_data,
+        )
 
 
 # class AggAux:
