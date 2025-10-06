@@ -37,8 +37,16 @@ def test_baltic_benchmark(atomix_nc_filename):
             arr["time"],
             {"mean": "time_slow"},
         ),
-        "press": arr["press"], # simplified form
-        "temp": arr["temp"][0, :], # simplified form
+        "temp": (
+            ["time"],
+            arr["temp"][0, :],
+            {"max": "temp"},
+        ),
+        "press": (
+            ["time"],
+            arr["press"],
+            {"mean": "press"},
+        ),
         "cond": (
             ["time"],
             arr["cond"],
@@ -51,14 +59,12 @@ def test_baltic_benchmark(atomix_nc_filename):
         atomix_nc_filename,
         level=1,
         data_aux=data_aux,
-        coords_aux=coords_aux,
     )
 
     level1 = p.level1
     level2 = p.level2
     level3 = p.level3
     level4 = p.level4
-    aux = p.aux.slow_to_xarray()
     assert isinstance(level1, ShearLevel1)
     assert isinstance(level2, ShearLevel2)
     assert isinstance(level3, ShearLevel3)
@@ -81,15 +87,15 @@ def test_baltic_benchmark(atomix_nc_filename):
     ds3_turban.to_netcdf("out/tests/baltic_level3.nc")
     ds4_turban.to_netcdf("out/tests/baltic_level4.nc")
 
-    _plot_level4(ds4, aux, ds4_turban)  # TODO
+    _plot_level4(ds4, ds4_turban)  # TODO
 
 
-def _plot_level4(ds4, aux, level4):
+def _plot_level4(ds4, level4):
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 9))
     ax.plot(ds4.PRES, ds4.EPSI_FINAL, "k", label="benchmark", marker="o")
-    ax.plot(aux.press, level4.eps.mean("nshear"), "r", label="turban", marker="o")
+    ax.plot(level4.press, level4.eps.mean("nshear"), "r", label="turban", marker="o")
     ax.set_xlabel("Pressure (dbar)")
     ax.set_ylabel("Dissipation rate (W/kg)")
     ax.set_yscale("log")

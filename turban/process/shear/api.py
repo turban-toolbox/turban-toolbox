@@ -12,7 +12,15 @@ from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
-from turban.process.generic.api import AggAux, Level1, Level2, Level3, Level4, Processing, AggAuxDataTypehint
+from turban.process.generic.api import (
+    AuxDataTypehint,
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Processing,
+    AggAuxDataTypehint,
+)
 
 
 @dataclass(kw_only=True)
@@ -284,11 +292,14 @@ class ShearProcessing(Processing):
         cls,
         fname: str,
         level: Literal[1, 2, 3, 4],
-        data_aux: AggAuxDataTypehint | None = None,
-        coords_aux: list[str] | None = None,
+        data_aux: AggAuxDataTypehint | AuxDataTypehint | None = None,
     ):
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-        return cls(data, level, data_aux, coords_aux)
+        if level<=2:
+            data._agg_aux_data = data_aux
+        else:
+            data._aux_data = data_aux
+        return cls(data, level)
 
 
 class AtomixNetcdfLoader:
