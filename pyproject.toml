@@ -3,38 +3,32 @@ name = "turban-toolbox"
 dynamic = ["version"]
 description = "Turbulence Analysis Toolbox"
 authors = [
-    { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
-    { name = "Peter Holtermann", email = "peter.holtermann@io-warnemuende.de" },
+  { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
+  { name = "Peter Holtermann", email = "peter.holtermann@io-warnemuende.de" },
 ]
 license = { text = "GPLv03" }
 dependencies = [
-    'beartype',
-    'datashader',
-    'gsw',
-    'hvplot',
-    'jaxtyping',
-    'matplotlib',
-    'netCDF4',
-    'numba',
-    'numpy',
-    'pandas',
-    'panel',
-    'pydantic',
-    'pytest-cov',
-    'pytest',
-    'scipy',
-    'setuptools',
-    'xarray',
-]
+  'gsw',
+  'jaxtyping',
+  'matplotlib',
+  'netCDF4',
+  'numba',
+  'numpy',
+  'pandas',
+  'pydantic',
+  'scipy',
+  'setuptools',
+  'xarray',
+] # for end user only - for developers, see environment-dev.yml
 requires-python = ">=3.9"
 readme = "README.md"
 classifiers = [
-    'Development Status :: 4 - Beta',
-    'Topic :: Scientific/Engineering',
-    'Intended Audience :: Science/Research',
-    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-    'Operating System :: OS Independent',
-    'Programming Language :: Python :: 3 :: Only',
+  'Development Status :: 4 - Beta',
+  'Topic :: Scientific/Engineering',
+  'Intended Audience :: Science/Research',
+  'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+  'Operating System :: OS Independent',
+  'Programming Language :: Python :: 3 :: Only',
 ]
 
 [project.scripts]
@@ -53,5 +47,19 @@ include-package-data = false
 "*" = ["VERSION"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=<project-name> --cov-report html"
 filterwarnings = "always::UserWarning"
+
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+exclude = '''
+
+(
+  /(
+    | \.ipynb_checkpoints
+    | \.pytest_cache
+    | __pycache__
+  )/
+)
+
+'''

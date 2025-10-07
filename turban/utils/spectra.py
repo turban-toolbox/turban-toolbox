@@ -3,18 +3,18 @@ from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Complex
 
-from turban.util import fast_to_slow_reshape_index
+from turban.utils.util import get_chunking_index
 
 
 def power_spectrum(
     x: Float[ndarray, "... time_fast"],
-    sampling_freq: float,
-    fft_length: int | None = None,
-    fft_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
-    section_marker: Int[ndarray, "time_fast"] | None = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
+    sampfreq: float,
+    segment_length: int | None = None,
+    segment_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
+    section_number: Int[ndarray, "time_fast"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
 ) -> tuple[
     Float[ndarray, "... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
@@ -22,12 +22,12 @@ def power_spectrum(
     Pf, freq = cospectrum(
         x,
         None,
-        sampling_freq,
-        fft_length,
-        fft_overlap,
-        diss_length,
-        diss_overlap,
-        section_marker,
+        sampfreq,
+        segment_length,
+        segment_overlap,
+        chunk_length,
+        chunk_overlap,
+        section_number,
         reshape_index,
     )
     return Pf.real, freq
@@ -36,13 +36,13 @@ def power_spectrum(
 def cospectrum(
     x: Float[ndarray, "... time_fast"],
     y: Float[ndarray, "... time_fast"] | None,  # if None, return power spectrum of x
-    sampling_freq: float,
-    fft_length: int | None = None,
-    fft_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
-    section_marker: Int[ndarray, "time_fast"] | None = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk fft_length"] | None = None,
+    sampfreq: float,
+    segment_length: int | None = None,
+    segment_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
+    section_number: Int[ndarray, "time_fast"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
     window: Literal["hanning"] | None = "hanning",
 ) -> tuple[
     Complex[ndarray, "... chunk freq"],
@@ -53,23 +53,23 @@ def cospectrum(
     If reshape_index is not supplied, calculates it.
     """
     if reshape_index is None:
-        reshape_index = fast_to_slow_reshape_index(
+        reshape_index = get_chunking_index(
             x.shape[-1],
-            fft_length,
-            fft_overlap,
-            diss_length,
-            diss_overlap,
-            section_marker,
+            segment_length,
+            segment_overlap,
+            chunk_length,
+            chunk_overlap,
+            section_number,
         )
     else:
-        fft_length = reshape_index.shape[-1]
+        segment_length = reshape_index.shape[-1]
 
-    freq = np.fft.rfftfreq(fft_length, d=1 / sampling_freq)
+    freq = np.fft.rfftfreq(segment_length, d=1 / sampfreq)
 
     xr = x[..., reshape_index]  # reshape to fft length windows
     xr -= xr.mean(axis=-1)[..., newaxis]  # subtract mean
     if window == "hanning":
-        xr *= np.hanning(fft_length)[newaxis, newaxis, :]  # hanning window
+        xr *= np.hanning(segment_length)[newaxis, newaxis, :]  # hanning window
     Fxr = np.fft.rfft(xr)[:, :]
 
     if y is None:
@@ -78,7 +78,7 @@ def cospectrum(
         yr = y[..., reshape_index]  # reshape to fft length windows
         yr -= yr.mean(axis=-1)[..., newaxis]  # subtract mean
         if window == "hanning":
-            yr *= np.hanning(fft_length)[newaxis, newaxis, :]  # hanning window
+            yr *= np.hanning(segment_length)[newaxis, newaxis, :]  # hanning window
         Fyr = np.fft.rfft(yr)[:, :]
         Pf = Fyr.conj() * Fxr
 

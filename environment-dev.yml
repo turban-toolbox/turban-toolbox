@@ -1,0 +1,25 @@
+# These are the current dependencies for developing TURBAN
+
+name: turban
+channels:
+  - conda-forge
+dependencies:
+  - beartype
+  - black
+  - gsw
+  - jaxtyping
+  - matplotlib
+  - netCDF4
+  - numba
+  - numpy
+  - pandas
+  - pip
+  - pydantic
+  - pytest
+  - pytest-cov
+  - scipy
+  - setuptools
+  - xarray
+  - pip:
+    - pytest-markdown-docs
+    
