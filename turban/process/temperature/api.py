@@ -11,14 +11,14 @@ from turban.process.temperature.temperature import temperature_gradient_spectra
 
 @dataclass(kw_only=True)
 class TempLevel1:
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     temp: Float[ndarray, "ntemp time"]
     cfg: TempConfig
 
 
 @dataclass(kw_only=True)
 class TempLevel2:
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     dtemp_dt: Float[ndarray, "ntemp time"]
     # n_despiked: Int[ndarray, "ntemp time"] | None
     section_number: Int[ndarray, "time"] | None
@@ -29,13 +29,13 @@ class TempLevel2:
         cls,
         level1: TempLevel1,
     ):
-        dtemp_dt = fft_grad(level1.temp, 1 / level1.cfg.sampling_freq)
+        dtemp_dt = fft_grad(level1.temp, 1 / level1.cfg.sampfreq)
 
         # cleaning routine for dtemp_dt
 
         return cls(
             dtemp_dt=dtemp_dt,
-            pspd=level1.pspd,
+            senspeed=level1.senspeed,
             # n_despiked=n_despiked,
             cfg=level1.cfg,
         )
@@ -43,11 +43,11 @@ class TempLevel2:
 
 @dataclass(kw_only=True)
 class TempLevel3:
-    Pk: Float[ndarray, "ntemp time wavenumber"]
-    k: Float[ndarray, "time wavenumber"]
-    Pf: Float[ndarray, "ntemp time wavenumber"] | None
-    freq: Float[ndarray, "wavenumber"] | None
-    platform_speed: Float[ndarray, "time"]
+    Pk: Float[ndarray, "ntemp time waveno"]
+    k: Float[ndarray, "time waveno"]
+    Pf: Float[ndarray, "ntemp time waveno"] | None
+    freq: Float[ndarray, "waveno"] | None
+    senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"] | None
     cfg: TempConfig
 
@@ -60,24 +60,24 @@ class TempLevel3:
 
         k, Pk, Pnoise = temperature_gradient_spectra(
             level2.dtemp_dt,
-            level2.pspd,
-            level2.cfg.diss_length,
-            level2.cfg.diss_overlap,
+            level2.senspeed,
+            level2.cfg.chunk_length,
+            level2.cfg.chunk_overlap,
             level2.cfg.segment_length,
-            level2.cfg.sampling_freq,
+            level2.cfg.sampfreq,
         )
 
-        k, Pk, Pf, freq, platform_speed, ancillary = process_level3(
+        k, Pk, Pf, freq, senspeed, ancillary = process_level3(
             shear=level2.shear,
-            pspd=level2.pspd,
+            senspeed=level2.senspeed,
             section_number=level1.section_number,
             segment_length=level2.cfg.segment_length,
-            sampling_freq=level2.cfg.sampling_freq,
+            sampfreq=level2.cfg.sampfreq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
         )
 
         return cls(
@@ -85,7 +85,7 @@ class TempLevel3:
             k=k,
             Pf=Pf,
             freq=freq,
-            platform_speed=platform_speed,
+            senspeed=senspeed,
             section_number=None,
             cfg=level2.cfg,
         )
@@ -93,15 +93,15 @@ class TempLevel3:
     def to_xarray(self):
         return xr.Dataset(
             {
-                "k": (["time_slow", "wavenumber"], self.k),
-                "Pk": (["ntemp", "time_slow", "wavenumber"], self.Pk),
+                "k": (["time_slow", "waveno"], self.k),
+                "Pk": (["ntemp", "time_slow", "waveno"], self.Pk),
                 "Pf": (
-                    (["ntemp", "time_slow", "wavenumber"], self.Pf)
+                    (["ntemp", "time_slow", "waveno"], self.Pf)
                     if self.Pf is not None
                     else None
                 ),
-                "freq": (["wavenumber"], self.freq) if self.freq is not None else None,
-                "platform_speed": (["time_slow"], self.platform_speed),
+                "freq": (["waveno"], self.freq) if self.freq is not None else None,
+                "senspeed": (["time_slow"], self.senspeed),
             }
         )
 
@@ -118,8 +118,8 @@ class TempLevel4:
     ) -> "TempLevel4":
         eps, _, _ = process_level4(
             psi=level3.Pk,
-            wavenumber=level3.k,
-            platform_speed=level3.platform_speed,
+            waveno=level3.k,
+            senspeed=level3.senspeed,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,

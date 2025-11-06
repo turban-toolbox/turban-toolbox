@@ -1,5 +1,5 @@
-from logging import warnings
-from typing import Literal
+import warnings
+from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
@@ -35,10 +35,10 @@ class ShearLevel1(Level1):
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
-            pspd=ds.PSPD_REL.values,
+            senspeed=ds.PSPD_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
-            cfg=ShearConfig.from_atomix_netcdf(fname),
+            cfg=cast(ShearConfig, ShearConfig.from_atomix_netcdf(fname)),
         )
 
 
@@ -54,11 +54,11 @@ class ShearLevel2(Level2):
     ):
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
-        cfg = level1.cfg
+        cfg = cast(ShearConfig, level1.cfg) # just for type checkers to understand type
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_number,
-            cfg.sampling_freq,
+            cfg.sampfreq,
             cfg.segment_length,
             cfg.cutoff_freq_lp,
             cfg.spike_threshold,
@@ -73,7 +73,7 @@ class ShearLevel2(Level2):
             dict(
                 time=level1.time,
                 shear=sh_cleaned,
-                pspd=level1.pspd,
+                senspeed=level1.senspeed,
                 num_despike_iter=num_despike_iter,
                 level_below=level1,
             )
@@ -86,7 +86,7 @@ class ShearLevel2(Level2):
         return cls(
             time=ds.TIME.values.astype(float),
             shear=ds.SHEAR.values,
-            pspd=ds.PSPD_REL.values,
+            senspeed=ds.PSPD_REL.values,
             # TODO: apparently not exported in benchmark files...?
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
@@ -96,8 +96,8 @@ class ShearLevel2(Level2):
 
 @dataclass(kw_only=True)
 class ShearLevel3(Level3):
-    Pk: Float[ndarray, "nshear time wavenumber"]
-    Pf: Float[ndarray, "nshear time wavenumber"]
+    Pk: Float[ndarray, "nshear time waveno"]
+    Pf: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
@@ -110,17 +110,17 @@ class ShearLevel3(Level3):
         kwarg = super()._from_level_below_kwarg(data)
         level2 = data
         level1 = data.level_below
-        k, Pk, Pf, freq, platform_speed, section_number = process_level3(
+        k, Pk, Pf, freq, senspeed, section_number = process_level3(
             shear=level2.shear,
-            pspd=level2.pspd,
+            senspeed=level2.senspeed,
             section_number=level1.section_number,
             segment_length=level2.cfg.segment_length,
-            sampling_freq=level2.cfg.sampling_freq,
+            sampfreq=level2.cfg.sampfreq,
             spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
             freq_highpass=level2.cfg.freq_highpass,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
         )
 
         spike_fraction = get_cleaned_fraction(
@@ -129,8 +129,8 @@ class ShearLevel3(Level3):
             data_len=level1.shear.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
             section_number=level1.section_number,
         )
 
@@ -139,24 +139,24 @@ class ShearLevel3(Level3):
             data_len=level2.num_despike_iter.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
-            diss_length=level2.cfg.diss_length,
-            diss_overlap=level2.cfg.diss_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
             section_number=level1.section_number,
             agg_method="max",
         )
 
         kwarg.update(
             dict(
-                time=np.ones_like(platform_speed),  # TODO get from level 2
-                Pk=Pk,
-                waveno=k,
-                Pf=Pf,
-                freq=freq,
-                platform_speed=platform_speed,
-                section_number=section_number,
-                spike_fraction=spike_fraction,
-                max_despike_iter=max_despike_iter,
-                level_below=data,
+            time=np.ones_like(senspeed),  # TODO get from level 2
+            Pk=Pk,
+            waveno=k,
+            Pf=Pf,
+            freq=freq,
+            senspeed=senspeed,
+            section_number=section_number,
+            spike_fraction=spike_fraction,
+            max_despike_iter=max_despike_iter,
+            level_below=data,
             )
         )
         return kwarg
@@ -173,7 +173,7 @@ class ShearLevel3(Level3):
             waveno=ds["KCYC"].values,
             Pf=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
-            platform_speed=ds["PSPD_REL"].values,
+            senspeed=ds["PSPD_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
             max_despike_iter=9999
@@ -194,14 +194,14 @@ class ShearLevel3(Level3):
             5
             / 4
             * (
-                self.cfg.number_fft_windows_per_spectrum
+                self.cfg.number_fft_windows_per_chunk
                 - self.number_signals_vibration_removal
             )
             ** (-7 / 9)
         )
 
     @property
-    def Pk_confidence_interval(self) -> Float[ndarray, "2 time wavenumber"]:
+    def Pk_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
         """95% confidence interval of power spectrum.
         Eq. 23 in the ATOMIX paper"""
         return np.concatenate(
@@ -215,8 +215,8 @@ class ShearLevel3(Level3):
     @property
     def data_length(self) -> Float[ndarray, "time"]:
         """l_\epsilon in ATOMIX paper"""
-        tau_eps = self.cfg.diss_length / self.cfg.sampling_freq
-        return tau_eps * self.platform_speed
+        tau_eps = self.cfg.chunk_length / self.cfg.sampfreq
+        return tau_eps * self.senspeed
 
 
 @dataclass(kw_only=True)
@@ -248,8 +248,8 @@ class ShearLevel4(Level4):
             num_spec_points,
         ) = process_level4(
             psi=level3.Pk,
-            wavenumber=level3.waveno,
-            platform_speed=level3.platform_speed,
+            waveno=level3.waveno,
+            senspeed=level3.senspeed,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
@@ -270,7 +270,7 @@ class ShearLevel4(Level4):
 
         kwarg.update(
             dict(
-                time=np.ones_like(level3.platform_speed),  # TODO get from level 2
+                time=np.ones_like(level3.senspeed),  # TODO get from level 2
                 eps=eps,
                 eps_source_flag=eps_source_flag,
                 log_diss_var=log_diss_var,
@@ -316,20 +316,31 @@ class ShearProcessing(Processing):
         return cls(data, level)
 
 
-class AtomixNetcdfLoader:
-    _map = {
-        "time": "L1_converted/TIME",
-        # 'L1_converted/SHEAR',
-        # 'L1_converted/TIME_CTD',
-        # 'L1_converted/PSPD_REL',
-        "press": "L1_converted/PRES",
-        # 'L1_converted/VIB',
-        "temp": "L1_converted/TEMP",
-        # 'L1_converted/TEMP_CTD',
-        "cond": "L1_converted/CNDC",
-    }
+class NetcdfReader:
+    """Load any netcdf with variable mapping from turban standard name (see variables.py)
+    to name in the netcdf.
+    NB This class is still under construction.
+    
+    TODO Load the variable mapping directly from variables.py."""
+    def __init__(self, varmap: dict[str, str] | Literal["atomix"] | None = None):
+        if varmap is None:
+            self._map = {}
+        elif varmap == "atomix":
+            self._map = {
+                "time": "L1_converted/TIME",
+                # 'L1_converted/SHEAR',
+                # 'L1_converted/TIME_CTD',
+                # 'L1_converted/PSPD_REL',
+                "press": "L1_converted/PRES",
+                # 'L1_converted/VIB',
+                "temp": "L1_converted/TEMP",
+                # 'L1_converted/TEMP_CTD',
+                "cond": "L1_converted/CNDC",
+            }
+        else:
+            self._map = varmap
 
-    def load(self, fname: str, vars: list[str]):
+    def read(self, fname: str, vars: list[str]) -> list[ndarray]:
         with Dataset(fname) as ds:
             data = [ds[self._map[var]][:] for var in vars]
         return data

@@ -16,7 +16,7 @@ from turban.process.shear.api import (
     ShearLevel2,
     ShearLevel3,
     ShearLevel4,
-    AtomixNetcdfLoader,
+    NetcdfReader,
 )
 
 from turban.process.shear.api import ShearProcessing
@@ -32,7 +32,7 @@ def test_load_atomix_netcdf(atomix_nc_filename):
 def test_agg_aux(atomix_nc_filename):
 
     aux_vars = ["temp"]
-    arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(atomix_nc_filename, aux_vars)))
+    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_nc_filename, aux_vars)))
     data_aux = {
         "temp": (
             ["time"],
@@ -57,7 +57,7 @@ def test_agg_aux(atomix_nc_filename):
 def test_baltic_benchmark(atomix_nc_filename):
 
     aux_vars = ["time", "press", "temp", "cond"]
-    arr = dict(zip(aux_vars, AtomixNetcdfLoader().load(atomix_nc_filename, aux_vars)))
+    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_nc_filename, aux_vars)))
     data_aux = {
         "time": (
             ["time"],

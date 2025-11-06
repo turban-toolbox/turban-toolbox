@@ -25,8 +25,8 @@ def test_get_cleaned_fraction():
         data_len=len(x),
         segment_length=4,
         segment_overlap=2,
-        diss_length=10,
-        diss_overlap=0,
+        chunk_length=10,
+        chunk_overlap=0,
     )
     assert np.all(cl_frac == np.array([2 / 10, 0]))
 
@@ -36,8 +36,8 @@ def test_diss_chunk_wise_reshape_index():
         data_len=20,
         segment_length=4,
         segment_overlap=2,
-        diss_length=10,
-        diss_overlap=0,
+        chunk_length=10,
+        chunk_overlap=0,
     )
     assert ii.shape == (2, 4, 4)
     assert diss_chunk_wise_reshape_index(ii).shape == (2, 10)
@@ -140,8 +140,8 @@ def test_average_fast_to_slow():
         data_len=x.shape[-1],
         segment_length=4,
         segment_overlap=2,
-        diss_length=6,
-        diss_overlap=2,
+        chunk_length=6,
+        chunk_overlap=2,
     )
 
     assert y.shape == (3, 2)
@@ -154,8 +154,8 @@ def test_agg_fast_to_slow():
         data_len=len(x),
         segment_length=4,
         segment_overlap=2,
-        diss_length=10,
-        diss_overlap=0,
+        chunk_length=10,
+        chunk_overlap=0,
         agg_method="max",
     )
     assert np.all(xm == np.array([9.0, 19.0]))

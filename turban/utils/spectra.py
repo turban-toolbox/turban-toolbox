@@ -8,11 +8,11 @@ from turban.utils.util import get_chunking_index
 
 def power_spectrum(
     x: Float[ndarray, "... time_fast"],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int | None = None,
     segment_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
 ) -> tuple[
@@ -22,11 +22,11 @@ def power_spectrum(
     Pf, freq = cospectrum(
         x,
         None,
-        sampling_freq,
+        sampfreq,
         segment_length,
         segment_overlap,
-        diss_length,
-        diss_overlap,
+        chunk_length,
+        chunk_overlap,
         section_number,
         reshape_index,
     )
@@ -36,11 +36,11 @@ def power_spectrum(
 def cospectrum(
     x: Float[ndarray, "... time_fast"],
     y: Float[ndarray, "... time_fast"] | None,  # if None, return power spectrum of x
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int | None = None,
     segment_overlap: int | None = None,
-    diss_length: int | None = None,
-    diss_overlap: int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
     window: Literal["hanning"] | None = "hanning",
@@ -57,14 +57,14 @@ def cospectrum(
             x.shape[-1],
             segment_length,
             segment_overlap,
-            diss_length,
-            diss_overlap,
+            chunk_length,
+            chunk_overlap,
             section_number,
         )
     else:
         segment_length = reshape_index.shape[-1]
 
-    freq = np.fft.rfftfreq(segment_length, d=1 / sampling_freq)
+    freq = np.fft.rfftfreq(segment_length, d=1 / sampfreq)
 
     xr = x[..., reshape_index]  # reshape to fft length windows
     xr -= xr.mean(axis=-1)[..., newaxis]  # subtract mean

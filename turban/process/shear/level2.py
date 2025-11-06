@@ -20,7 +20,7 @@ data_and_bounds_type = list[
 def process_level2(
     shear: Float[ndarray, "n_shear time"],
     section_numbers: Int[ndarray, "time"],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int,
     cutoff_freq_lp: float,
     spike_threshold: float,
@@ -39,10 +39,10 @@ def process_level2(
 
     for marker, data in segments.items():
         flag2 = -999 * np.zeros(data.shape[0], dtype=int)
-        for k, sh in enumerate(data):
-            sh, ctr = clean_shear(
-                sh,
-                sampling_freq=sampling_freq,
+        for k, shear in enumerate(data):
+            shear, ctr = clean_shear(
+                shear,
+                sampfreq=sampfreq,
                 spike_threshold=spike_threshold,
                 max_tries=max_tries,
                 spike_replace_before=spike_replace_before,
@@ -55,9 +55,9 @@ def process_level2(
             # after removal of spikes, can high-pass filter
             # Eq. 17
             sh_clean = butterfilt(
-                signal=sh,
-                cutoff_freq_Hz=0.5 / (segment_length / sampling_freq),
-                sampling_freq=sampling_freq,
+                signal=shear,
+                cutoff_freq_Hz=0.5 / (segment_length / sampfreq),
+                sampfreq=sampfreq,
                 btype="high",
             )
             ctr_agg[k, section_numbers == marker] = ctr
@@ -150,24 +150,24 @@ def enlarge_bool(x, before, after):
 
 
 def detect_shear_spikes(
-    sh: Float[ndarray, "time"],
-    sampling_freq: float,
+    shear: Float[ndarray, "time"],
+    sampfreq: float,
     spike_threshold: float,
     spike_include_before: int,
     spike_include_after: int,
     cutoff_freq_lp: float,
 ) -> Bool[ndarray, "time"]:
     sh_hp = butterfilt(
-        signal=sh,
+        signal=shear,
         cutoff_freq_Hz=0.1,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="high",
     )
     sh_abs = np.abs(sh_hp)
     sh_lp = butterfilt(
         signal=sh_abs,
         cutoff_freq_Hz=cutoff_freq_lp,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="lp",
     )
     spikes = (sh_abs / sh_lp) > spike_threshold  # boolean array
@@ -176,8 +176,8 @@ def detect_shear_spikes(
 
 
 def clean_shear(
-    sh: Float[ndarray, "time"],
-    sampling_freq: float,
+    shear: Float[ndarray, "time"],
+    sampfreq: float,
     spike_threshold: float,
     max_tries: int,
     spike_replace_before: int,
@@ -190,37 +190,37 @@ def clean_shear(
     Int[ndarray, "time"],  # number of despike iterations on each sample
 ]:
     """Section 3.2.2"""
-    N = len(sh)
+    N = len(shear)
     ctr = 0
     spikes = detect_shear_spikes(
-        sh,
-        sampling_freq,
+        shear,
+        sampfreq,
         spike_threshold=spike_threshold,
         spike_include_before=spike_include_before,
         spike_include_after=spike_include_after,
         cutoff_freq_lp=cutoff_freq_lp,
     )
-    ctr = np.zeros_like(sh, dtype=int)
+    ctr = np.zeros_like(shear, dtype=int)
     while np.any(spikes) and np.all(ctr <= max_tries):
         spike_sections = boolarr_to_sections(spikes)
         spike_markers = sections_to_marker(spike_sections, N)
         replace_spikes(
-            sh,
+            shear,
             spike_markers,
             spike_replace_before=spike_replace_before,
             spike_replace_after=spike_replace_after,
         )
         ctr[spikes] += 1
         spikes = detect_shear_spikes(
-            sh,
-            sampling_freq,
+            shear,
+            sampfreq,
             spike_threshold=spike_threshold,
             spike_include_before=spike_include_before,
             spike_include_after=spike_include_after,
             cutoff_freq_lp=cutoff_freq_lp,
         )
 
-    return sh, ctr
+    return shear, ctr
 
 
 from numba import jit, float64
@@ -252,24 +252,24 @@ def nanmean_two(a, b):
 
 @jit  # ((float64[:], int32, int32, int32, int32))
 def replace_spike(
-    sh,  #: Float[ndarray, "time"],
+    shear,  #: Float[ndarray, "time"],
     start,
     stop,
     spike_replace_before,  #: int,
     spike_replace_after,  #: int,
 ):
     context_mean_before = nanmean_empty(
-        sh[max(start - spike_replace_before, 0) : start]
+        shear[max(start - spike_replace_before, 0) : start]
     )
     context_mean_after = nanmean_empty(
-        sh[stop : min(len(sh), stop + spike_replace_after)]
+        shear[stop : min(len(shear), stop + spike_replace_after)]
     )
 
-    sh[start:stop] = nanmean_two(context_mean_before, context_mean_after)
+    shear[start:stop] = nanmean_two(context_mean_before, context_mean_after)
 
 
 @jit
-def replace_spikes(sh, spike_markers, spike_replace_before, spike_replace_after):
+def replace_spikes(shear, spike_markers, spike_replace_before, spike_replace_after):
     """In-place replacement of shear spikes according to atomix procedure"""
     for marker in np.unique(spike_markers):
         if marker == 0:
@@ -277,4 +277,4 @@ def replace_spikes(sh, spike_markers, spike_replace_before, spike_replace_after)
         (spike,) = np.where(spike_markers == marker)
         start = min(spike)
         stop = max(spike) + 1
-        replace_spike(sh, start, stop, spike_replace_before, spike_replace_after)
+        replace_spike(shear, start, stop, spike_replace_before, spike_replace_after)

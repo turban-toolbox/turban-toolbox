@@ -19,8 +19,8 @@ def ensure_reshape_index(func):
         data_len: int = None,  # length of data vector
         segment_length: int = None,
         segment_overlap: int = None,
-        diss_length: int = None,
-        diss_overlap: int = None,
+        chunk_length: int = None,
+        chunk_overlap: int = None,
         section_number: Int[ndarray, "num_data"] = None,
         **kwarg,
     ):
@@ -29,8 +29,8 @@ def ensure_reshape_index(func):
                 data_len,
                 segment_length,
                 segment_overlap,
-                diss_length,
-                diss_overlap,
+                chunk_length,
+                chunk_overlap,
                 section_number,
             )
         return func(*argv, **kwarg)
@@ -73,27 +73,27 @@ def convert_atomix_benchmark_to_turban_netcdf(fname: str):
     raise NotImplementedError
 
 
-def get_vsink(pressure_raw, sampling_freq=1024.0):
+def get_vsink(pressure_raw, sampfreq=1024.0):
     # lowpass filter pressure
     pressure_lp = butterfilt(
         signal=pressure_raw,
         cutoff_freq_Hz=0.5,
-        sampling_freq=sampling_freq,
+        sampfreq=sampfreq,
         btype="low",
     )
     # sinking speed
-    vsink = fft_grad(pressure_lp, 1 / sampling_freq)
+    vsink = fft_grad(pressure_lp, 1 / sampfreq)
     return vsink, pressure_lp
 
 
 def fast_to_slow_grad_by_segment(
     x: Float[ndarray, "... time_fast"],
     y: Float[ndarray, "... time_fast"],
-    sampling_freq: float,
+    sampfreq: float,
     segment_length: int = None,
     segment_overlap: int = None,
-    diss_length: int = None,
-    diss_overlap: int = None,
+    chunk_length: int = None,
+    chunk_overlap: int = None,
     section_number: Int[ndarray, "time_fast"] = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] = None,
 ) -> Float[ndarray, "... time_slow"]:
@@ -106,8 +106,8 @@ def fast_to_slow_grad_by_segment(
             shear.shape[-1],
             segment_length,
             segment_overlap,
-            diss_length,
-            diss_overlap,
+            chunk_length,
+            chunk_overlap,
             section_number,
         )
     else:
@@ -117,11 +117,11 @@ def fast_to_slow_grad_by_segment(
     y = y[..., reshape_index]
 
     # dummy time vector in seconds
-    time = np.linspace(1, segment_length / sampling_freq, segment_length)
+    time = np.linspace(1, segment_length / sampfreq, segment_length)
     dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
     dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
     dydx = dydt / dxdt
-    return dydx.mean(axis=-1)  # average gradient over each `diss_length` segment
+    return dydx.mean(axis=-1)  # average gradient over each `chunk_length` segment
 
 
 @ensure_reshape_index
@@ -164,8 +164,8 @@ def get_chunking_index(
     data_len: int,
     segment_length: int,
     segment_overlap: int,
-    diss_length: int,
-    diss_overlap: int,
+    chunk_length: int,
+    chunk_overlap: int,
     section_number: Int[ndarray, "time_fast"] | None = None,
 ) -> Int[ndarray, "diss_chunk fft_chunk segment_length"]:
 
@@ -177,9 +177,9 @@ def get_chunking_index(
     reshape_segments = []
     for data in sections.values():
 
-        # reshape time dimension into chunks of length diss_length
-        ii_diss: Int[ndarray, "diss_chunk diss_length"] = reshape_overlap_index(
-            diss_length, diss_overlap, len(data)
+        # reshape time dimension into chunks of length chunk_length
+        ii_diss: Int[ndarray, "diss_chunk chunk_length"] = reshape_overlap_index(
+            chunk_length, chunk_overlap, len(data)
         )
         # reshape fft dimension into chunks of length segment_length
         ii_fft: Int[ndarray, "fft_chunk segment_length"] = reshape_overlap_index(
@@ -229,10 +229,10 @@ def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: tuple[int, ...
     return arr
 
 
-def butterfilt(signal, cutoff_freq_Hz, sampling_freq, **kwarg):
+def butterfilt(signal, cutoff_freq_Hz, sampfreq, **kwarg):
     """Apply first oder Butterworth filter. kwarg are passed into `butter`"""
     # nondimensionalize using Nyquist freq
-    cutoff_nondim = cutoff_freq_Hz / (sampling_freq / 2)
+    cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, **kwarg)
     return filtfilt(b, a, signal)
 
@@ -379,11 +379,11 @@ def get_cleaned_fraction(
 
 def diss_chunk_wise_reshape_index(
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
-) -> Int[ndarray, "diss_chunk diss_length"]:
+) -> Int[ndarray, "diss_chunk chunk_length"]:
     """Flatten the last two dimensions into one, making sure only unique indices appear
     for each `diss_chunk`.
     """
     ii = reshape_index
     ii_flat = ii.reshape((ii.shape[0], ii.shape[1] * ii.shape[2]))
-    diss_length = ii_flat[0].max() - ii_flat[0].min() + 1
-    return ii_flat.min(axis=1)[:, newaxis] + np.arange(0, diss_length)[newaxis, :]
+    chunk_length = ii_flat[0].max() - ii_flat[0].min() + 1
+    return ii_flat.min(axis=1)[:, newaxis] + np.arange(0, chunk_length)[newaxis, :]

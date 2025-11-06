@@ -47,15 +47,15 @@ def costfunction_c11(psi: ndarray, psi_theoretical: ndarray) -> float:
 
 @jit
 def get_k_batchelor_estimate(
-    k_test, chi, wavenumber, psi, psi_noise, viscosity_kinematic, diffusivity_temp
+    k_test, chi, waveno, psi, psi_noise, viscosity_kinematic, diffusivity_temp
 ):
     # start value
     values = np.zeros_like(k_test)
     for i, k_batchelor in enumerate(k_test):
-        # loop over wavenumbers
+        # loop over wavenos
         psi_theoretical = (
             theoretical_spectrum(
-                wavenumber,
+                waveno,
                 k_batchelor,
                 chi,
                 viscosity_kinematic,
@@ -70,7 +70,7 @@ def get_k_batchelor_estimate(
 
 @jit
 def theoretical_spectrum(
-    wavenumber: ndarray,
+    waveno: ndarray,
     k_batchelor: float,
     chi: float,
     viscosity_kinematic: float,
@@ -84,8 +84,8 @@ def theoretical_spectrum(
     eps = k_batchelor ** (4.0) * viscosity_kinematic * diffusivity_temp ** (2.0)
 
     # temp. gradient spectrum
-    spec = np.zeros_like(wavenumber)
-    for i, k in enumerate(wavenumber):
+    spec = np.zeros_like(waveno)
+    for i, k in enumerate(waveno):
         spec[i] = (
             chi
             * np.sqrt(viscosity_kinematic / eps)
@@ -108,18 +108,18 @@ def theoretical_spectrum(
 
 @jit
 def temperature_dissipation(
-    wavenumber: ndarray[float],
+    waveno: ndarray[float],
     psi: ndarray[float],
     psi_noise: ndarray[float],
-    wavenumber_limit_upper: float,
+    waveno_limit_upper: float,
 ):
     """
     pub fn temperature_diss(
-            wavenumber: &[f64],
+            waveno: &[f64],
             psi: &[f64],
             psi_noise: &[f64],
-            platform_speed: f64,
-            wavenumber_limit_upper: f64,
+            senspeed: f64,
+            waveno_limit_upper: f64,
     ) -> Result<f64, f64> {
     """
     #   nu, kin. viscosity of water; assumed known constant
@@ -131,24 +131,24 @@ def temperature_dissipation(
     # find last point where spec exceeds 2x noise spec
 
     idx_above_noise = exceeds_until(psi, 2 * psi_noise)
-    ku = min(wavenumber[idx_above_noise], wavenumber_limit_upper)
+    ku = min(waveno[idx_above_noise], waveno_limit_upper)
 
     # subtract noise
 
     psi = psi - psi_noise
 
     # integrate spectrum, 1st pass
-    _spec_int = integrate(psi, wavenumber, wavenumber[1], ku)
+    _spec_int = integrate(psi, waveno, waveno[1], ku)
     if _spec_int < 0.0:
-        _spec_int = integrate(psi_noise, wavenumber, wavenumber[1], ku)
+        _spec_int = integrate(psi_noise, waveno, waveno[1], ku)
     chi = 6.0 * diffusivity_temp * _spec_int
 
-    kmax = 3.0 * np.nanmax(wavenumber)
+    kmax = 3.0 * np.nanmax(waveno)
     kmin = kmax / 600.0
     k_test = np.linspace(kmin, kmax, 30)  # k_batchelor values to test
 
     k_batchelor_estimate = get_k_batchelor_estimate(
-        k_test, chi, wavenumber, psi, psi_noise, viscosity_kinematic, diffusivity_temp
+        k_test, chi, waveno, psi, psi_noise, viscosity_kinematic, diffusivity_temp
     )
     return chi, k_batchelor_estimate
 
@@ -185,7 +185,7 @@ def get_noise(spectra: ndarray) -> ndarray:
 
 
 @jit
-def power_spectrum(x: ndarray, segment_length: int, sampling_freq: float):
+def power_spectrum(x: ndarray, segment_length: int, sampfreq: float):
     assert segment_length % 2 == 0
     data_length = len(x)
     # half-overlapping windows
@@ -202,7 +202,7 @@ def power_spectrum(x: ndarray, segment_length: int, sampling_freq: float):
             F = np.fft.rfft(xc)
         spectra[i, :] = (F.conj() * F).real
 
-    return mean_axis0(spectra) / segment_length / (sampling_freq / 2)
+    return mean_axis0(spectra) / segment_length / (sampfreq / 2)
 
 
 from numba import float64, int32
@@ -211,11 +211,11 @@ from numba import float64, int32
 @jit(float64[:](float64[:], float64, int32, int32, float64))
 def process_temperature_series(
     x: ndarray[float],
-    # platform_speed: ndarray,
-    wavenumber_limit_upper: float,
+    # senspeed: ndarray,
+    waveno_limit_upper: float,
     chunk_length: int,
     segment_length: int,
-    sampling_freq: float,
+    sampfreq: float,
 ):
     assert chunk_length % 2 == 0
     assert x.ndim == 1
@@ -223,13 +223,13 @@ def process_temperature_series(
     N = 2 * (len(x) // chunk_length) - 1
     spec_length = int(segment_length / 2 + 1)
     spectra = np.zeros((N, spec_length))
-    pspd = np.zeros(N)
+    senspeed = np.zeros(N)
     for i in range(N):
         i0 = i * int(chunk_length / 2)
         i1 = i0 + chunk_length
         xc = x[i0:i1]
-        spectra[i, :] = power_spectrum(xc, segment_length, sampling_freq)
-        # pspd[i] = np.mean(platform_speed[i0:i1])
+        spectra[i, :] = power_spectrum(xc, segment_length, sampfreq)
+        # senspeed[i] = np.mean(senspeed[i0:i1])
 
     Pnoise = get_noise(spectra)
     with nb.objmode(freq="float64[:]"):
@@ -238,27 +238,27 @@ def process_temperature_series(
     chi = np.zeros(N)
     k_batchelor = np.zeros(N)
     for i, P in enumerate(spectra):
-        pspd = 1  # TODO
-        k = freq / pspd
+        senspeed = 1  # TODO
+        k = freq / senspeed
         chi[i], k_batchelor[i] = temperature_dissipation(
-            wavenumber=k,
-            psi=P * pspd,
+            waveno=k,
+            psi=P * senspeed,
             psi_noise=Pnoise,
-            wavenumber_limit_upper=wavenumber_limit_upper,
+            waveno_limit_upper=waveno_limit_upper,
         )
 
     return chi
 
 
 if __name__ == "__main__":
-    # chi = temperature_dissipation(wavenumber, psi, psi_noise, 1.0, 10000.0)
+    # chi = temperature_dissipation(waveno, psi, psi_noise, 1.0, 10000.0)
     # print(chi)
     x = np.random.rand(int(1e5))
     res = process_temperature_series(
         x,
-        wavenumber_limit_upper=1e3,
+        waveno_limit_upper=1e3,
         chunk_length=5024,
         segment_length=1024,
-        sampling_freq=1 / 1024.0,
+        sampfreq=1 / 1024.0,
     )
     print(res)

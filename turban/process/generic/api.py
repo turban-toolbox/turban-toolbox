@@ -147,7 +147,7 @@ class HasLevelBelow(TimeseriesLevel):
         return cls(**cls._from_level_below_kwarg(data))
 
     @property
-    def cfg(self):
+    def cfg(self) -> SegmentConfig:
         if self.level_below is not None:
             return self.level_below.cfg
         elif hasattr(self, "_cfg"):
@@ -165,21 +165,21 @@ class HasLevelBelow(TimeseriesLevel):
 
 @dataclass(kw_only=True)
 class Level1(AuxiliaryDataFast):
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     section_number: Int[ndarray, "time"]
 
 
 @dataclass(kw_only=True)
 class Level2(HasLevelBelow, AuxiliaryDataFast):
-    pspd: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
         return dict(
             time=data.time,
-            pspd=data.pspd,
+            senspeed=data.senspeed,
             section_number=data.section_number,
             _agg_aux_data=data._agg_aux_data,
         )
@@ -189,7 +189,7 @@ class Level2(HasLevelBelow, AuxiliaryDataFast):
 class Level3(HasLevelBelow, AuxiliaryDataSlow):
     waveno: Float[ndarray, "time waveno"]
     freq: Float[ndarray, "waveno"]
-    platform_speed: Float[ndarray, "time"]
+    senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
     _coords = ["time", "freq"]
@@ -201,8 +201,8 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
             _aux_data=cls.agg(
                 data=cast(AggAuxDataTypehint, data._agg_aux_data),
                 data_len=len(data.time),
-                diss_length=data.cfg.diss_length,
-                diss_overlap=data.cfg.diss_overlap,
+                chunk_length=data.cfg.chunk_length,
+                chunk_overlap=data.cfg.chunk_overlap,
                 section_number=data.section_number,
             ),
         )
@@ -212,11 +212,11 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
         cls,
         data: AggAuxDataTypehint,
         data_len: int,
-        diss_length: int,
-        diss_overlap: int,
+        chunk_length: int,
+        chunk_overlap: int,
         section_number: Int[ndarray, "time"],
     ) -> AuxDataTypehint:
-        """Aggregates data from Level2 in the form:
+        """Aggregates data from Level2. These are stored in  in the form:
         {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}
         """
         slow = {}
@@ -224,10 +224,10 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
         # sample_data = data[data.keys()[0]][1]
         cidx = get_chunking_index(
             data_len,
-            diss_length,
+            chunk_length,
             0,
-            diss_length,
-            diss_overlap,
+            chunk_length,
+            chunk_overlap,
             section_number,
         )
 
