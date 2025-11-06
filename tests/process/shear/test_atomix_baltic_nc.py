@@ -1,8 +1,8 @@
-from turban.process.shear.api import ShearProcessing
+import matplotlib.pyplot as plt
 import netCDF4
-import pylab as plt
-from numpy import *
+import numpy as np
 
+from turban.process.shear.api import ShearProcessing
 
 def test_spectra_atomix_baltic():
 
@@ -55,7 +55,7 @@ def test_spectra_atomix_baltic():
     p4 = ax.plot([kmax] * 2, YL, "-r")
     ax.set_title(
         "Spectrum in {:.2f} m depth: eps nc 10x{:.2f} eps tu 10x{:.2f}".format(
-            L3_nc_p[ik], log10(eps_nc), log10(eps_tur)
+            L3_nc_p[ik], np.log10(eps_nc), np.log10(eps_tur)
         )
     )
     ax.legend([pnc[0], ptu[0], p4[0]], ("netCDF", "turban", "kmax (nc)"))
