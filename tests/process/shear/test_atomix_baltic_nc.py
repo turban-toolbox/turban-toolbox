@@ -1,8 +1,8 @@
-from turban.process.shear.api import ShearProcessing
+import matplotlib.pyplot as plt
 import netCDF4
-import pylab as pl
-from numpy import *
+import numpy as np
 
+from turban.process.shear.api import ShearProcessing
 
 def test_spectra_atomix_baltic():
 
@@ -25,20 +25,20 @@ def test_spectra_atomix_baltic():
 
     L4_nc_epsi = nc.groups["L4_dissipation"]["EPSI"][:]
     #
-    pl.figure(1)
-    pl.clf()
-    pl.plot(L1_nc_sh[0, :], L1_nc_p)
-    pl.plot(p.level1.shear[0, :], L1_nc_p)
-    pl.ylim([100, 0])
-    pl.title("L1 shear")
+    fig, ax = plt.subplots()
+    ax.plot(L1_nc_sh[0, :], L1_nc_p)
+    ax.plot(p.level1.shear[0, :], L1_nc_p)
+    ax.set_ylim([100, 0])
+    ax.set_title("L1 shear")
+    fig.savefig("out/tests/baltic-level1.png")
 
     #
-    pl.figure(2)
-    pl.clf()
-    pl.plot(L2_nc_sh[0, :], L2_nc_p)
-    pl.plot(p.level2.shear[0, :], L2_nc_p)
-    pl.ylim([100, 0])
-    pl.title("L2 shear")
+    fig, ax = plt.subplots()
+    ax.plot(L2_nc_sh[0, :], L2_nc_p)
+    ax.plot(p.level2.shear[0, :], L2_nc_p)
+    ax.set_ylim([100, 0])
+    ax.set_title("L2 shear")
+    fig.savefig("out/tests/baltic-level2.png")
 
     ik = 10
     eps_tur = p.level4.eps[0, ik]
@@ -47,24 +47,18 @@ def test_spectra_atomix_baltic():
     kmin = nc.groups["L4_dissipation"].variables["KMIN"][0, ik]
     kmax = nc.groups["L4_dissipation"].variables["KMAX"][0, ik]
 
-    #
-    pl.figure(3)
-    pl.clf()
-    pnc = pl.plot(L3_nc_k[:, ik], L3_nc_Pk[0, :, ik])
-    ptu = pl.plot(p.level3.waveno[ik, :], p.level3.Pk[0, ik, :])
-    YL = pl.ylim()
-    p3 = pl.plot([kmin] * 2, YL, "-k")
-    p4 = pl.plot([kmax] * 2, YL, "-r")
-    pl.title(
+    fig, ax = plt.subplots()
+    pnc = ax.plot(L3_nc_k[:, ik], L3_nc_Pk[0, :, ik])
+    ptu = ax.plot(p.level3.waveno[ik, :], p.level3.Pk[0, ik, :])
+    YL = ax.get_ylim()
+    p3 = ax.plot([kmin] * 2, YL, "-k")
+    p4 = ax.plot([kmax] * 2, YL, "-r")
+    ax.set_title(
         "Spectrum in {:.2f} m depth: eps nc 10x{:.2f} eps tu 10x{:.2f}".format(
-            L3_nc_p[ik], log10(eps_nc), log10(eps_tur)
+            L3_nc_p[ik], np.log10(eps_nc), np.log10(eps_tur)
         )
     )
-    pl.legend([pnc[0], ptu[0], p4[0]], ("netCDF", "turban", "kmax (nc)"))
-    pl.gca().set_xscale("log")
-    pl.gca().set_yscale("log")
-    # pl.plot(p.level2.shear[0,:],L2_nc_p)
-    # pl.ylim([100,0])
-    # pl.title('L1 shear')
-
-    pl.show()
+    ax.legend([pnc[0], ptu[0], p4[0]], ("netCDF", "turban", "kmax (nc)"))
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    fig.savefig("out/tests/baltic-spectra.png")

@@ -12,12 +12,12 @@ from turban.process.shear.level2 import (
     butterfilt,
 )
 from turban.process.shear.api import ShearLevel1, ShearLevel2
-from tests.fixtures import atomix_nc_filename
+from tests.fixtures import atomix_mss_nc_filename
 
 
-def test_despike_benchmark(atomix_nc_filename):
+def test_despike_benchmark(atomix_mss_nc_filename):
 
-    level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_mss_nc_filename)
     ds1 = level1.to_xarray()
 
     # level2_bm = ShearLevel2.from_atomix_netcdf(atomix_nc_filename)
@@ -38,12 +38,12 @@ def test_despike_benchmark(atomix_nc_filename):
     assert np.any(detect_shear_spikes(x, 1024.0, 8.0, 512, 512, 0.5))
 
 
-def test_despike_benchmark_plot(atomix_nc_filename):
+def test_despike_benchmark_plot(atomix_mss_nc_filename):
 
-    level1 = ShearLevel1.from_atomix_netcdf(atomix_nc_filename)
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_mss_nc_filename)
     cfg = level1.cfg
     ds1 = level1.to_xarray()
-    level2_bm = ShearLevel2.from_atomix_netcdf(atomix_nc_filename)
+    level2_bm = ShearLevel2.from_atomix_netcdf(atomix_mss_nc_filename)
     ds2_bm = level2_bm.to_xarray()
 
     i0 = 48_000  # start of segment

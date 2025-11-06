@@ -36,7 +36,7 @@ from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 atomix_nc_filename = "data/mss/MSS_Baltic.nc"
 
 cfg = ShearConfig(
-    sampling_freq=1024.0,
+    sampfreq=1024.0,
     segment_length=2048,
     segment_overlap=1024,
     chunk_length=5120,
@@ -63,7 +63,7 @@ time = ds1.TIME.values.astype("datetime64[s]").astype(
 )  # time in seconds since epoch
 level1 = ShearLevel1(
     time=time,
-    pspd=ds1.PSPD_REL.values,
+    senspeed=ds1.PSPD_REL.values,
     cfg=cfg,
     shear=ds1.SHEAR.values,
     section_number=ds2.SECTION_NUMBER.values.astype(int),

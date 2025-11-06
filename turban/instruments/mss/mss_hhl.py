@@ -4,15 +4,15 @@ import numpy as np
 
 
 # Setup logging module
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-logger = logging.getLogger("turban.instruments.mss_hhl")
+# logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
 class hhl:
     """A processor for the HHL binary datastream from Sea & Sun Technology."""
 
     def __init__(self, verbosity=logging.DEBUG, config={}):
-        logger.setLevel(verbosity)
+        self.logger = logging.getLogger("turban.instruments.mss_hhl")
+        self.logger.setLevel(verbosity)
         self.config = config
         self.buffer = b""  # a binary buffer for the rawdata
         self.ngood = 0
@@ -96,7 +96,7 @@ class hhl:
 
         align = self.align_buffer()
         if align is None:
-            logger.debug("Could not align buffer")
+            self.logger.debug("Could not align buffer")
             return None
         else:
             # If we have a valid buffer, starts with channel 0 and has at least 48 bytes
@@ -121,7 +121,7 @@ class hhl:
                                 print("Problem decoding, realigning", data_proc)
                                 align = self.align_buffer()
                                 if align is None:
-                                    logger.debug("Could not realign align buffer")
+                                    self.logger.debug("Could not realign align buffer")
                                     return None
 
                             self.buffer = self.buffer[3:]
@@ -132,7 +132,7 @@ class hhl:
                                 print("Bad channel", channel, i)
                                 align = self.align_buffer()
                                 if align is None:
-                                    logger.debug("Could not realign align buffer")
+                                    self.logger.debug("Could not realign align buffer")
                                     return None
                                 # return None
 
