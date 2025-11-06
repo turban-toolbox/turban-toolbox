@@ -1,5 +1,5 @@
-from logging import warnings
-from typing import Literal
+import warnings
+from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
@@ -13,12 +13,13 @@ from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
 from turban.process.generic.api import (
-    AggAux,
+    AuxDataTypehint,
     Level1,
     Level2,
     Level3,
     Level4,
     Processing,
+    AggAuxDataTypehint,
 )
 
 
@@ -37,7 +38,7 @@ class ShearLevel1(Level1):
             senspeed=ds.PSPD_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
-            cfg=ShearConfig.from_atomix_netcdf(fname),
+            cfg=cast(ShearConfig, ShearConfig.from_atomix_netcdf(fname)),
         )
 
 
@@ -47,12 +48,13 @@ class ShearLevel2(Level2):
     num_despike_iter: Int[ndarray, "n_shear time"]
 
     @classmethod
-    def from_level_below(
+    def _from_level_below_kwarg(
         cls,
         data: ShearLevel1,
     ):
+        kwarg = super()._from_level_below_kwarg(data)
         level1 = data
-        cfg = level1.cfg
+        cfg = cast(ShearConfig, level1.cfg) # just for type checkers to understand type
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_number,
@@ -67,13 +69,16 @@ class ShearLevel2(Level2):
             cfg.spike_include_after,
         )
 
-        return cls(
-            time=level1.time,
-            shear=sh_cleaned,
-            senspeed=level1.senspeed,
-            num_despike_iter=num_despike_iter,
-            level_below=level1,
+        kwarg.update(
+            dict(
+                time=level1.time,
+                shear=sh_cleaned,
+                senspeed=level1.senspeed,
+                num_despike_iter=num_despike_iter,
+                level_below=level1,
+            )
         )
+        return kwarg
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
@@ -83,6 +88,7 @@ class ShearLevel2(Level2):
             shear=ds.SHEAR.values,
             senspeed=ds.PSPD_REL.values,
             # TODO: apparently not exported in benchmark files...?
+            section_number=ds["SECTION_NUMBER"].values.astype(int),
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
         )
@@ -93,15 +99,15 @@ class ShearLevel3(Level3):
     Pk: Float[ndarray, "nshear time waveno"]
     Pf: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
-    section_number: Int[ndarray, "time"]
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
 
     @classmethod
-    def from_level_below(
+    def _from_level_below_kwarg(
         cls,
         data: ShearLevel2,
-    ) -> "ShearLevel3":
+    ) -> dict:
+        kwarg = super()._from_level_below_kwarg(data)
         level2 = data
         level1 = data.level_below
         k, Pk, Pf, freq, senspeed, section_number = process_level3(
@@ -139,7 +145,8 @@ class ShearLevel3(Level3):
             agg_method="max",
         )
 
-        return cls(
+        kwarg.update(
+            dict(
             time=np.ones_like(senspeed),  # TODO get from level 2
             Pk=Pk,
             waveno=k,
@@ -150,7 +157,9 @@ class ShearLevel3(Level3):
             spike_fraction=spike_fraction,
             max_despike_iter=max_despike_iter,
             level_below=data,
+            )
         )
+        return kwarg
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
@@ -222,10 +231,11 @@ class ShearLevel4(Level4):
     quality_metric: Int[ndarray, "nshear time"]
 
     @classmethod
-    def from_level_below(
+    def _from_level_below_kwarg(
         cls,
         data: ShearLevel3,
-    ) -> "ShearLevel4":
+    ) -> dict:
+        kwarg = super()._from_level_below_kwarg(data)
         level3 = data
         (
             eps,
@@ -258,18 +268,21 @@ class ShearLevel4(Level4):
             resolved_var_frac=resolved_var_frac,
         )
 
-        return cls(
-            time=np.ones_like(level3.senspeed),  # TODO get from level 2
-            eps=eps,
-            eps_source_flag=eps_source_flag,
-            log_diss_var=log_diss_var,
-            log_diss_mad=log_diss_mad,
-            kolm_length=kolm_length,
-            resolved_var_frac=resolved_var_frac,
-            num_spec_points=num_spec_points,
-            quality_metric=quality_metric,
-            level_below=level3,
+        kwarg.update(
+            dict(
+                time=np.ones_like(level3.senspeed),  # TODO get from level 2
+                eps=eps,
+                eps_source_flag=eps_source_flag,
+                log_diss_var=log_diss_var,
+                log_diss_mad=log_diss_mad,
+                kolm_length=kolm_length,
+                resolved_var_frac=resolved_var_frac,
+                num_spec_points=num_spec_points,
+                quality_metric=quality_metric,
+                level_below=level3,
+            )
         )
+        return kwarg
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
@@ -291,35 +304,16 @@ class ShearProcessing(Processing):
         cls,
         fname: str,
         level: Literal[1, 2, 3, 4],
+        data_aux: AggAuxDataTypehint | AuxDataTypehint | None = None,
     ):
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-
-        aux_vars = ["time", "press", "temp", "cond"]
-        arr = dict(zip(aux_vars, NetcdfReader("atomix").read(fname, aux_vars)))
-        data_aux = {
-            "time": (
-                ["time"],
-                arr["time"],
-                {"mean": "time_slow"},
-            ),
-            "press": (
-                ["time"],
-                arr["press"],
-                {"mean": "press"},
-            ),
-            "temp": (
-                ["time"],
-                arr["temp"][0, :],
-                {"mean": "temp"},
-            ),
-            "cond": (
-                ["time"],
-                arr["cond"],
-                {"mean": "cond"},
-            ),
-        }
-        coords_aux = ["time", "time_slow"]
-        return cls(data, level, data_aux, coords_aux)
+        if data_aux is None:
+            data_aux = {}
+        if level <= 2:
+            data._agg_aux_data = data_aux
+        else:
+            data._aux_data = data_aux
+        return cls(data, level)
 
 
 class NetcdfReader:
