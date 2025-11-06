@@ -33,7 +33,7 @@ def test_agg_aux(atomix_mss_nc_filename):
     """Test equivalence of simplified and advanced API for aggregating aux variables"""
 
     aux_vars = ["temp"]
-    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_nc_filename, aux_vars)))
+    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_mss_nc_filename, aux_vars)))
     data_aux = {
         "temp": (
             ["time"],
@@ -58,7 +58,7 @@ def test_agg_aux(atomix_mss_nc_filename):
 def test_baltic_benchmark(atomix_mss_nc_filename):
 
     aux_vars = ["time", "press", "temp", "cond"]
-    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_nc_filename, aux_vars)))
+    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_mss_nc_filename, aux_vars)))
     data_aux = {
         "time": (
             ["time"],

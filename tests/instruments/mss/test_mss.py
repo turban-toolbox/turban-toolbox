@@ -27,7 +27,7 @@ def test_mss(atomix_mss_mrd_filename):
 
     #
     shear_config = ShearConfig(
-        sampling_freq=1024.0,
+        sampfreq=1024.0,
         segment_length=2048,
         segment_overlap=1024,
         chunk_length=4 * 2048,
@@ -49,7 +49,7 @@ def test_mss(atomix_mss_mrd_filename):
     section_number[2677:152620] = int(1)
     shear_level1 = ShearLevel1(
         time=np.asarray(data_level1["time_count"]),
-        pspd=np.asarray(data_level1["PSPD_REL"]),
+        senspeed=np.asarray(data_level1["PSPD_REL"]),
         shear=np.asarray(data_level1["SHEAR"]),
         section_number=section_number,
         cfg=shear_config,
