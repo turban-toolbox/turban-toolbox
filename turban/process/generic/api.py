@@ -133,6 +133,72 @@ class AuxiliaryDataSlow(TimeseriesLevel):
 
 
 @dataclass(kw_only=True)
+class AuxiliaryDataFast(TimeseriesLevel):
+    """Mix-in class. Only useful for Level1 and Level2"""
+
+    # Here auxiliary data are stored along with aggregation instructions
+    _agg_aux_data: AggAuxDataTypehint | None = None
+
+    def __post_init__(self):
+        if self._agg_aux_data is None:
+            self._agg_aux_data = {}
+
+    def arrays_as_xr_dicts(self):
+        data_vars, coords = super().arrays_as_xr_dicts()
+        # so linters understand we have a dict after __post_init__
+        data = cast(AggAuxDataTypehint, self._agg_aux_data)
+        data_vars.update(
+            {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
+        )
+        return data_vars, coords
+
+    def add_aux_data(
+        self,
+        name: str,
+        data: Float[ndarray, "time"],
+        agg_method: str = "mean",
+        name_out: str | None = None,
+    ):
+        """Simplified API"""
+        # so linters understand we have a dict after __post_init__
+        self._agg_aux_data = cast(AggAuxDataTypehint, self._agg_aux_data)
+        if name in self._agg_aux_data:
+            raise ValueError(f"Aux data `{name}` already exists")
+        # Construct the full aggregation instruction
+        self._agg_aux_data[name] = (["time"], data, {agg_method: name_out})
+
+
+@dataclass(kw_only=True)
+class AuxiliaryDataSlow(TimeseriesLevel):
+    """Mix-in class. Only useful for Level3 and Level4"""
+
+    _aux_data: AuxDataTypehint | None = None
+
+    def __post_init__(self):
+        if self._aux_data is None:
+            self._aux_data = {}
+
+    def arrays_as_xr_dicts(self):
+        data_vars, coords = super().arrays_as_xr_dicts()
+        # so linters understand we have a dict after __post_init__
+        data = cast(AuxDataTypehint, self._aux_data)
+        data_vars.update(data)
+        return data_vars, coords
+
+    def add_aux_data(
+        self,
+        name: str,
+        data: Float[ndarray, "time"],
+    ):
+        """This simply adds entries"""
+        # so linters understand we have a dict after __post_init__
+        self._aux_data = cast(AuxDataTypehint, self._aux_data)
+        if name in self._aux_data:
+            raise ValueError(f"Aux data `{name}` already exists")
+        self._aux_data[name] = (["time"], data)
+
+
+@dataclass(kw_only=True)
 class HasLevelBelow(TimeseriesLevel):
     level_below: TimeseriesLevel | None
 
@@ -168,6 +234,9 @@ class Level1(AuxiliaryDataFast):
     senspeed: Float[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     section_number: Int[ndarray, "time"]
+
+    # TODO should consider using pydantic or similar for runtime checking of user input
+    # (e.g., positive platform speed, etc.) 
 
 
 @dataclass(kw_only=True)
