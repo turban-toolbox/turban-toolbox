@@ -2,8 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from tests.fixtures import atomix_mss_mrd_filename
-from turban.instruments.mss.api import MSS
-import turban
 from turban.instruments.mss import mss
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 
