@@ -26,12 +26,9 @@ def process_level3(
     Int[ndarray, "time_slow"],  # section_number_slow
 ]:
     ii = get_chunking_index(
-        shear.shape[-1],
-        segment_length,
-        segment_overlap,
-        chunk_length,
-        chunk_overlap,
         section_number,
+        (chunk_length, chunk_overlap),
+        (segment_length, segment_overlap),
     )
 
     psi_f, freq = power_spectrum(shear, sampfreq, reshape_index=ii)
@@ -42,9 +39,7 @@ def process_level3(
     section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
 
     # to waveno domain
-    psi_k = (
-        psi_f * senspeeda[newaxis, :, newaxis] / segment_length / (sampfreq / 2)
-    )
+    psi_k = psi_f * senspeeda[newaxis, :, newaxis] / segment_length / (sampfreq / 2)
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 
     # apply corrections

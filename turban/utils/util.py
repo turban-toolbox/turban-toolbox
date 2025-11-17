@@ -1,5 +1,7 @@
 import json
 from functools import wraps
+from typing import cast
+import warnings
 import numpy as np
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
@@ -16,23 +18,45 @@ def ensure_reshape_index(func):
     @wraps(func)
     def decorated(
         *argv,
-        data_len: int = None,  # length of data vector
-        segment_length: int = None,
-        segment_overlap: int = None,
-        chunk_length: int = None,
-        chunk_overlap: int = None,
-        section_number: Int[ndarray, "num_data"] = None,
+        section_number_or_data_len: Int[ndarray, "num_data"] | int | None = None,
+        segment_length: int | None = None,
+        segment_overlap: int | None = None,
+        chunk_length: int | None = None,
+        chunk_overlap: int | None = None,
         **kwarg,
     ):
         if "reshape_index" not in kwarg or kwarg["reshape_index"] is None:
-            kwarg["reshape_index"] = get_chunking_index(
-                data_len,
-                segment_length,
-                segment_overlap,
-                chunk_length,
-                chunk_overlap,
-                section_number,
+            # now the other parameters cannot be None
+            section_number_or_data_len = cast(
+                Int[ndarray, "num_data"] | int, section_number_or_data_len
             )
+            segment_length = cast(int, segment_length)
+            segment_overlap = cast(int, segment_overlap)
+            chunk_length = cast(int, chunk_length)
+            chunk_overlap = cast(int, chunk_overlap)
+            kwarg["reshape_index"] = get_chunking_index(
+                section_number_or_data_len,
+                (chunk_length, chunk_overlap),
+                (segment_length, segment_overlap),
+            )
+        elif (
+            segment_length is not None
+            or segment_overlap is not None
+            or chunk_length is not None
+            or chunk_overlap is not None
+            or section_number_or_data_len is not None
+        ):
+            raise Warning(
+                (
+                    "Disregarding superfluous parameters: ",
+                    "section_number_or_data_len, ",
+                    "segment_length, ",
+                    "segment_overlap, ",
+                    "chunk_length, ",
+                    "chunk_overlap.",
+                )
+            )
+
         return func(*argv, **kwarg)
 
     return decorated
@@ -103,12 +127,9 @@ def fast_to_slow_grad_by_segment(
     """
     if reshape_index is None:
         reshape_index = get_chunking_index(
-            shear.shape[-1],
-            segment_length,
-            segment_overlap,
-            chunk_length,
-            chunk_overlap,
             section_number,
+            (chunk_length, chunk_overlap),
+            (segment_length, segment_overlap),
         )
     else:
         segment_length = reshape_index.shape[-1]
@@ -161,34 +182,44 @@ def fast_to_slow_avg_by_segment():
 
 
 def get_chunking_index(
-    data_len: int,
-    segment_length: int,
-    segment_overlap: int,
-    chunk_length: int,
-    chunk_overlap: int,
-    section_number: Int[ndarray, "time_fast"] | None = None,
-) -> Int[ndarray, "diss_chunk fft_chunk segment_length"]:
+    section_number_or_data_len: Int[ndarray, "time_fast"] | int,
+    *length_and_overlap: tuple[int, int],
+) -> Int[ndarray, "*any"]:
+    """
+    Create index that rechunks a dimension into overlapping segments.
 
-    if section_number is None:
+    First argument: Either int (length of data) or a 1d array of int section markers.
+    Successive arguments: Tuples of the form (length, overlap). These will be successively nested.
+    """
+
+    if isinstance(section_number_or_data_len, int):
+        data_len = section_number_or_data_len
         section_number = np.ones(data_len, dtype=int)
+    else:
+        section_number = section_number_or_data_len
+        data_len = len(section_number_or_data_len)
 
-    sections = split_data(np.arange(data_len), section_number)
+    indices = np.arange(data_len)
+    sections = split_data(indices, section_number)
 
-    reshape_segments = []
-    for data in sections.values():
+    for k, (length, overlap) in enumerate(length_and_overlap):
+        if k == 0:
+            reshape_segments = []
+            for section in sections.values():
+                ii: Int[ndarray, "Nchunks chunklen"] = reshape_overlap_index(
+                    length, overlap, len(section)
+                )
+                reshape_segments.append(ii + section[0])
+                ichunk = np.concatenate(reshape_segments, axis=0)
 
-        # reshape time dimension into chunks of length chunk_length
-        ii_diss: Int[ndarray, "diss_chunk chunk_length"] = reshape_overlap_index(
-            chunk_length, chunk_overlap, len(data)
-        )
-        # reshape fft dimension into chunks of length segment_length
-        ii_fft: Int[ndarray, "fft_chunk segment_length"] = reshape_overlap_index(
-            segment_length, segment_overlap, ii_diss.shape[-1]
-        )
-        reshape_segments.append(ii_diss[:, ii_fft] + data[0])
+        else:
+            # successive iterations
+            ii: Int[ndarray, "Nchunks chunklen"] = reshape_overlap_index(
+                length, overlap, ii.shape[-1]
+            )
+            ichunk = ichunk[..., ii]
 
-    # concatenate along dissipation chunks
-    return np.concatenate(reshape_segments, axis=0)
+    return ichunk
 
 
 def split_data(

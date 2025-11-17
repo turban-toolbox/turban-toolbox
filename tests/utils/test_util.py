@@ -22,7 +22,7 @@ def test_get_cleaned_fraction():
     cl_frac = get_cleaned_fraction(
         x,
         xc,
-        data_len=len(x),
+        section_number_or_data_len=len(x),
         segment_length=4,
         segment_overlap=2,
         chunk_length=10,
@@ -33,11 +33,9 @@ def test_get_cleaned_fraction():
 
 def test_diss_chunk_wise_reshape_index():
     ii = get_chunking_index(
-        data_len=20,
-        segment_length=4,
-        segment_overlap=2,
-        chunk_length=10,
-        chunk_overlap=0,
+        20,
+        (10, 0),
+        (4, 2),
     )
     assert ii.shape == (2, 4, 4)
     assert diss_chunk_wise_reshape_index(ii).shape == (2, 10)
@@ -137,7 +135,7 @@ def test_average_fast_to_slow():
     # then averaged over intervals of length 3 with overlap 1: 2
     y = agg_fast_to_slow(
         x,
-        data_len=x.shape[-1],
+        section_number_or_data_len=x.shape[-1],
         segment_length=4,
         segment_overlap=2,
         chunk_length=6,
@@ -151,7 +149,7 @@ def test_agg_fast_to_slow():
     x = np.arange(20.0)
     xm = agg_fast_to_slow(
         x,
-        data_len=len(x),
+        section_number_or_data_len=len(x),
         segment_length=4,
         segment_overlap=2,
         chunk_length=10,

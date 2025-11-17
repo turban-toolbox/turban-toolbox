@@ -40,9 +40,9 @@ chunk_overlap = 1
 
 ### Implementation
 
-In order to use numpy's vectorized routines for time series analysis, we use the function `get_chunking_index`. It takes in the parameters `segment_length`, `segment_overlap`, `chunk_length`, `chunk_overlap`, and `section_number`, in addition to the length of the time series `samples_len`, and return an array of indices (see sketch), in the following called `idx`. 
+In order to use numpy's vectorized routines for time series analysis, we use the function `get_chunking_index`. It takes in the parameters `section_number_or_data_len` and arbitrarily many tuples of the form (`length`, `overlap`), and return an array of indices, in the following called `idx`. 
 
-Index `idx`, when used to index an axis of length `samples_len` of any array, will trigger expansion of the time axis into three axes, that are, in turn: 
+When called with exactly the two tuples (`chunk_length`, `chunk_overlap`) and(`segment_length`, `segment_overlap`), then index `idx` (see sketch), when used to index an axis of length `len(section_number_or_data_len)` or `section_number_or_data_len` of any array, will trigger expansion of the time axis into three axes, that are, in turn: 
 1. The slow/reduced/aggregated time axis, i.e. counting chunks.
 2. Inside each chunk, counting the number of segments.
 3. Inside each segment, counting the samples attributed to each segment.

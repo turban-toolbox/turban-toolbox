@@ -126,22 +126,20 @@ class ShearLevel3(Level3):
         spike_fraction = get_cleaned_fraction(
             x=level1.shear,
             x_clean=level2.shear,
-            data_len=level1.shear.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
-            section_number=level1.section_number,
+            section_number_or_data_len=level1.section_number,
         )
 
         max_despike_iter = agg_fast_to_slow(
             level2.num_despike_iter,
-            data_len=level2.num_despike_iter.shape[-1],
             segment_length=level2.cfg.segment_length,
             segment_overlap=level2.cfg.segment_overlap,
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
-            section_number=level1.section_number,
+            section_number_or_data_len=level1.section_number,
             agg_method="max",
         )
 

@@ -236,7 +236,7 @@ class Level1(AuxiliaryDataFast):
     section_number: Int[ndarray, "time"]
 
     # TODO should consider using pydantic or similar for runtime checking of user input
-    # (e.g., positive platform speed, etc.) 
+    # (e.g., positive platform speed, etc.)
 
 
 @dataclass(kw_only=True)
@@ -292,12 +292,9 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
 
         # sample_data = data[data.keys()[0]][1]
         cidx = get_chunking_index(
-            data_len,
-            chunk_length,
-            0,
-            chunk_length,
-            chunk_overlap,
             section_number,
+            (chunk_length, chunk_overlap),
+            (chunk_length, 0),
         )
 
         for varname, (dims, arr, rename_dict) in data.items():
@@ -306,7 +303,11 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
                     varname_new = f"{varname}_{agg_method}"
                 slow[varname_new] = (
                     dims,
-                    agg_fast_to_slow(arr, reshape_index=cidx, agg_method=agg_method),
+                    agg_fast_to_slow(
+                        arr,
+                        reshape_index=cidx,
+                        agg_method=agg_method,
+                    ),
                 )
         return slow
 

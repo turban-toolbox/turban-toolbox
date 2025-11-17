@@ -54,12 +54,9 @@ def cospectrum(
     """
     if reshape_index is None:
         reshape_index = get_chunking_index(
-            x.shape[-1],
-            segment_length,
-            segment_overlap,
-            chunk_length,
-            chunk_overlap,
             section_number,
+            (chunk_length, chunk_overlap),
+            (segment_length, segment_overlap),
         )
     else:
         segment_length = reshape_index.shape[-1]
