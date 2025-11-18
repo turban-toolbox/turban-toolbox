@@ -8,6 +8,7 @@ authors = [
 ]
 license = { text = "GPLv03" }
 dependencies = [
+  'beartype',
   'gsw',
   'jaxtyping',
   'matplotlib',
