@@ -46,17 +46,17 @@ def process_level3(
 
     section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
 
+    _ = apply_compensation_highpass(psi_f, freq, freq_highpass)
+
     # to waveno domain
     psi_k = psi_f * senspeeda[newaxis, :, newaxis]
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 
-    # apply corrections
-    if False:
-        correction_factor_spatial = apply_compensation_spatial_response(
-            psi_k, waveno, spatial_response_wavenum
-        )
-        _ = apply_compensation_highpass(psi_k, freq, freq_highpass)
-    # apply_removal_coherent_vibrations(P)
+    _ = apply_compensation_spatial_response(
+        psi_k, waveno, spatial_response_wavenum
+    )
+
+    # apply_removal_coherent_vibrations(P) # TODO
 
     return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow
 
@@ -68,7 +68,7 @@ def apply_compensation_spatial_response(
 ) -> Float[ndarray, "time_slow k"]:
     correction_factor = 1.0 + (waveno / waveno_0) ** 2
     # TODO Eqn. 18 text: Do not use spectra where correction exceeds 10
-    correction_factor[correction_factor > 10.0] = 10.0  # dirty hack
+    correction_factor[correction_factor > 10.0] = 1
     psi_k *= correction_factor[newaxis, :, :]
     return correction_factor
 
