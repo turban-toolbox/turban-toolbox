@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from turban.process.shear.level3 import power_spectrum
+from turban.process.shear.level3 import spectrum
 from turban.utils.util import agg_fast_to_slow, reshape_overlap_index
 
 
@@ -17,13 +17,19 @@ def test_spectra_arr_shape():
     chunk_length = 12
     chunk_overlap = 9
 
-    y1, f = power_spectrum(
-        x, sampfreq, segment_length, segment_overlap, chunk_length, chunk_overlap
+    y1, f = spectrum(
+        x,
+        sampfreq,
+        segment_length,
+        segment_overlap,
+        chunk_length,
+        chunk_overlap,
+        section_number=np.ones(N, dtype=int),
     )
     # platform speed
     y2 = agg_fast_to_slow(
         x,
-        data_len=N,
+        section_number_or_data_len=N,
         segment_length=segment_length,
         segment_overlap=segment_overlap,
         chunk_length=chunk_length,

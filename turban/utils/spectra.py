@@ -1,12 +1,13 @@
-from typing import Literal
+from typing import Literal, cast
 from numpy import ndarray, newaxis
 import numpy as np
-from jaxtyping import Float, Int, Complex
+from jaxtyping import Float, Int, Complex, Num
+from scipy.signal import welch, csd, windows
 
 from turban.utils.util import get_chunking_index
 
 
-def power_spectrum(
+def spectrum(
     x: Float[ndarray, "... time_fast"],
     sampfreq: float,
     segment_length: int | None = None,
@@ -15,70 +16,69 @@ def power_spectrum(
     chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
+    y: (
+        Float[ndarray, "... time_fast"] | None
+    ) = None,  # if not None, return cross spectral density
+    **estimator_kwarg,
 ) -> tuple[
-    Float[ndarray, "... chunk freq"],
-    Float[ndarray, "freq"],  # frequencies
-]:
-    Pf, freq = cospectrum(
-        x,
-        None,
-        sampfreq,
-        segment_length,
-        segment_overlap,
-        chunk_length,
-        chunk_overlap,
-        section_number,
-        reshape_index,
-    )
-    return Pf.real, freq
-
-
-def cospectrum(
-    x: Float[ndarray, "... time_fast"],
-    y: Float[ndarray, "... time_fast"] | None,  # if None, return power spectrum of x
-    sampfreq: float,
-    segment_length: int | None = None,
-    segment_overlap: int | None = None,
-    chunk_length: int | None = None,
-    chunk_overlap: int | None = None,
-    section_number: Int[ndarray, "time_fast"] | None = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
-    window: Literal["hanning"] | None = "hanning",
-) -> tuple[
-    Complex[ndarray, "... chunk freq"],
+    Num[ndarray, "... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:
     """
-    Produce spectra from cleaned shear time series.
+    Produce spectra from time series.
     If reshape_index is not supplied, calculates it.
+
+    If onlyx is provided, will compute power spectral density.
+
+    If y is provided (same shape as x), will compute cross spectral density.
     """
     if reshape_index is None:
+        section_number = cast(Int[ndarray, "time_fast"], section_number)
+        chunk_length = cast(int, chunk_length)
+        chunk_overlap = cast(int, chunk_overlap)
         reshape_index = get_chunking_index(
             section_number,
             (chunk_length, chunk_overlap),
-            (segment_length, segment_overlap),
         )
     else:
         segment_length = reshape_index.shape[-1]
 
-    freq = np.fft.rfftfreq(segment_length, d=1 / sampfreq)
+    kwarg = dict(
+        axis=-1,
+        fs=sampfreq,
+        nperseg=segment_length,
+        noverlap=segment_overlap,
+        scaling="density",
+    )
 
-    xr = x[..., reshape_index]  # reshape to fft length windows
-    xr -= xr.mean(axis=-1)[..., newaxis]  # subtract mean
-    if window == "hanning":
-        xr *= np.hanning(segment_length)[newaxis, newaxis, :]  # hanning window
-    Fxr = np.fft.rfft(xr)[:, :]
+    xr = x[..., reshape_index]  # reshape to chunk  length windows
 
     if y is None:
-        Pf = Fxr.conj() * Fxr
+        freq, psi = welch(xr, **kwarg, **estimator_kwarg)
     else:
-        yr = y[..., reshape_index]  # reshape to fft length windows
-        yr -= yr.mean(axis=-1)[..., newaxis]  # subtract mean
-        if window == "hanning":
-            yr *= np.hanning(segment_length)[newaxis, newaxis, :]  # hanning window
-        Fyr = np.fft.rfft(yr)[:, :]
-        Pf = Fyr.conj() * Fxr
+        yr = y[..., reshape_index]
+        freq, psi = csd(xr, yr, **kwarg, **estimator_kwarg)
 
-    # average spectra by chunks (reshape the segments)
-    Pf = Pf.mean(axis=-2)
-    return Pf, freq
+    dfreq = freq[1] - freq[0]
+    # by using scaling 'density' above, variance should already be approximately conserved,
+    # but now we correct for PSD estimator bias manually:
+    _ = apply_var_conserve(psi, dfreq, xr)
+
+    return psi, freq
+
+
+def apply_var_conserve(
+    psi: Float[ndarray, "*any freq"],
+    dfreq: float,
+    signal_reshape: Float[ndarray, "n_shear chunks freq"],
+) -> Float[ndarray, "*any"]:
+    """
+    Scale `psi` such that its integral along last axis (`freq`) equals variance of input signal.
+    """
+    intpsi = psi[..., 1:].sum(axis=-1) * dfreq  # disregard first frequency
+    signal_reshape = np.ascontiguousarray(
+        signal_reshape
+    )  # performance enhancement for np.var
+    corr_factor = np.var(signal_reshape, axis=-1) / intpsi
+    psi *= corr_factor[..., newaxis]
+    return corr_factor

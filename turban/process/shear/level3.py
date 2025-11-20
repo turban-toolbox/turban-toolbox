@@ -3,7 +3,7 @@ import numpy as np
 from jaxtyping import Float, Int
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
-from turban.utils.spectra import power_spectrum
+from turban.utils.spectra import spectrum
 
 
 def process_level3(
@@ -31,7 +31,15 @@ def process_level3(
         (segment_length, segment_overlap),
     )
 
-    psi_f, freq = power_spectrum(shear, sampfreq, reshape_index=ii)
+    psi_f, freq = spectrum(
+        shear,
+        sampfreq,
+        section_number=section_number,
+        chunk_length=chunk_length,
+        chunk_overlap=chunk_overlap,
+        segment_length=segment_length,
+        segment_overlap=segment_overlap,
+    )
 
     # platform speed
     senspeeda = agg_fast_to_slow(senspeed, reshape_index=ii)
@@ -39,7 +47,7 @@ def process_level3(
     section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
 
     # to waveno domain
-    psi_k = psi_f * senspeeda[newaxis, :, newaxis] / segment_length / (sampfreq / 2)
+    psi_k = psi_f * senspeeda[newaxis, :, newaxis]
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 
     # apply corrections
@@ -49,8 +57,6 @@ def process_level3(
         )
         _ = apply_compensation_highpass(psi_k, freq, freq_highpass)
     # apply_removal_coherent_vibrations(P)
-
-    apply_var_conserve(psi_k, waveno, shear, ii)
 
     return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow
 
@@ -75,21 +81,3 @@ def apply_compensation_highpass(
     correction_factor = (1.0 + (freq_highpass / freq) ** 2.0) ** 2.0
     psi_f *= correction_factor[newaxis, :]
     return correction_factor
-
-
-def apply_var_conserve(
-    psi_k: Float[ndarray, "n_shear time_slow waveno"],
-    waveno: Float[ndarray, "time_slow k"],
-    shear: Float[ndarray, "n_shear time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
-) -> Float[ndarray, "n_shear time_slow"]:
-    dk = waveno[..., 1] - waveno[..., 0]
-    varPk = psi_k[..., 1:].sum(axis=-1) * dk[newaxis, :]  # disregard first wavelength
-    sr = shear[:, reshape_index]
-    srf = sr.reshape(
-        sr.shape[:-2] + (sr.shape[-2] * sr.shape[-1],)
-    )  # flatten last two axes
-    srf = np.ascontiguousarray(srf)  # performance enhancement for np.var
-    corr_factor = np.var(srf, axis=-1) / varPk
-    psi_k *= corr_factor[..., newaxis]
-    return corr_factor
