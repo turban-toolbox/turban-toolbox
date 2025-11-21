@@ -311,7 +311,7 @@ def raw_to_level0(mss_config, rawdata, logger=None):
     # Create a xarray
     #
     nsamples = len(rawdatac[:, 0])
-    index = np.arange(nsamples)
+    index = numpy.arange(nsamples)
     level0_dataset = xr.Dataset(
         coords={
             "index": index,
@@ -364,7 +364,7 @@ def raw_to_level0(mss_config, rawdata, logger=None):
     # Calculate a time [s]
     # TODO: Use the COUNT variable, this is a stupid counting without checking for missing data
     # count_offset_new = len(data['COUNT']) + count_offset
-    # data['COUNT_TOTAL'] = np.arange(count_offset, count_offset_new)
+    # data['COUNT_TOTAL'] = numpy.arange(count_offset, count_offset_new)
     # time_offset = self.config['time_offset_unix']
     # data['t'] = data['COUNT_TOTAL'] / config['fs'] + time_offset
     # return data
@@ -404,9 +404,9 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
             },
         )
         # Count the number of samples and divide by sampling frequency, to get a time vector
-        time_count = np.cumsum(index) / mss_config.sampling_freq
+        time_count = numpy.cumsum(index) / mss_config.sampling_freq
         print("time count", time_count)
-        print("Time count", np.shape(time_count), np.shape(index))
+        print("Time count", numpy.shape(time_count), numpy.shape(index))
         channelname = "time_count"
         level1_dataset[channelname] = time_count
         level1_dataset[channelname].attrs["units"] = "s"
@@ -417,7 +417,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
         # Create a time vector, TODO: This has to be improved alot!
         if False:  # Calculate time
             dt = 1 / mss_config.sampling_freq
-            t = np.arange(0, nsamples) * dt
+            t = numpy.arange(0, nsamples) * dt
             Dt = t[-1]
             if False:
                 level1["TIME"] = t
@@ -480,7 +480,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
                     mss_config.pspd_rel_constant_vel
                 )
             )
-            vsink = np.zeros(nsamples) + mss_config.pspd_rel_constant_vel
+            vsink = numpy.zeros(nsamples) + mss_config.pspd_rel_constant_vel
         elif (pspd_rel is None) or (mss_config.pspd_rel_method == "pressure"):
             logger.debug(funcname + "Using change of pressure to caluclate velocity")
             vsink = mss_utils.calc_vsink(
@@ -518,8 +518,8 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
                 )
                 shear.append(SH)
 
-        shear = np.asarray(shear)
-        shear[np.isinf(shear)] = np.nan
+        shear = numpy.asarray(shear)
+        shear[numpy.isinf(shear)] = numpy.nan
         level1_dataset["SHEAR"] = (["n_shear", "index"], shear)
 
         return level1_dataset
@@ -612,8 +612,8 @@ class mrd:
             self.meta["basename"] = ""
             self.meta["cast"] = ""
             self.meta["date"] = datetime.datetime(1970, 1, 1)
-            self.meta["lon"] = np.nan
-            self.meta["lat"] = np.nan
+            self.meta["lon"] = numpy.nan
+            self.meta["lat"] = numpy.nan
 
             self.logger.debug("No filename given")
             # If the configuration has a key called "header", lets parse it
@@ -653,8 +653,8 @@ class mrd:
             self.meta["basename"] = basename
             self.meta["cast"] = cast
             self.meta["date"] = None
-            self.meta["lon"] = np.nan
-            self.meta["lat"] = np.nan
+            self.meta["lon"] = numpy.nan
+            self.meta["lat"] = numpy.nan
 
             # Opening file for reading and calculating sha1
             try:
@@ -784,7 +784,7 @@ class mrd:
             # Create a time vector, TODO: This has to be improved alot!
             nsamples = len(level0["COUNT"])
             dt = 1 / self.config["fs"]
-            t = np.arange(0, nsamples) * dt
+            t = numpy.arange(0, nsamples) * dt
             Dt = t[-1]
             if False:
                 level1["TIME"] = t
@@ -807,12 +807,12 @@ class mrd:
             level1["PSAL"] = SP
             level1_units["PSAL"] = "1"
             # Calculating absolute salinity
-            if np.isfinite(self.meta["lon"]):
+            if numpy.isfinite(self.meta["lon"]):
                 lon = self.meta["lon"]
             else:
                 lon = 0
 
-            if np.isfinite(self.meta["lat"]):
+            if numpy.isfinite(self.meta["lat"]):
                 lat = self.meta["lat"]
             else:
                 lat = 0
@@ -843,7 +843,7 @@ class mrd:
                     funcname
                     + "Using constant velocity {:f}".format(config_pspd_rel_data)
                 )
-                vsink = np.zeros(nsamples) + config_pspd_rel_data
+                vsink = numpy.zeros(nsamples) + config_pspd_rel_data
                 level1["PSPD_REL"] = vsink
                 # vsink = config_pspd_rel_data
             elif (pspd_rel is None) or (pspd_rel.upper() == "IOW"):
@@ -886,9 +886,9 @@ class mrd:
                     SH = self.calc_shear(level0[k], vsink, dens, fs=self.config["fs"])
                     shear.append(SH)
 
-            shear = np.asarray(shear)
+            shear = numpy.asarray(shear)
             level1["SHEAR"] = shear.T
-            shear[np.isinf(shear)] = np.nan
+            shear[numpy.isinf(shear)] = numpy.nan
 
             return [level1, level1_units]
 
@@ -908,29 +908,29 @@ class mrd:
         # FLAG_interpolate_NAN = False  # TODO, add config
         RATIO_BADDATA = 0.1
         FLAG_BADDATA_EXCEEDED = False
-        nshear = np.shape(level1["SHEAR"])[1]  # Number of shear sensors
-        Ntot = np.shape(level1["SHEAR"])[
+        nshear = numpy.shape(level1["SHEAR"])[1]  # Number of shear sensors
+        Ntot = numpy.shape(level1["SHEAR"])[
             0
         ]  # Number of shear sensorslen(shear)  # The total length
         level2 = {}
         level2["TIME"] = level1["TIME"].copy()
-        level2["SHEAR"] = level1["SHEAR"] * np.nan
+        level2["SHEAR"] = level1["SHEAR"] * numpy.nan
 
         if FLAG_interpolate_NAN:
-            t = np.arange(0, Ntot)  # Fake time axis
+            t = numpy.arange(0, Ntot)  # Fake time axis
             vars_int = ["PSPD_REL", "TEMP", "PRES", "PSAL"]
             for var in vars_int:
                 self.logger.debug(funcname + "Interpolating {:s}".format(var))
                 # print('Hallo', level1)
                 # print('Hallo', level1[var])
-                nnan = sum(np.isnan(level1[var]))  # Count number of nans
+                nnan = sum(numpy.isnan(level1[var]))  # Count number of nans
                 if nnan:
                     logger.debug("Interpolating nan {:d} pspd_rel".format(nnan))
-                    igood = ~np.isnan(level1[var])
+                    igood = ~numpy.isnan(level1[var])
                     if sum(igood) > (RATIO_BADDATA * Ntot):
-                        level2[var] = np.interp(t, t[igood], level1[var][igood])
+                        level2[var] = numpy.interp(t, t[igood], level1[var][igood])
                     else:
-                        level2[var] = level1[var] * np.nan
+                        level2[var] = level1[var] * numpy.nan
                         logger.debug(
                             funcname + "Will stop processing, bad data exceeds limit"
                         )
@@ -940,7 +940,7 @@ class mrd:
 
             # Interpolate 2D Matrix, at the moment shear only
             for i in range(nshear):  # Loop over all shear sensors
-                nnanshear = sum(np.isnan(level1["SHEAR"][:, i]))
+                nnanshear = sum(numpy.isnan(level1["SHEAR"][:, i]))
                 if nnanshear:
                     print("Interpolating")
                     logger.debug(
@@ -948,9 +948,9 @@ class mrd:
                             nnanshear, Ntot, i
                         )
                     )
-                    igood = ~np.isnan(level1["SHEAR"][:, i])
+                    igood = ~numpy.isnan(level1["SHEAR"][:, i])
                     if sum(igood) > (RATIO_BADDATA * Ntot):
-                        level2["SHEAR"][:, i] = np.interp(
+                        level2["SHEAR"][:, i] = numpy.interp(
                             t, t[igood], level1["SHEAR"][igood, i]
                         )
                     else:
@@ -992,7 +992,7 @@ class mrd:
         # dshdt_desp = dshdt
 
         vsink_tmp = vsink.copy()
-        vsink_tmp[vsink_tmp == 0] = np.nan
+        vsink_tmp[vsink_tmp == 0] = numpy.nan
 
         shear = dshdt_desp * (density ** (-1)) * (vsink_tmp ** (-2))
         return shear
@@ -1410,7 +1410,7 @@ class mrd:
         # Calculate a time [s]
         # TODO: Use the COUNT variable, this is a stupid counting without checking for missing data
         count_offset_new = len(data["COUNT"]) + count_offset
-        data["COUNT_TOTAL"] = np.arange(count_offset, count_offset_new)
+        data["COUNT_TOTAL"] = numpy.arange(count_offset, count_offset_new)
         time_offset = self.config["time_offset_unix"]
         data["t"] = data["COUNT_TOTAL"] / config["fs"] + time_offset
         return [data, data_units]
@@ -1547,7 +1547,7 @@ class mrd:
             if (
                 k in data2.keys()
             ):  # If the data is in the keys, stack it, otherwise just leave it with a copy
-                data[k] = np.hstack([data2[k], data1[k]])
+                data[k] = numpy.hstack([data2[k], data1[k]])
             else:
                 pass
 
