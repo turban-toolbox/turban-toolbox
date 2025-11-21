@@ -10,7 +10,7 @@ def test_mss(atomix_mss_mrd_filename):
 
     mss_conf = mss.MssDeviceConfig.from_mrd(
         filename=atomix_mss_mrd_filename,
-        shear_sensitivities=[3.90e-4, 4.05e-4],  # sensors 32 and 33 (MSS038)
+        shear_sensitivities={'SHE1': 3.90e-4, 'SHE2': 4.05e-4},  # sensors 32 and 33 (MSS038)
         offset=0,
     )
     # # Change the pressure sensor manually, because P250 had a cap on and did not measure properly
