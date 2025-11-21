@@ -1,8 +1,9 @@
-import pydantic
-import typing
+from typing import Literal, Union, Optional
 import logging
 import sys
 import numpy
+from pydantic import BaseModel, Field
+
 from . import mss_mrd
 
 
@@ -20,16 +21,16 @@ mss_standard_ctd_sensornames["temp"] = ["TEMP", "NTC"]
 mss_standard_ctd_sensornames["cond"] = ["COND"]
 
 
-class MssSensor(pydantic.BaseModel):
+class MssSensor(BaseModel):
     name: str
     coefficients: list[float]
     channel: int
-    unit: str = pydantic.Field(default="")
+    unit: str = Field(default="")
     calibration_type: str
 
 
 class MssSensorPoly(MssSensor):
-    calibration_type: typing.Literal["N"] = pydantic.Field(default="N")
+    calibration_type: Literal["N"] = Field(default="N")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,10 +43,10 @@ class MssSensorPoly(MssSensor):
 
 class MssShearSensor(MssSensor):
     sensitivity: float
-    serial_number: str = pydantic.Field(default="")
-    reference_temperature: float = pydantic.Field(default=-9999)
-    calibration_date: str = pydantic.Field(default="")
-    calibration_type: typing.Literal["SHE"] = pydantic.Field(default="SHE")
+    serial_number: str = Field(default="")
+    reference_temperature: float = Field(default=-9999)
+    calibration_date: str = Field(default="")
+    calibration_type: Literal["SHE"] = Field(default="SHE")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -60,7 +61,7 @@ class MssShearSensor(MssSensor):
 
 
 class MssSensorPressure(MssSensor):
-    calibration_type: typing.Literal["P"] = pydantic.Field(default="P")
+    calibration_type: Literal["P"] = Field(default="P")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -76,7 +77,7 @@ class MssSensorNTC(MssSensor):
     Steinhart/Hart NTC Polynomial
     """
 
-    calibration_type: typing.Literal["SHH"] = pydantic.Field(default="SHH")
+    calibration_type: Literal["SHH"] = Field(default="SHH")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -93,7 +94,7 @@ class MssSensorTurb(MssSensor):
     Convert rawdata turbidity to NFC
     """
 
-    calibration_type: typing.Literal["NFC"] = pydantic.Field(default="NFC")
+    calibration_type: Literal["NFC"] = Field(default="NFC")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,7 +111,7 @@ class MssSensorOptode(MssSensor):
     Convert oxygen optode rawdata to physical units
     """
 
-    calibration_type: typing.Literal["V04"] = pydantic.Field(default="V04")
+    calibration_type: Literal["V04"] = Field(default="V04")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -128,7 +129,7 @@ class MssSensorOptode(MssSensor):
 
 
 class MssSensorOptodeInternalTemp(MssSensor):
-    calibration_type: typing.Literal["N24"] = pydantic.Field(default="N24")
+    calibration_type: Literal["N24"] = Field(default="N24")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -139,37 +140,37 @@ class MssSensorOptodeInternalTemp(MssSensor):
         return data
 
 
-class MssDeviceConfig(pydantic.BaseModel):
-    offset: int = pydantic.Field(
+class MssDeviceConfig(BaseModel):
+    offset: int = Field(
         default=0, description="16bit offset, typically 0, older devices have -32768"
     )
-    sampling_freq: float = pydantic.Field(
+    sampling_freq: float = Field(
         default=1024,
         description="The sampling frequency [Hz] of the microstructure probe",
     )
-    sensors: dict[str, typing.Union[MssSensor, MssShearSensor]] = pydantic.Field(
+    sensors: dict[str, Union[MssSensor, MssShearSensor]] = Field(
         default={}, description="A dictionary of the sensors mounted to the probe"
     )
     sensornames_ctd: dict[
-        typing.Union[
-            typing.Literal["cond"], typing.Literal["temp"], typing.Literal["press"]
+        Union[
+            Literal["cond"], Literal["temp"], Literal["press"]
         ],
         str,
-    ] = pydantic.Field(
+    ] = Field(
         default={"cond": "", "temp": "", "press": ""},
         description="A dictionary to link standard ctd names to the names of the MSS config",
     )
-    pressure_sensorname: typing.Optional[str] = pydantic.Field(
+    pressure_sensorname: Optional[str] = Field(
         default=None,
         description="The sensorname of the pressure sensor, if None a best guess will be made",
     )
-    pspd_rel_method: typing.Literal["pressure", "constant", "external"] = (
-        pydantic.Field(
+    pspd_rel_method: Literal["pressure", "constant", "external"] = (
+        Field(
             default="pressure",
             description="Method for the platform speed relative to the seawater, this is needed to calculate wavenumbers from the sampled data",
         )
     )
-    pspd_rel_constant_vel: typing.Optional[float] = pydantic.Field(
+    pspd_rel_constant_vel: Optional[float] = Field(
         default=None,
         description='Constant velocity [m/s] used as pspd_rel, if defined by "pspd_rel_method"',
     )
