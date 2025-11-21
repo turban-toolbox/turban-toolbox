@@ -236,12 +236,13 @@ class MssDeviceConfig(BaseModel):
             sensor_dict = header["mss"]["channels"][ch]
             sensorname = sensor_dict["name"]
             unit = sensor_dict["unit"]
+            caltype = sensor_dict["caltype"].upper()
             logger.debug(
                 "Checking Channel:{}, sensorname:{}, caltype:{}".format(
-                    ch, sensorname, sensor_dict["caltype"].upper()
+                    ch, sensorname, caltype
                 )
             )
-            if sensor_dict["caltype"].upper() == "N":  # Polynom
+            if caltype == "N":  # Polynom
                 if sensorname.upper().startswith("SHE"):
                     logger.debug("\tAdding shear sensor {}".format(sensorname))
                     sensitivity = shear_sensitivities[sensorname]
@@ -262,7 +263,15 @@ class MssDeviceConfig(BaseModel):
                         coefficients=sensor_dict["coeff"],
                         unit=unit,
                     )
-            elif sensor_dict["caltype"].upper() == "P":  # Pressure
+            elif caltype == "SHH":
+                logger.debug("\tAdding NTC sensor {}".format(sensorname))
+                self.sensors[sensorname] = MssSensorNTC(
+                    channel=ch,
+                    name=sensorname,
+                    coefficients=sensor_dict["coeff"],
+                    unit=unit,
+                )
+            elif caltype == "P":  # Pressure
                 logger.debug("\tAdding pressure sensor {}".format(sensorname))
                 self.sensors[sensorname] = MssSensorPressure(
                     channel=ch,
@@ -270,7 +279,7 @@ class MssDeviceConfig(BaseModel):
                     coefficients=sensor_dict["coeff"],
                     unit=unit,
                 )
-            elif sensor_dict["caltype"].upper() == "V04":  # Oxygen
+            elif caltype == "V04":  # Oxygen
                 logger.debug("\tAdding oxygen optode sensor {}".format(sensorname))
                 self.sensors[sensorname] = MssSensorOptode(
                     channel=ch,
@@ -279,7 +288,7 @@ class MssDeviceConfig(BaseModel):
                     unit=unit,
                 )
             elif (
-                sensor_dict["caltype"].upper() == "N24"
+                caltype == "N24"
             ):  # Internal temperature of oxygensensor
                 logger.debug(
                     "\tAdding oxygen optode temperature sensor {}".format(sensorname)
@@ -290,7 +299,7 @@ class MssDeviceConfig(BaseModel):
                     coefficients=sensor_dict["coeff"],
                     unit=unit,
                 )
-            elif sensor_dict["caltype"].upper() == "NFC":  # Turbidity etc.
+            elif caltype == "NFC":  # Turbidity etc.
                 logger.debug("\tAdding NFC sensor {}".format(sensorname))
                 self.sensors[sensorname] = MssSensorTurb(
                     channel=ch,
