@@ -317,9 +317,14 @@ def raw_to_level0(mss_config, rawdata, logger=None):
     )
 
     # Add gps information
-    level0_dataset.attrs["longitude"] = gps[0][1]
-    level0_dataset.attrs["latitude"] = gps[0][2]
-    level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
+    if gps:
+        level0_dataset.attrs["longitude"] = gps[0][1]
+        level0_dataset.attrs["latitude"] = gps[0][2]
+        level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
+    else:
+        level0_dataset.attrs["longitude"] = None
+        level0_dataset.attrs["latitude"] = None
+        level0_dataset.attrs["date_gps"] = None
     # Add the header to the dataset
     # try:
     if True:
