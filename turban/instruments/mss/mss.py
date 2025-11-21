@@ -51,7 +51,7 @@ class MssShearSensor(MssSensor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.coefficients = [None, None]
-        self.coefficients[0] = -3
+        self.coefficients[0] = 1.47133e-6 / self.sensitivity
         self.coefficients[1] = 2.94266e-6 / self.sensitivity
         self._p = numpy.polynomial.Polynomial(self.coefficients)
 
