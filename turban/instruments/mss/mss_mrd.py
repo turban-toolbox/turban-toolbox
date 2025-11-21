@@ -3,7 +3,6 @@ import warnings
 from pytz import timezone
 import math
 import numpy
-import numpy as np
 import logging
 import sys
 import pkg_resources
@@ -11,6 +10,7 @@ import os
 import hashlib
 import re
 import glob
+
 from . import mss_utils
 import scipy.signal
 import errno
@@ -24,6 +24,7 @@ except ImportError:
     warnings.warn("Could not import dateparser")
     dateparser = None
 
+
 # Get the version
 version_file = pkg_resources.resource_filename("turban", "VERSION")
 
@@ -32,6 +33,7 @@ with open(version_file) as version_f:
 
 # Setup logging module
 # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+
 
 
 def read_mrd(filestream, header_only=False, pos_time_only=False, logger=None):

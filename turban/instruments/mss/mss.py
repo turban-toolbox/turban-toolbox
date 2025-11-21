@@ -1,11 +1,15 @@
 from typing import Literal, Union, Optional, Annotated
 import logging
 import sys
-import numpy
+from typing import cast
+from pathlib import Path
+import numpy as np
 from pydantic import BaseModel, Field
 
 from . import mss_mrd
 
+from turban.process.shear.config import ShearConfig
+from turban.process.shear.api import ShearLevel1
 
 # Setup logging module
 # TODO should handle this more gracefully, having debug level logging everywhere is annoying
@@ -34,7 +38,7 @@ class MssSensorPoly(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p = numpy.polynomial.Polynomial(self.coefficients)
+        self._p = np.polynomial.Polynomial(self.coefficients)
 
     def raw_to_units(self, rawdata, offset=0):
         data = self._p(rawdata + offset)
@@ -53,7 +57,7 @@ class MssShearSensor(MssSensor):
         self.coefficients = [None, None]
         self.coefficients[0] = 1.47133e-6 / self.sensitivity
         self.coefficients[1] = 2.94266e-6 / self.sensitivity
-        self._p = numpy.polynomial.Polynomial(self.coefficients)
+        self._p = np.polynomial.Polynomial(self.coefficients)
 
     def raw_to_units(self, rawdata, offset=0):
         data = self._p(rawdata - offset)  # The shear sensors have the negative offset
@@ -65,7 +69,7 @@ class MssSensorPressure(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p = numpy.polynomial.Polynomial(self.coefficients[:-1])
+        self._p = np.polynomial.Polynomial(self.coefficients[:-1])
 
     def raw_to_units(self, rawdata, offset=0):
         data = self._p(rawdata + offset) - self.coefficients[-1]
@@ -81,10 +85,10 @@ class MssSensorNTC(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p = numpy.polynomial.Polynomial(self.coefficients[:-1])
+        self._p = np.polynomial.Polynomial(self.coefficients[:-1])
 
     def raw_to_units(self, rawdata, offset):
-        data = self._p(numpy.log(rawdata + offset))
+        data = self._p(np.log(rawdata + offset))
         data = 1 / data - 273.15  # Kelvin to degC
         return data
 
@@ -98,10 +102,10 @@ class MssSensorTurb(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p = numpy.polynomial.Polynomial(self.coefficients[:-1])
+        self._p = np.polynomial.Polynomial(self.coefficients[:-1])
 
     def raw_to_units(self, rawdata, offset):
-        p = numpy.polynomial.Polynomial(self.coefficients[:-2])
+        p = np.polynomial.Polynomial(self.coefficients[:-2])
         data = p(rawdata + offset) * self.coefficients[-1] + self.coefficients[-2]
         return data
 
@@ -115,10 +119,10 @@ class MssSensorOptode(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p1 = numpy.polynomial.Polynomial(
+        self._p1 = np.polynomial.Polynomial(
             self.coefficients[0:2]
         )  # Convert data to mV
-        self._p2 = numpy.polynomial.Polynomial(
+        self._p2 = np.polynomial.Polynomial(
             self.coefficients[-2:]
         )  # 0 Point correction with B0 and B1
 
@@ -133,7 +137,7 @@ class MssSensorOptodeInternalTemp(MssSensor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._p = numpy.polynomial.Polynomial(self.coefficients)
+        self._p = np.polynomial.Polynomial(self.coefficients)
 
     def raw_to_units(self, rawdata, offset=0):
         data = self._p(rawdata + offset)
@@ -317,3 +321,34 @@ class MssDeviceConfig(BaseModel):
         Creating a MssDeviceConfig from a prb file
         """
         raise NotImplementedError
+
+
+def mrd_to_shear_level1(
+    fpath: Path,
+    shear_config: ShearConfig,
+    mss_config: MssDeviceConfig | None = None,
+    shear_sensitivities: dict[str, float] | None = None,
+):
+    if mss_config is None:
+        # in this case, shear_sensitivities must not be None
+        shear_sensitivities = cast(dict[str, float], shear_sensitivities)
+        mss_config = MssDeviceConfig.from_mrd(
+            filename=str(fpath),
+            shear_sensitivities=shear_sensitivities,
+            offset=0,
+        )
+
+    with open(fpath, "rb") as f:
+        data_raw = mss_mrd.read_mrd(f)
+
+    data_level0 = mss_mrd.raw_to_level0(mss_config, data_raw)
+    data_level1 = mss_mrd.level0_to_level1(mss_config, data_level0)
+
+    return ShearLevel1(
+        time=np.asarray(data_level1["time_count"]),
+        senspeed=np.asarray(data_level1["PSPD_REL"]),
+        shear=np.asarray(data_level1["SHEAR"]),
+        section_number=np.zeros_like(data_level1["time_count"], dtype=int),
+        cfg=shear_config,
+    )
+
