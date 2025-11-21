@@ -1,4 +1,4 @@
-from typing import Literal, Union, Optional
+from typing import Literal, Union, Optional, Annotated
 import logging
 import sys
 import numpy
@@ -26,7 +26,7 @@ class MssSensor(BaseModel):
     coefficients: list[float]
     channel: int
     unit: str = Field(default="")
-    calibration_type: str
+    calibration_type: Literal[None]  # ["N", "SHE", "P", "SHH", "NFC", "V04", "N24"]
 
 
 class MssSensorPoly(MssSensor):
@@ -148,13 +148,26 @@ class MssDeviceConfig(BaseModel):
         default=1024,
         description="The sampling frequency [Hz] of the microstructure probe",
     )
-    sensors: dict[str, Union[MssSensor, MssShearSensor]] = Field(
+    sensors: dict[
+        str,
+        Annotated[
+            Union[
+                MssSensor,
+                MssSensorPoly,
+                MssShearSensor,
+                MssSensorPressure,
+                MssSensorNTC,
+                MssSensorTurb,
+                MssSensorOptode,
+                MssSensorOptodeInternalTemp,
+            ],
+            Field(discriminator="calibration_type"),
+        ],
+    ] = Field(
         default={}, description="A dictionary of the sensors mounted to the probe"
     )
     sensornames_ctd: dict[
-        Union[
-            Literal["cond"], Literal["temp"], Literal["press"]
-        ],
+        Union[Literal["cond"], Literal["temp"], Literal["press"]],
         str,
     ] = Field(
         default={"cond": "", "temp": "", "press": ""},
@@ -164,11 +177,9 @@ class MssDeviceConfig(BaseModel):
         default=None,
         description="The sensorname of the pressure sensor, if None a best guess will be made",
     )
-    pspd_rel_method: Literal["pressure", "constant", "external"] = (
-        Field(
-            default="pressure",
-            description="Method for the platform speed relative to the seawater, this is needed to calculate wavenumbers from the sampled data",
-        )
+    pspd_rel_method: Literal["pressure", "constant", "external"] = Field(
+        default="pressure",
+        description="Method for the platform speed relative to the seawater, this is needed to calculate wavenumbers from the sampled data",
     )
     pspd_rel_constant_vel: Optional[float] = Field(
         default=None,
@@ -239,7 +250,7 @@ class MssDeviceConfig(BaseModel):
                         name=sensorname,
                         coefficients=sensor_dict["coeff"],
                         unit=unit,
-                        sensitivity=sensitivity, # TODO why is this not included in model_dump???
+                        sensitivity=sensitivity,
                     )
                 else:
                     logger.debug(
