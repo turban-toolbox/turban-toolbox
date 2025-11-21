@@ -25,7 +25,7 @@ class MssSensor(pydantic.BaseModel):
     coefficients: list[float]
     channel: int
     unit: str = pydantic.Field(default="")
-    # calibration_type: typing.Literal
+    calibration_type: str
 
 
 class MssSensorPoly(MssSensor):
@@ -178,7 +178,7 @@ class MssDeviceConfig(pydantic.BaseModel):
     def from_mrd(
         cls,
         filename: str,
-        shear_sensitivities: list[float],
+        shear_sensitivities: dict[str, float],
         offset: int = 0,
     ):
         """
@@ -231,16 +231,14 @@ class MssDeviceConfig(pydantic.BaseModel):
             )
             if sensor_dict["caltype"].upper() == "N":  # Polynom
                 if sensorname.upper().startswith("SHE"):
-                    shear_num = int(sensorname[3:])
-                    logger.debug("\tFound shear sensor {}".format(shear_num))
                     logger.debug("\tAdding shear sensor {}".format(sensorname))
-                    sensitivity = shear_sensitivities[shear_num - 1]
+                    sensitivity = shear_sensitivities[sensorname]
                     self.sensors[sensorname] = MssShearSensor(
                         channel=ch,
                         name=sensorname,
                         coefficients=sensor_dict["coeff"],
                         unit=unit,
-                        sensitivity=sensitivity,
+                        sensitivity=sensitivity, # TODO why is this not included in model_dump???
                     )
                 else:
                     logger.debug(
