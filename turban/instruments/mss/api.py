@@ -18,7 +18,7 @@ logger = logging.getLogger("turban.instruments.mss")
 
 
 def mrd_to_shear_level1(
-    fpath: Path,
+    fname: str,
     shear_config: ShearConfig,
     mss_config: MssDeviceConfig | None = None,
     shear_sensitivities: dict[str, float] | None = None,
@@ -33,12 +33,12 @@ def mrd_to_shear_level1(
         # in this case, shear_sensitivities must not be None
         shear_sensitivities = cast(dict[str, float], shear_sensitivities)
         mss_config = MssDeviceConfig.from_mrd(
-            filename=str(fpath),
+            filename=fname,
             shear_sensitivities=shear_sensitivities,
             offset=0,
         )
 
-    with open(fpath, "rb") as f:
+    with open(fname, "rb") as f:
         data_raw = mss_mrd.read_mrd(f)
 
     data_level0 = mss_mrd.raw_to_level0(mss_config, data_raw)
