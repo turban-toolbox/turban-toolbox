@@ -3,6 +3,7 @@ from functools import wraps
 from typing import cast
 import warnings
 import numpy as np
+from jaxtyping import Bool
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
@@ -418,3 +419,59 @@ def diss_chunk_wise_reshape_index(
     ii_flat = ii.reshape((ii.shape[0], ii.shape[1] * ii.shape[2]))
     chunk_length = ii_flat[0].max() - ii_flat[0].min() + 1
     return ii_flat.min(axis=1)[:, newaxis] + np.arange(0, chunk_length)[newaxis, :]
+
+
+def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> list[list[int]]:
+    """Separate a list of bools into contiguous chunks"""
+    bools_as_ints = list(map(int, bools))
+    sections = []
+    # make sure first and last sections are picked up
+    # even if bordering on list start or end
+    offset = 0
+    if bools[0]:
+        bools_as_ints.insert(0, 0)
+        offset = 1
+    if bools[-1]:
+        bools_as_ints.append(0)
+
+    # register every jump from True to False
+    true_to_false = np.diff(bools_as_ints) == -1
+    # vice versa
+    false_to_true = np.diff(bools_as_ints) == 1
+
+    for ic0, ic1 in zip(np.flatnonzero(false_to_true), np.flatnonzero(true_to_false)):
+        sections.append(list(range(ic0 + 1 - offset, ic1 + 1 - offset)))
+
+    return sections
+
+
+def define_sections(
+    *data_and_bounds: tuple[Float[ndarray, "*any"], float, float],
+    segment_min_len: int | None = None,
+) -> Int[ndarray, "*any"]:
+    """
+    Select sections from a list of time series.
+    Arguments are tuples of (data_array, min, max) values.
+    segment_min_len (int) only retains sections with this minimum length.
+
+    Returns:
+        List of indices for each section (list of lists of integers)
+    """
+    data_shp = data_and_bounds[0][0].shape  # select first data entry as sample
+    inds = np.ones(data_shp, dtype=bool)
+    for data, lo, up in data_and_bounds:
+        if lo is not None:
+            inds = inds & (lo <= np.array(data))
+        if up is not None:
+            inds = inds & (up >= np.array(data))
+
+    sections = boolarr_to_sections(inds)
+
+    if segment_min_len is not None:
+        sections = [sec for sec in sections if len(sec) >= segment_min_len]
+
+    section_number = np.zeros(data_shp, dtype=int)
+    for k, sec in enumerate(sections):
+        section_number[sec] = k + 1
+
+    return section_number

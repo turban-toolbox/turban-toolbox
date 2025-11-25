@@ -12,6 +12,7 @@ from turban.utils.util import (
     get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
     get_chunking_index,
+    boolarr_to_sections,
 )
 
 
@@ -39,6 +40,24 @@ def test_diss_chunk_wise_reshape_index():
     )
     assert ii.shape == (2, 4, 4)
     assert diss_chunk_wise_reshape_index(ii).shape == (2, 10)
+
+
+def test_boolarr_to_sections():
+    bools = np.array([True, False, False, True, True, False, True])
+    result = [[0], [3, 4], [6]]
+    assert boolarr_to_sections(bools) == result
+
+    bools = np.array([True, False, False, True, True, False])
+    result = [[0], [3, 4]]
+    assert boolarr_to_sections(bools) == result
+
+    bools = np.array([False, False, True, True, False, True])
+    result = [[2, 3], [5]]
+    assert boolarr_to_sections(bools) == result
+
+    bools = np.array([False, False, True, True, False])
+    result = [[2, 3]]
+    assert boolarr_to_sections(bools) == result
 
 
 def test_fft_grad():

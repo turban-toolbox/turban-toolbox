@@ -3,7 +3,7 @@ import numpy as np
 from turban.utils.util import butterfilt
 from jaxtyping import Float, Bool, Int
 from numpy import ndarray
-from turban.utils.util import split_data
+from turban.utils.util import split_data, boolarr_to_sections
 
 
 data_and_bounds_type = list[
@@ -89,30 +89,6 @@ def select_sections(
 
     if segment_min_len is not None:
         sections = [sec for sec in sections if len(sec) >= segment_min_len]
-
-    return sections
-
-
-def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> list[list[int]]:
-    """Separate a list of bools into contiguous chunks"""
-    bools_as_ints = list(map(int, bools))
-    sections = []
-    # make sure first and last sections are picked up
-    # even if bordering on list start or end
-    offset = 0
-    if bools[0]:
-        bools_as_ints.insert(0, 0)
-        offset = 1
-    if bools[-1]:
-        bools_as_ints.append(0)
-
-    # register every jump from True to False
-    true_to_false = np.diff(bools_as_ints) == -1
-    # vice versa
-    false_to_true = np.diff(bools_as_ints) == 1
-
-    for ic0, ic1 in zip(np.flatnonzero(false_to_true), np.flatnonzero(true_to_false)):
-        sections.append(list(range(ic0 + 1 - offset, ic1 + 1 - offset)))
 
     return sections
 

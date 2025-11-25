@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from turban.process.shear.level2 import (
-    boolarr_to_sections,
     sections_to_marker,
     detect_shear_spikes,
     replace_spike,
@@ -103,7 +102,9 @@ def test_replace_spike():
     # at indices [2, 3, 6, 7]
     r = (2 + 3 + 6 + 7) / 4.0 / 100
     replace_spike(shear, 4, 6, 2, 2)
-    assert np.all(shear == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09]))
+    assert np.all(
+        shear == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09])
+    )
 
 
 def test_replace_spikes():
@@ -113,7 +114,9 @@ def test_replace_spikes():
     spike_markers[4:6] = 1
     replace_spikes(shear, spike_markers, 2, 2)
     r = (2 + 3 + 6 + 7) / 4.0 / 100
-    assert np.all(shear == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09]))
+    assert np.all(
+        shear == np.array([0, 0.01, 0.02, 0.03, r, r, 0.06, 0.07, 0.08, 0.09])
+    )
 
 
 def test_enlarge_bool():
@@ -125,24 +128,6 @@ def test_enlarge_bool():
         enlarge_bool([False, True, False, False, False, True], 1, 0)
         == np.array([True, True, False, False, True, True])
     )
-
-
-def test_boolarr_to_sections():
-    bools = np.array([True, False, False, True, True, False, True])
-    result = [[0], [3, 4], [6]]
-    assert boolarr_to_sections(bools) == result
-
-    bools = np.array([True, False, False, True, True, False])
-    result = [[0], [3, 4]]
-    assert boolarr_to_sections(bools) == result
-
-    bools = np.array([False, False, True, True, False, True])
-    result = [[2, 3], [5]]
-    assert boolarr_to_sections(bools) == result
-
-    bools = np.array([False, False, True, True, False])
-    result = [[2, 3]]
-    assert boolarr_to_sections(bools) == result
 
 
 def test_despike():
