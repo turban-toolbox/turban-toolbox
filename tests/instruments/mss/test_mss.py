@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from tests.fixtures import atomix_mss_mrd_filename
-from turban.instruments.mss import mss
+from turban.instruments.mss.config import MssDeviceConfig
+from turban.instruments.mss.mss_mrd import read_mrd, raw_to_level0, level0_to_level1
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 
 
 def test_mss(atomix_mss_mrd_filename):
 
-    mss_conf = mss.MssDeviceConfig.from_mrd(
+    mss_conf = MssDeviceConfig.from_mrd(
         filename=atomix_mss_mrd_filename,
         shear_sensitivities={'SHE1': 3.90e-4, 'SHE2': 4.05e-4},  # sensors 32 and 33 (MSS038)
         offset=0,
@@ -17,11 +18,11 @@ def test_mss(atomix_mss_mrd_filename):
     # mss_conf.sensornames_ctd["press"] = "P1000"
 
     with open(atomix_mss_mrd_filename, "rb") as f:
-        data_raw = mss.mss_mrd.read_mrd(f)
-    data_level0 = mss.mss_mrd.raw_to_level0(mss_conf, data_raw)
+        data_raw = read_mrd(f)
+    data_level0 = raw_to_level0(mss_conf, data_raw)
 
     print("Attributes", data_level0.attrs)
-    data_level1 = mss.mss_mrd.level0_to_level1(mss_conf, data_level0)
+    data_level1 = level0_to_level1(mss_conf, data_level0)
 
     #
     shear_config = ShearConfig(
