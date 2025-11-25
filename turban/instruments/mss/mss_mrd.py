@@ -324,8 +324,9 @@ def raw_to_level0(mss_config, rawdata, logger=None):
         level0_dataset.attrs["latitude"] = gps[0][2]
         level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
     else:
-        level0_dataset.attrs["longitude"] = None
-        level0_dataset.attrs["latitude"] = None
+        logger.warning('No GPS data available, setting longitude/latitude to 0.')
+        level0_dataset.attrs["longitude"] = 0
+        level0_dataset.attrs["latitude"] = 0
         level0_dataset.attrs["date_gps"] = None
     # Add the header to the dataset
     # try:
@@ -441,18 +442,9 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
         SP = gsw.SP_from_C(cond, level0[temp_sensorname], level0[press_sensorname])
         level1_dataset["PSAL"] = SP
         level1_dataset["PSAL"].attrs["units"] = "1"
-        # Calculating absolute salinity
-        try:
-            lon = level0.longitude
-        except:
-            lon = 0
 
-        try:
-            lat = level0.latitude
-        except:
-            lat = 0
 
-        SA = gsw.SA_from_SP(SP, level0[press_sensorname], lon, lat)
+        SA = gsw.SA_from_SP(SP, level0[press_sensorname], level0.longitude, level0.latitude)
         level1_dataset["SA"] = SA
         level1_dataset["SA"].attrs["units"] = "g kg-1"
         # Calculating conservative temperature
