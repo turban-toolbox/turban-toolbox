@@ -42,7 +42,7 @@ def mrd_to_shear_level1(
         time=np.asarray(data_level1["time_count"]),
         senspeed=np.asarray(data_level1["PSPD_REL"]),
         shear=np.asarray(data_level1["SHEAR"]),
-        section_number=np.zeros_like(data_level1["time_count"], dtype=int),
+        section_number=np.ones_like(data_level1["time_count"], dtype=int),
         cfg=shear_config,
     )
 
