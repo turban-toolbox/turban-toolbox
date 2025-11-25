@@ -23,6 +23,12 @@ def mrd_to_shear_level1(
     mss_config: MssDeviceConfig | None = None,
     shear_sensitivities: dict[str, float] | None = None,
 ):
+    """
+    Read a binary .MRD file and convert to level1.
+
+    If no MssDeviceConfig object is given, will read from MRD header. In this case,
+    shear_sensitivities must not be None. 
+    """
     if mss_config is None:
         # in this case, shear_sensitivities must not be None
         shear_sensitivities = cast(dict[str, float], shear_sensitivities)
@@ -38,11 +44,13 @@ def mrd_to_shear_level1(
     data_level0 = mss_mrd.raw_to_level0(mss_config, data_raw)
     data_level1 = mss_mrd.level0_to_level1(mss_config, data_level0)
 
-    return ShearLevel1(
+    sl1 = ShearLevel1(
         time=np.asarray(data_level1["time_count"]),
         senspeed=np.asarray(data_level1["PSPD_REL"]),
         shear=np.asarray(data_level1["SHEAR"]),
         section_number=np.ones_like(data_level1["time_count"], dtype=int),
         cfg=shear_config,
     )
+
+    return sl1
 
