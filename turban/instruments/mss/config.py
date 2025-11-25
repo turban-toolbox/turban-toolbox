@@ -322,33 +322,3 @@ class MssDeviceConfig(BaseModel):
         """
         raise NotImplementedError
 
-
-def mrd_to_shear_level1(
-    fpath: Path,
-    shear_config: ShearConfig,
-    mss_config: MssDeviceConfig | None = None,
-    shear_sensitivities: dict[str, float] | None = None,
-):
-    if mss_config is None:
-        # in this case, shear_sensitivities must not be None
-        shear_sensitivities = cast(dict[str, float], shear_sensitivities)
-        mss_config = MssDeviceConfig.from_mrd(
-            filename=str(fpath),
-            shear_sensitivities=shear_sensitivities,
-            offset=0,
-        )
-
-    with open(fpath, "rb") as f:
-        data_raw = mss_mrd.read_mrd(f)
-
-    data_level0 = mss_mrd.raw_to_level0(mss_config, data_raw)
-    data_level1 = mss_mrd.level0_to_level1(mss_config, data_level0)
-
-    return ShearLevel1(
-        time=np.asarray(data_level1["time_count"]),
-        senspeed=np.asarray(data_level1["PSPD_REL"]),
-        shear=np.asarray(data_level1["SHEAR"]),
-        section_number=np.zeros_like(data_level1["time_count"], dtype=int),
-        cfg=shear_config,
-    )
-
