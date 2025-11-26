@@ -1,6 +1,7 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
 from functools import wraps
+from inspect import isclass
 from logging import warnings
 from typing import get_type_hints, ClassVar, cast
 from abc import abstractmethod, ABC
@@ -36,6 +37,19 @@ AuxDataTypehint = dict[
     ],
 ]
 
+def get_type_hints_recursive(obj):
+    """
+    Collect all type definitions on a given objects, also from parent classes.
+
+    :param obj: Any python object
+    """
+    hints = {}
+    # loop through MRO in reverse order if anything is superseded by inheritance
+    for type_ in type(obj).mro()[::-1]:
+        hints.update(get_type_hints(type_))
+    
+    return hints
+
 
 @dataclass(kw_only=True)
 class TimeseriesLevel:
@@ -49,7 +63,8 @@ class TimeseriesLevel:
                 [dim.name for dim in t.dims],
                 getattr(self, name),
             )
-            for name, t in get_type_hints(self).items()
+            for name, t in get_type_hints_recursive(self).items()
+            if isclass(t)
             if issubclass(t, AbstractArray)
         }
         data_vars = {k: v for k, v in dct.items() if k not in self._coords}
