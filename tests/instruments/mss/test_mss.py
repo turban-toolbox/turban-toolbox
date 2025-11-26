@@ -57,7 +57,7 @@ def test_mss(atomix_mss_mrd_filename):
     print(data_level1)
 
     for v in ["PRESS", "TEMP", "COND"]:
-        shear_level1.add_aux_data(v.lower(), data_level1[v].values)
+        shear_level1.add_aux_data(data_level1[v].values, v.lower())
 
     p = ShearProcessing(shear_level1, level=1)
     level4 = p.level4.to_xarray()

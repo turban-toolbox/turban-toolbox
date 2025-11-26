@@ -13,13 +13,13 @@ from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
 from turban.process.generic.api import (
-    AuxDataTypehint,
+    AuxDataTypehintLevel12,
+    AuxDataTypehintLevel34,
     Level1,
     Level2,
     Level3,
     Level4,
     Processing,
-    AggAuxDataTypehint,
 )
 
 
@@ -302,15 +302,17 @@ class ShearProcessing(Processing):
         cls,
         fname: str,
         level: Literal[1, 2, 3, 4],
-        data_aux: AggAuxDataTypehint | AuxDataTypehint | None = None,
+        data_aux: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None,
     ):
+        """
+        Create shear processing pipeline from ATOMIX netcdf file.
+
+        Supplying data_aux here triggers the full API (dictionary with aggregation
+        instructions if level<=2). If one wishes to use the simplified data aggregation
+        API, one should first create a ShearLevelN object, then use .add_aux_data().
+        """
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-        if data_aux is None:
-            data_aux = {}
-        if level <= 2:
-            data._agg_aux_data = data_aux
-        else:
-            data._aux_data = data_aux
+        data.add_aux_data(data_aux)
         return cls(data, level)
 
 

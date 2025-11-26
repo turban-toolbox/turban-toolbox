@@ -53,7 +53,7 @@ def mrd_to_shear_level1(
     )
 
     for varname in ['SA', 'CT', 'Press', 'DENS']:
-        sl1.add_aux_data(varname, data_level1[varname].values)
+        sl1.add_aux_data(data_level1[varname].values, varname)
 
     return sl1
 
