@@ -447,12 +447,15 @@ def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> list[list[int]]:
 
 def define_sections(
     *data_and_bounds: tuple[Float[ndarray, "*any"], float, float],
-    segment_min_len: int | None = None,
+    segment_min_len: int = 0,
+    trim: int = 0,
 ) -> Int[ndarray, "*any"]:
     """
-    Select sections from a list of time series.
+    Select sections from a list of time series by requiring values to fall within
+    (min, max) bounds.
     Arguments are tuples of (data_array, min, max) values.
     segment_min_len (int) only retains sections with this minimum length.
+    trim (int) shortens (positive) or widens (negative) the sections.
 
     Returns:
         List of indices for each section (list of lists of integers)
@@ -465,9 +468,24 @@ def define_sections(
         if up is not None:
             inds = inds & (up >= np.array(data))
 
+    if trim != 0:
+        abstrim = abs(trim)
+        inds_rollpos = np.roll(inds, abstrim)
+        inds_rollneg = np.roll(inds, -abstrim)
+        # handle wraparound of np.roll
+        inds_rollpos[:abstrim] = False
+        inds_rollneg[-abstrim:] = False
+
+        if trim > 0:
+            # trim so that sections become shorter
+            inds = inds & inds_rollneg & inds_rollpos
+        else:
+            # sections become longer
+            inds = inds | inds_rollneg | inds_rollpos
+
     sections = boolarr_to_sections(inds)
 
-    if segment_min_len is not None:
+    if segment_min_len > 0:
         sections = [sec for sec in sections if len(sec) >= segment_min_len]
 
     section_number = np.zeros(data_shp, dtype=int)
