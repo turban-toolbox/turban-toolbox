@@ -23,8 +23,8 @@ def calc_shear(shear, vsink, density, fs):
     # calculate time gradient of raw shear
     dshdt = np.gradient(shear_hp, dt)
     # screen for spikes
-    dshdt_desp = despike_std(dshdt, 1024, 4)
-    # dshdt_desp = dshdt
+    # dshdt_desp = despike_std(dshdt, 1024, 4)
+    dshdt_desp = dshdt # do not despike at level1!
 
     vsink_tmp = vsink.copy()
     vsink_tmp[vsink_tmp == 0] = np.nan

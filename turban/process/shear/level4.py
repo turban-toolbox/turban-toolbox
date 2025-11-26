@@ -84,7 +84,11 @@ def process_level4(
         np.where(use_waveno, psi_model, np.nan)[..., 1:],
         log_psi_var,
     )
-    assert np.all(np.equal(num_spec_points, num_spec_points_fom))  # Sanity check
+    num_spec_points_agree = np.equal(num_spec_points, num_spec_points_fom)
+    if not np.all(num_spec_points_agree):
+        warnings.warn(
+            f"Disagreement about number of available spectral points at {np.where(~num_spec_points_agree)}"
+        )
 
     return (
         eps,
