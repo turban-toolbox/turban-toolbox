@@ -57,7 +57,7 @@ class TimeseriesLevel:
     time: Float[ndarray, "time"]
 
     _coords: ClassVar[list[str]] = ["time"]
-    _level: int
+    _level: ClassVar[int]
 
     def arrays_as_xr_dicts(self):
         dct = {
@@ -123,7 +123,12 @@ class AuxiliaryData(TimeseriesLevel):
 
     def add_aux_data(
         self,
-        data: Num[ndarray, "time"] | AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None,
+        data: (
+            Num[ndarray, "time"]
+            | AuxDataTypehintLevel12
+            | AuxDataTypehintLevel34
+            | None
+        ),
         name: str | None = None,
         agg_method: str | None = "mean",
         name_out: str | None = None,
@@ -207,7 +212,7 @@ class Level1(AuxiliaryData):
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     section_number: Int[ndarray, "time"]
 
-    _level: int = 1
+    _level: ClassVar[int] = 1
 
     # TODO should consider using pydantic or similar for runtime checking of user input
     # (e.g., positive platform speed, etc.)
@@ -218,7 +223,7 @@ class Level2(HasLevelBelow, AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _level: int = 2
+    _level: ClassVar[int] = 2
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
@@ -239,7 +244,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
 
     _coords = ["time", "freq"]
 
-    _level: int = 3
+    _level: ClassVar[int] = 3
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level2) -> dict:
@@ -294,7 +299,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
 class Level4(HasLevelBelow, AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
-    _level: int = 4
+    _level: ClassVar[int] = 4
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level3) -> dict:
