@@ -71,13 +71,10 @@ class TimeseriesLevel:
         }
         data_vars = {k: v for k, v in dct.items() if k not in self._coords}
         coords = {k: v for k, v in dct.items() if k in self._coords}
-        print(type(self), data_vars.keys(), coords.keys())
-
         return data_vars, coords
 
     def to_xarray(self):
         data_vars, coords = self.arrays_as_xr_dicts()
-        # print(data_vars.keys(), coords.keys())
         return xr.Dataset(data_vars=data_vars, coords=coords)
 
     def get_attr(self, name):
