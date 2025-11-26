@@ -126,16 +126,17 @@ class AuxiliaryData(TimeseriesLevel):
 
     def add_aux_data(
         self,
-        name: str,
         data: Num[ndarray, "time"] | AggAuxDataTypehint | AuxDataTypehint | None,
+        name: str | None = None,
         agg_method: str | None = "mean",
         name_out: str | None = None,
     ):
         """Adds auxiliary data to any level.
 
-        If data is a 1D numpy array, uses simplified API. Must supply `agg_method` and optionally `name_out`.
+        If data is a 1D numpy array, uses simplified API.
+        Must then supply `name`, `agg_method` and optionally `name_out`.
 
-        Otherwise, use the full API
+        Otherwise, use the full API.
         """
         if data is None:
             self._aux_data = {}

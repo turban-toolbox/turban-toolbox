@@ -312,12 +312,7 @@ class ShearProcessing(Processing):
         API, one should first create a ShearLevelN object, then use .add_aux_data().
         """
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
-        if data_aux is None:
-            data_aux = {}
-        if level <= 2:
-            data._aux_data = data_aux
-        else:
-            data._aux_data = data_aux
+        data.add_aux_data(data_aux)
         return cls(data, level)
 
 
