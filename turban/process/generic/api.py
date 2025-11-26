@@ -37,6 +37,7 @@ AuxDataTypehint = dict[
     ],
 ]
 
+
 def get_type_hints_recursive(obj):
     """
     Collect all type definitions on a given objects, also from parent classes.
@@ -47,7 +48,7 @@ def get_type_hints_recursive(obj):
     # loop through MRO in reverse order if anything is superseded by inheritance
     for type_ in type(obj).mro()[::-1]:
         hints.update(get_type_hints(type_))
-    
+
     return hints
 
 
@@ -56,6 +57,7 @@ class TimeseriesLevel:
     time: Float[ndarray, "time"]
 
     _coords: ClassVar[list[str]] = ["time"]
+    _level: int
 
     def arrays_as_xr_dicts(self):
         dct = {
@@ -69,10 +71,13 @@ class TimeseriesLevel:
         }
         data_vars = {k: v for k, v in dct.items() if k not in self._coords}
         coords = {k: v for k, v in dct.items() if k in self._coords}
+        print(type(self), data_vars.keys(), coords.keys())
+
         return data_vars, coords
 
     def to_xarray(self):
         data_vars, coords = self.arrays_as_xr_dicts()
+        # print(data_vars.keys(), coords.keys())
         return xr.Dataset(data_vars=data_vars, coords=coords)
 
     def get_attr(self, name):
@@ -82,46 +87,11 @@ class TimeseriesLevel:
 
 
 @dataclass(kw_only=True)
-class AuxiliaryDataFast(TimeseriesLevel):
+class AuxiliaryData(TimeseriesLevel):
     """Mix-in class. Only useful for Level1 and Level2"""
 
     # Here auxiliary data are stored along with aggregation instructions
-    _agg_aux_data: AggAuxDataTypehint | None = None
-
-    def __post_init__(self):
-        if self._agg_aux_data is None:
-            self._agg_aux_data = {}
-
-    def arrays_as_xr_dicts(self):
-        data_vars, coords = super().arrays_as_xr_dicts()
-        # so linters understand we have a dict after __post_init__
-        data = cast(AggAuxDataTypehint, self._agg_aux_data)
-        data_vars.update(
-            {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
-        )
-        return data_vars, coords
-
-    def add_aux_data(
-        self,
-        name: str,
-        data: Float[ndarray, "time"],
-        agg_method: str = "mean",
-        name_out: str | None = None,
-    ):
-        """Simplified API"""
-        # so linters understand we have a dict after __post_init__
-        self._agg_aux_data = cast(AggAuxDataTypehint, self._agg_aux_data)
-        if name in self._agg_aux_data:
-            raise ValueError(f"Aux data `{name}` already exists")
-        # Construct the full aggregation instruction
-        self._agg_aux_data[name] = (["time"], data, {agg_method: name_out})
-
-
-@dataclass(kw_only=True)
-class AuxiliaryDataSlow(TimeseriesLevel):
-    """Mix-in class. Only useful for Level3 and Level4"""
-
-    _aux_data: AuxDataTypehint | None = None
+    _aux_data: AggAuxDataTypehint | AuxDataTypehint | None = None
 
     def __post_init__(self):
         if self._aux_data is None:
@@ -129,22 +99,77 @@ class AuxiliaryDataSlow(TimeseriesLevel):
 
     def arrays_as_xr_dicts(self):
         data_vars, coords = super().arrays_as_xr_dicts()
-        # so linters understand we have a dict after __post_init__
-        data = cast(AuxDataTypehint, self._aux_data)
-        data_vars.update(data)
+        if self._level <= 2:
+            data = cast(AggAuxDataTypehint, self._aux_data)
+            data_vars.update(
+                {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
+            )
+        else:
+            data = cast(AuxDataTypehint, self._aux_data)
+            data_vars.update(
+                {varname: (dims, arr) for varname, (dims, arr) in data.items()}
+            )
         return data_vars, coords
+
+    def _variable_present(self, name):
+        """Returns True if variable called `name` already present somewhere"""
+        if name in self._aux_data:
+            warnings.warn(f"Variable`{name}` already exists in aux data, skipping")
+        elif name in get_type_hints_recursive(self):
+            warnings.warn(
+                f"Variable `{name}` already defined on object itself, skipping"
+            )
+        else:
+            return False
+
+        return True
 
     def add_aux_data(
         self,
         name: str,
-        data: Float[ndarray, "time"],
+        data: Num[ndarray, "time"] | AggAuxDataTypehint | AuxDataTypehint | None,
+        agg_method: str | None = "mean",
+        name_out: str | None = None,
     ):
-        """This simply adds entries"""
-        # so linters understand we have a dict after __post_init__
-        self._aux_data = cast(AuxDataTypehint, self._aux_data)
-        if name in self._aux_data:
-            raise ValueError(f"Aux data `{name}` already exists")
-        self._aux_data[name] = (["time"], data)
+        """Adds auxiliary data to any level.
+
+        If data is a 1D numpy array, uses simplified API. Must supply `agg_method` and optionally `name_out`.
+
+        Otherwise, use the full API
+        """
+        if data is None:
+            self._aux_data = {}
+
+        elif isinstance(data, ndarray):
+            # Simplified API
+            if agg_method is None:
+                raise ValueError("`agg_method` must not be None")
+            data = cast(Num[ndarray, "time"], data)
+            # so linters understand we have a dict after __post_init__
+            if not self._variable_present(name):
+                if self._level <= 2:
+                    self._aux_data = cast(AggAuxDataTypehint, self._aux_data)
+                    agg_method = cast(str, agg_method)  # agg_method must be str
+                    # Construct the full aggregation instruction
+                    self._aux_data[name] = (["time"], data, {agg_method: name_out})
+                else:
+                    self._aux_data = cast(AuxDataTypehint, self._aux_data)
+                    self._aux_data[name] = (["time"], data)
+
+        else:
+            # Full API
+            data = cast(AggAuxDataTypehint | AuxDataTypehint, data)
+            if self._level <= 2:
+                self._aux_data = cast(AggAuxDataTypehint, self._aux_data)
+            else:
+                self._aux_data = cast(AuxDataTypehint, self._aux_data)
+            # clean data for variables that are not present
+            data = {
+                varname: v
+                for varname, v in data.items()
+                if not self._variable_present(varname)
+            }
+            self._aux_data = data
 
 
 @dataclass(kw_only=True)
@@ -179,19 +204,23 @@ class HasLevelBelow(TimeseriesLevel):
 
 
 @dataclass(kw_only=True)
-class Level1(AuxiliaryDataFast):
+class Level1(AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     section_number: Int[ndarray, "time"]
+
+    _level: int = 1
 
     # TODO should consider using pydantic or similar for runtime checking of user input
     # (e.g., positive platform speed, etc.)
 
 
 @dataclass(kw_only=True)
-class Level2(HasLevelBelow, AuxiliaryDataFast):
+class Level2(HasLevelBelow, AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
+
+    _level: int = 2
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
@@ -199,12 +228,12 @@ class Level2(HasLevelBelow, AuxiliaryDataFast):
             time=data.time,
             senspeed=data.senspeed,
             section_number=data.section_number,
-            _agg_aux_data=data._agg_aux_data,
+            _aux_data=data._aux_data,
         )
 
 
 @dataclass(kw_only=True)
-class Level3(HasLevelBelow, AuxiliaryDataSlow):
+class Level3(HasLevelBelow, AuxiliaryData):
     waveno: Float[ndarray, "time waveno"]
     freq: Float[ndarray, "waveno"]
     senspeed: Float[ndarray, "time"]
@@ -212,12 +241,14 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
 
     _coords = ["time", "freq"]
 
+    _level: int = 3
+
     @classmethod
     def _from_level_below_kwarg(cls, data: Level2) -> dict:
         return dict(
             time=data.time,
             _aux_data=cls.agg(
-                data=cast(AggAuxDataTypehint, data._agg_aux_data),
+                data=cast(AggAuxDataTypehint, data._aux_data),
                 data_len=len(data.time),
                 chunk_length=data.cfg.chunk_length,
                 chunk_overlap=data.cfg.chunk_overlap,
@@ -262,8 +293,10 @@ class Level3(HasLevelBelow, AuxiliaryDataSlow):
 
 
 @dataclass(kw_only=True)
-class Level4(HasLevelBelow, AuxiliaryDataSlow):
+class Level4(HasLevelBelow, AuxiliaryData):
     section_number: Int[ndarray, "time"]
+
+    _level: int = 4
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level3) -> dict:

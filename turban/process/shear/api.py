@@ -304,11 +304,18 @@ class ShearProcessing(Processing):
         level: Literal[1, 2, 3, 4],
         data_aux: AggAuxDataTypehint | AuxDataTypehint | None = None,
     ):
+        """
+        Create shear processing pipeline from ATOMIX netcdf file.
+
+        Supplying data_aux here triggers the full API (dictionary with aggregation
+        instructions if level<=2). If one wishes to use the simplified data aggregation
+        API, one should first create a ShearLevelN object, then use .add_aux_data().
+        """
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
         if data_aux is None:
             data_aux = {}
         if level <= 2:
-            data._agg_aux_data = data_aux
+            data._aux_data = data_aux
         else:
             data._aux_data = data_aux
         return cls(data, level)
