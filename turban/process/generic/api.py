@@ -38,7 +38,7 @@ AuxDataTypehintLevel34 = dict[
 ]
 
 
-def get_type_hints_recursive(obj):
+def get_type_hints_recursive(obj) -> dict:
     """
     Collect all type definitions on a given objects, also from parent classes.
 
@@ -76,6 +76,17 @@ class TimeseriesLevel:
     def to_xarray(self):
         data_vars, coords = self.arrays_as_xr_dicts()
         return xr.Dataset(data_vars=data_vars, coords=coords)
+
+    @classmethod
+    def from_xarray(cls, ds: xr.Dataset):
+        raise NotImplementedError
+        data = {}
+        hints = get_type_hints_recursive(cls).items()
+        for name in ds:
+            if name in hints:
+                data[name] = ds[name].values
+        # how to handle aux data?
+        return cls(**data)
 
     def get_attr(self, name):
         attr = getattr(self, name)
