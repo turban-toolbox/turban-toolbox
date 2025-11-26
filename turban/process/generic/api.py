@@ -16,7 +16,7 @@ import xarray as xr
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 
 # For Level1/2
-AggAuxDataTypehint = dict[
+AuxDataTypehintLevel12 = dict[
     str,  # variable name
     tuple[
         list[str],  # list of dimensions (for xarray)
@@ -29,7 +29,7 @@ AggAuxDataTypehint = dict[
 ]
 
 # For Level3/4
-AuxDataTypehint = dict[
+AuxDataTypehintLevel34 = dict[
     str,  # variable name
     tuple[
         list[str],  # list of dimensions (for xarray)
@@ -85,10 +85,10 @@ class TimeseriesLevel:
 
 @dataclass(kw_only=True)
 class AuxiliaryData(TimeseriesLevel):
-    """Mix-in class. Only useful for Level1 and Level2"""
+    """Mix-in class to provide support for non-essential auxiliary data"""
 
     # Here auxiliary data are stored along with aggregation instructions
-    _aux_data: AggAuxDataTypehint | AuxDataTypehint | None = None
+    _aux_data: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None
 
     def __post_init__(self):
         if self._aux_data is None:
@@ -97,12 +97,12 @@ class AuxiliaryData(TimeseriesLevel):
     def arrays_as_xr_dicts(self):
         data_vars, coords = super().arrays_as_xr_dicts()
         if self._level <= 2:
-            data = cast(AggAuxDataTypehint, self._aux_data)
+            data = cast(AuxDataTypehintLevel12, self._aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
             )
         else:
-            data = cast(AuxDataTypehint, self._aux_data)
+            data = cast(AuxDataTypehintLevel34, self._aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr) in data.items()}
             )
@@ -123,7 +123,7 @@ class AuxiliaryData(TimeseriesLevel):
 
     def add_aux_data(
         self,
-        data: Num[ndarray, "time"] | AggAuxDataTypehint | AuxDataTypehint | None,
+        data: Num[ndarray, "time"] | AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None,
         name: str | None = None,
         agg_method: str | None = "mean",
         name_out: str | None = None,
@@ -146,21 +146,21 @@ class AuxiliaryData(TimeseriesLevel):
             # so linters understand we have a dict after __post_init__
             if not self._variable_present(name):
                 if self._level <= 2:
-                    self._aux_data = cast(AggAuxDataTypehint, self._aux_data)
+                    self._aux_data = cast(AuxDataTypehintLevel12, self._aux_data)
                     agg_method = cast(str, agg_method)  # agg_method must be str
                     # Construct the full aggregation instruction
                     self._aux_data[name] = (["time"], data, {agg_method: name_out})
                 else:
-                    self._aux_data = cast(AuxDataTypehint, self._aux_data)
+                    self._aux_data = cast(AuxDataTypehintLevel34, self._aux_data)
                     self._aux_data[name] = (["time"], data)
 
         else:
             # Full API
-            data = cast(AggAuxDataTypehint | AuxDataTypehint, data)
+            data = cast(AuxDataTypehintLevel12 | AuxDataTypehintLevel34, data)
             if self._level <= 2:
-                self._aux_data = cast(AggAuxDataTypehint, self._aux_data)
+                self._aux_data = cast(AuxDataTypehintLevel12, self._aux_data)
             else:
-                self._aux_data = cast(AuxDataTypehint, self._aux_data)
+                self._aux_data = cast(AuxDataTypehintLevel34, self._aux_data)
             # clean data for variables that are not present
             data = {
                 varname: v
@@ -246,7 +246,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
         return dict(
             time=data.time,
             _aux_data=cls.agg(
-                data=cast(AggAuxDataTypehint, data._aux_data),
+                data=cast(AuxDataTypehintLevel12, data._aux_data),
                 data_len=len(data.time),
                 chunk_length=data.cfg.chunk_length,
                 chunk_overlap=data.cfg.chunk_overlap,
@@ -257,12 +257,12 @@ class Level3(HasLevelBelow, AuxiliaryData):
     @classmethod
     def agg(
         cls,
-        data: AggAuxDataTypehint,
+        data: AuxDataTypehintLevel12,
         data_len: int,
         chunk_length: int,
         chunk_overlap: int,
         section_number: Int[ndarray, "time"],
-    ) -> AuxDataTypehint:
+    ) -> AuxDataTypehintLevel34:
         """Aggregates data from Level2. These are stored in  in the form:
         {variable_name_fast: ([dims], ndarray, {agg_method: variable_new_slow}])}
         """

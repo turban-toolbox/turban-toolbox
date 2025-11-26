@@ -13,13 +13,13 @@ from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
 from turban.process.generic.api import (
-    AuxDataTypehint,
+    AuxDataTypehintLevel12,
+    AuxDataTypehintLevel34,
     Level1,
     Level2,
     Level3,
     Level4,
     Processing,
-    AggAuxDataTypehint,
 )
 
 
@@ -302,7 +302,7 @@ class ShearProcessing(Processing):
         cls,
         fname: str,
         level: Literal[1, 2, 3, 4],
-        data_aux: AggAuxDataTypehint | AuxDataTypehint | None = None,
+        data_aux: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None,
     ):
         """
         Create shear processing pipeline from ATOMIX netcdf file.
