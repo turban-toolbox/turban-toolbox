@@ -1,5 +1,9 @@
 import numpy as np
 import scipy.signal
+import numpy as np
+from jaxtyping import Int
+from numpy import ndarray, newaxis
+from scipy.signal import butter, lfilter, lfiltic
 
 
 def calc_shear(shear, vsink, density, fs):
@@ -17,14 +21,14 @@ def calc_shear(shear, vsink, density, fs):
     degree = 4
     cutoff_Fs = 1  # 1 Hz
     cutoff = cutoff_Fs / (fs / 2)  # non - dim with Nyquist freq.
-    [b, a] = scipy.signal.butter(degree, cutoff, 'high')
+    [b, a] = scipy.signal.butter(degree, cutoff, "high")
 
     shear_hp = scipy.signal.filtfilt(b, a, shear)
     # calculate time gradient of raw shear
     dshdt = np.gradient(shear_hp, dt)
     # screen for spikes
     # dshdt_desp = despike_std(dshdt, 1024, 4)
-    dshdt_desp = dshdt # do not despike at level1!
+    dshdt_desp = dshdt  # do not despike at level1!
 
     vsink_tmp = vsink.copy()
     vsink_tmp[vsink_tmp == 0] = np.nan
@@ -32,7 +36,8 @@ def calc_shear(shear, vsink, density, fs):
     shear = dshdt_desp * (density ** (-1)) * (vsink_tmp ** (-2))
     return shear
 
-def calc_vsink(press, fs, f_low = 0.2):
+
+def calc_vsink(press, fs, f_low=0.2):
     dt = 1 / fs
     # Low pass the pressure signal
     degree = 4
@@ -161,7 +166,7 @@ def gradient_legacy(x, dt):
     print(np.asarray(x))
     print(np.shape(x))
     print(np.shape(dxdt))
-    print(np.shape(x[2:]),np.shape(x[1:-1]),np.shape(x[0:-2]))
+    print(np.shape(x[2:]), np.shape(x[1:-1]), np.shape(x[0:-2]))
     print(np.shape(dxdt[2:]))
     print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)))
     print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2])))
@@ -171,3 +176,18 @@ def gradient_legacy(x, dt):
     dxdt[1] = (x[2] - x[0]) / (2 * dt)
 
     return dxdt
+
+
+def deconvolute_mss_ntchp(
+    x: Int[ndarray, "time"],
+    x_emph: Int[ndarray, "time"],
+    sampfreq: float,
+    gain: float = 1.5,
+):
+    cutoff_freq_Hz = 1 / (2 * np.pi * gain)
+    # cutoff_freq_Hz = 0.5
+    cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
+    b, a = butter(N=1, Wn=cutoff_nondim, btype="low")
+    zi = lfiltic(b, a, x[:1], x_emph[:1])  # initial conditions
+    x_d, _ = lfilter(b, a, x_emph, zi=zi)  # deconvoluted
+    return x_d
