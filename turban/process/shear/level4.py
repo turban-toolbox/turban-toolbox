@@ -150,18 +150,6 @@ def get_quality_metric(
     return quality_metric
 
 
-def unwrap_base2(
-    q: Int[ndarray, "*any"], maxflag: int = 16
-) -> dict[int, Bool[ndarray, "*any"]]:
-    """Unwrap integers into base 2 constituents"""
-    flag_arr: Bool[ndarray, "*any"] = np.unpackbits(
-        q.astype(np.uint8)[np.newaxis], axis=0, bitorder="little"
-    ).astype(bool)
-    base = [2**i for i in range(int(np.log2(maxflag) + 1))]
-    flag_dict = {name: val for name, val in zip(base, flag_arr)}
-    return flag_dict
-
-
 def get_log_diss_var(
     eps_source_flag: Int[ndarray, "nshear time"],
     kolm_length: Float[ndarray, "nshear time"],
