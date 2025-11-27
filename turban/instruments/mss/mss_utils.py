@@ -178,7 +178,7 @@ def gradient_legacy(x, dt):
     return dxdt
 
 
-def deconvolute_mss_ntchp(
+def deconvolve_mss_ntchp(
     x: Int[ndarray, "time"],
     x_emph: Int[ndarray, "time"],
     sampfreq: float,
