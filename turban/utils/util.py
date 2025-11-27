@@ -478,5 +478,3 @@ def unwrap_base2(
     base = [2**i for i in range(int(np.log2(maxflag) + 1))]
     flag_dict = {name: val for name, val in zip(base, flag_arr)}
     return flag_dict
-
-
