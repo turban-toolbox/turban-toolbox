@@ -4,15 +4,15 @@ from numpy import newaxis
 import matplotlib.pyplot as plt
 
 from turban.process.shear.level4 import (
-    unwrap_quality_metric,
+    unwrap_base2,
     model_spectrum,
     model_spectrum_lueck,
 )
 
 
-def test_unwrap_quality_metric():
+def test_unwrap_unwrap_base2():
     q = np.array([0, 1, 2, 3, 9])
-    qd = unwrap_quality_metric(q)
+    qd = unwrap_base2(q)
     assert np.all(qd[1] == np.array([False, True, False, True, True]))
     assert np.all(qd[2] == np.array([False, False, True, True, False]))
     assert np.all(qd[4] == np.array([False, False, False, False, False]))
