@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from jaxtyping import Float, Int
 from numpy import ndarray, newaxis
@@ -5,6 +6,8 @@ from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 
 from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_last
+from turban.utils.util import agg_fast_to_slow, get_chunking_index
+from turban.utils.spectra import spectrum
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
@@ -15,53 +18,64 @@ q_b = 3.7
 
 
 def temperature_gradient_spectra(
-    dTdt: Float[ndarray, "time_fast"],
+    dtempdt: Float[ndarray, "ntemp time_fast"],
     senspeed: Float[ndarray, "time_fast"],
-    chunklen: int,
-    chunkoverlap: int,
     segment_length: int,
+    segment_overlap: int,
+    chunk_length: int,
+    chunk_overlap: int,
     sampfreq: float,
+    waveno_limit_upper: float,
+    section_number: Int[ndarray, "time_fast"],
 ) -> tuple[
-    Float[ndarray, "time_slow waveno"],
-    Float[ndarray, "time_slow waveno"],
-    Float[ndarray, "1 waveno"],
+    Float[ndarray, "time_slow k"],  # k
+    Float[ndarray, "ntemp time_slow waveno"],  # Pk
+    Float[ndarray, "ntemp time_slow waveno"],  # Pf
+    Float[ndarray, "waveno"],  # freq
+    Float[ndarray, "time_slow"],  # senspeeda
+    Int[ndarray, "time_slow"],  # section_number_slow
+    Float[ndarray, "ntemp waveno"],  # psi_noise
 ]:
-    yr: Float[ndarray, "time_slow freq"] = reshape_halfoverlap_last(
-        dTdt, segment_length
-    )
-    yr -= yr.mean(axis=1)[:, np.newaxis]
-    yr *= np.hanning(segment_length)[np.newaxis, :]
-
-    freq: Float[ndarray, "1 freq"] = np.fft.rfftfreq(segment_length, d=1 / sampfreq)[
-        np.newaxis, :
-    ]
-    Fyr = np.fft.rfft(yr)[:, :]
-    Pf: Float[ndarray, "time_slow freq"] = (Fyr.conj() * Fyr).real
-
-    senspeeda: Float[ndarray, "time_slow 1"] = reshape_any_first(
-        reshape_halfoverlap_last(senspeed, segment_length).mean(axis=1)[:, np.newaxis],
-        chunklen,
-        chunkoverlap,
-    ).mean(axis=1)
-    assert senspeeda.shape[1] == 1
-
-    correction = correction_frequency_response_bilinear(
-        freq=freq, Fs=sampfreq
-    ) * correction_frequency_response_vachon_lueck(freq=freq, senspeed=senspeeda)
-
-    # average spectra by chunks
-    Pf = reshape_any_first(Pf, chunklen, chunkoverlap).mean(axis=1)
-    # Pf = Pf * correction
-
-    k = freq / senspeeda
-    Pk: Float[ndarray, "time_slow freq"] = (
-        Pf * senspeeda / segment_length / (sampfreq / 2)
+    ii = get_chunking_index(
+        section_number,
+        (chunk_length, chunk_overlap),
+        (segment_length, segment_overlap),
     )
 
-    Pnoise = get_noise(Pk)
+    psi_f, freq = spectrum(
+        dtempdt,
+        sampfreq,
+        section_number=section_number,
+        chunk_length=chunk_length,
+        chunk_overlap=chunk_overlap,
+        segment_length=segment_length,
+        segment_overlap=segment_overlap,
+    )
+
+    # platform speed
+    senspeeda = agg_fast_to_slow(senspeed, reshape_index=ii)
+
+    section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
+
+    # double check spectral corrections
+    psi_f *= correction_frequency_response_bilinear(freq=freq, Fs=sampfreq)
+    psi_f *= correction_frequency_response_vachon_lueck(freq=freq, senspeed=senspeeda)
+
+    waveno = freq / senspeeda
+    psi_k: Float[ndarray, "time_slow freq"] = (
+        psi_f * senspeeda / segment_length / (sampfreq / 2)
+    )
+
+    # to waveno domain
+    psi_k = psi_f * senspeeda[newaxis, :, newaxis]
+    waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
+
+    # TODO explore supplying own noise level by input arguments
+    psi_noise = get_noise(psi_k)
+    # TODO double check whether we should subtract noise here
     # Pk -= Pnoise
 
-    return k, Pk, Pnoise
+    return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow, psi_noise
 
 
 def correction_frequency_response_bilinear(
@@ -100,4 +114,22 @@ def correction_frequency_response_vachon_lueck(
 
 
 def correction_frequency_response():
+    raise warnings.warn("To be implemented")
     return 1
+
+
+def get_noise(
+    spectra: Float[ndarray, "time frequency"],
+) -> Float[ndarray, "frequency"]:
+    """
+    Define noise as average of least intense 5% of spectra
+    """
+    if spectra.shape[0] > 0:
+        # a measure of the intensity of the spectrum
+        spec_intens = np.mean(spectra[:, :20], axis=1)
+        # 5 % least intense spectra
+        (ii,) = np.where(spec_intens < np.percentile(spec_intens, 5))
+        noise = 10 ** np.mean(np.log10(spectra[ii, :]), axis=0)
+        return noise
+    else:
+        return np.zeros((spectra.shape[1],), dtype=float)

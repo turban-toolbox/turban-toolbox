@@ -84,54 +84,42 @@ def tke_dissipation(
 
 
 def temperature_dissipation(
-    dTdt: Float[ndarray, "time_fast"],
-    senspeed: Float[ndarray, "time_fast"],
-    chunklen: int,
-    chunkoverlap: int,
-    segment_length: int,
-    sampfreq: float,
+    psi_k: Float[ndarray, "ntemp time_slow waveno"],
+    waveno: Float[ndarray, "time_slow waveno"],
+    psi_noise: Float[ndarray, "ntemp waveno"],
     waveno_limit_upper: float,
 ) -> tuple[
-    Float[ndarray, "time_slow waveno"],
-    Float[ndarray, "time_slow waveno"],
-    Float[ndarray, "time_slow waveno"],
-    Float[ndarray, "time_slow"],
-    Float[ndarray, "time_slow"],
+    Float[ndarray, "ntemp time_slow"],
+    Float[ndarray, "ntemp time_slow"],
 ]:
     """
     Calculate chi (temperature variance dissipation)
     """
-    k, Pk, Pnoise = temperature_gradient_spectra(
-        dTdt,
-        senspeed,
-        chunklen,
-        chunkoverlap,
-        segment_length,
-        sampfreq,
-    )
 
-    chi = integrate_chi(k, Pk, Pnoise, waveno_limit_upper)
+    chi = integrate_chi(waveno, psi_k, psi_noise, waveno_limit_upper)
 
     # first round of k_batchelor estimates
-    kb_est1 = k_batchelor_mle(chi, k, Pk, Pnoise)
+    kb_est1 = k_batchelor_mle(chi, waveno, psi_k, psi_noise)
     # correct for unresolved variance
     # note that k[:, 0]==0 is dropped from integrals
     kstar = 0.04 * np.sqrt(diffusivity_temp / viscosity_kinematic) * kb_est1
     # lower waveno integration limit
-    kLO = k[range(k.shape[0]), np.argmax(3 * kstar[:, newaxis] <= k, axis=1)]
-    kLO = np.where(
-        3 * kstar >= k[:, 1], kLO, k[:, 1]
+    klo = waveno[
+        range(waveno.shape[0]), np.argmax(3 * kstar[:, newaxis] <= waveno, axis=1)
+    ]
+    klo = np.where(
+        3 * kstar >= waveno[:, 1], klo, waveno[:, 1]
     )  # where k[1] is smaller than 3*kstar, round up to kstar
-    # # higher waveno integration limit
-    kUP = k[:, -1]
+    # upper waveno integration limit
+    kup = waveno[:, -1]
     chi_low = (
         6.0
         * diffusivity_temp
         * integrate_batchelor_theoretical(
             1e-3 + np.zeros_like(kb_est1),  # something "small"
-            kLO,
+            klo,
             kb_est1,
-            k,
+            waveno,
             chi,
             diffusivity_temp,
             q_b,
@@ -141,10 +129,10 @@ def temperature_dissipation(
         6.0
         * diffusivity_temp
         * integrate_batchelor_theoretical(
-            kUP,
+            kup,
             2000.0 + np.zeros_like(kb_est1),
             kb_est1,
-            k,
+            waveno,
             chi,
             diffusivity_temp,
             q_b,
@@ -154,10 +142,11 @@ def temperature_dissipation(
     chi_correction = (chi_high + chi_low) / chi
 
     # MLE fitting, round 2
-    kb_est2 = k_batchelor_mle(chi, k, Pk, Pnoise)
+    kb_est2 = k_batchelor_mle(chi, waveno, psi_k, psi_noise)
+    eps_est2 = kb_est2 ** (4.0) * viscosity_kinematic * diffusivity_temp ** (2.0)
 
     # TODO missing steps
-    # find maximum likelihood from 5th order polynomial fit -> kB (MOVE THIS INTO k_batchelor_mle...!!!)
+    # find maximum likelihood from 5th order polynomial fit -> kB (move this into k_batchelor_mle?)
     # find eps, eps_CI from that
     # calculate theoretical spectrum from chi, eps so far
     # integrate theoretical spectrum to give final value of chi
@@ -165,11 +154,8 @@ def temperature_dissipation(
     # get linear fit to observed spectrum -> use for likelihood ratio
 
     return (
-        k,
-        Pk,
-        Pnoise,
         chi,
-        kb_est2,
+        eps_est2,
     )
 
 
@@ -333,20 +319,3 @@ def costfunction_c11(
     # degrees of freedom
     cost_vector = chisquared(dof * psi / psi_theoretical, dof)
     return np.nanmean(cost_vector, axis=-1)
-
-
-def get_noise(
-    spectra: Float[ndarray, "time frequency"],
-) -> Float[ndarray, "1 frequency"]:
-    """
-    Define noise as average of least intense 5% of spectra
-    """
-    if spectra.shape[0] > 0:
-        # a measure of the intensity of the spectrum
-        spec_intens = np.mean(spectra[:, :20], axis=1)
-        # 5 % least intense spectra
-        (ii,) = np.where(spec_intens < np.percentile(spec_intens, 5))
-        noise = 10 ** np.mean(np.log10(spectra[ii, :]), axis=0)[newaxis, :]
-        return noise
-    else:
-        return np.zeros((1, spectra.shape[1]), dtype=float)
