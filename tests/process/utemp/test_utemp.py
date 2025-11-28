@@ -9,8 +9,8 @@ from turban.instruments.mss import mss_mrd
 from turban.instruments.mss.api import mrd_to_level1
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.instruments.mss.mss_mrd import read_mrd, level0_to_level1, raw_to_level0
-from turban.process.temperature.level3 import get_noise
-from turban.process.temperature.api import TempLevel1, TempConfig, TempProcessing
+from turban.process.utemp.level3 import get_noise
+from turban.process.utemp.api import UTempConfig, UTempProcessing
 from turban.utils.util import define_sections
 from turban.instruments.mss.mss_utils import deconvolve_mss_ntchp
 
@@ -23,7 +23,7 @@ def test_mss():
     with open(top_level / "data" / "mss" / "probeconf_mss053_2024.json") as f:
         mss_cfg_053 = MssDeviceConfig.model_validate(json.load(f))
 
-    cfg = TempConfig(
+    cfg = UTempConfig(
         sampfreq=1024.0,
         segment_length=2048,
         segment_overlap=1024,
@@ -35,5 +35,5 @@ def test_mss():
     fname = top_level / "data" / "mss" / "AO2024_0035.MRD"
     # sl1 = mrd_to_level1(fname, 'shear', cfg, mss_cfg_053)
     ut1 = mrd_to_level1(fname, "utemp", cfg, mss_cfg_053)
-    p = TempProcessing(ut1, level=1)
+    p = UTempProcessing(ut1, level=1)
     ds4 = p.level4.to_xarray()

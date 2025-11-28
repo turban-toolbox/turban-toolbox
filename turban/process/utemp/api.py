@@ -8,11 +8,11 @@ import numpy as np
 import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
-from turban.process.temperature.config import TempConfig
+from turban.process.utemp.config import UTempConfig
 
-# from turban.process.temperature.level2 import process_level2
-from turban.process.temperature.level3 import temperature_gradient_spectra
-from turban.process.temperature.level4 import temperature_dissipation
+# from turban.process.utemp.level2 import process_level2
+from turban.process.utemp.level3 import temperature_gradient_spectra
+from turban.process.utemp.level4 import temperature_dissipation
 from turban.process.generic.api import (
     AuxDataTypehintLevel12,
     AuxDataTypehintLevel34,
@@ -25,13 +25,13 @@ from turban.process.generic.api import (
 
 
 @dataclass(kw_only=True)
-class TempLevel1(Level1):
+class UTempLevel1(Level1):
     dtempdt: Float[ndarray, "ntemp time"]
-    cfg: TempConfig
+    cfg: UTempConfig
 
 
 @dataclass(kw_only=True)
-class TempLevel2(Level2):
+class UTempLevel2(Level2):
     senspeed: Float[ndarray, "time"]
     dtempdt: Float[ndarray, "ntemp time"]
     # num_despike_iter: Int[ndarray, "n_shear time"]
@@ -39,11 +39,11 @@ class TempLevel2(Level2):
     @classmethod
     def _from_level_below_kwarg(
         cls,
-        data: TempLevel1,
+        data: UTempLevel1,
     ):
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
-        cfg = cast(TempConfig, level1.cfg)  # just for type checkers to understand type
+        cfg = cast(UTempConfig, level1.cfg)  # just for type checkers to understand type
         utemp_cleaned = level1.dtempdt
         # utemp_cleaned, num_despike_iter = process_level2(
         #     level1.utemp,
@@ -65,7 +65,7 @@ class TempLevel2(Level2):
 
 
 @dataclass(kw_only=True)
-class TempLevel3(Level3):
+class UTempLevel3(Level3):
     psi_k: Float[ndarray, "ntemp time freq"]
     psi_noise: Float[ndarray, "ntemp freq"]
     psi_f: Float[ndarray, "ntemp time freq"]
@@ -73,10 +73,10 @@ class TempLevel3(Level3):
     @classmethod
     def _from_level_below_kwarg(
         cls,
-        data: TempLevel2,
+        data: UTempLevel2,
     ) -> dict:
         level2 = data
-        cfg = cast(TempConfig, level2.cfg)
+        cfg = cast(UTempConfig, level2.cfg)
         kwarg = super()._from_level_below_kwarg(level2)
 
         (
@@ -120,16 +120,16 @@ class TempLevel3(Level3):
 
 
 @dataclass(kw_only=True)
-class TempLevel4(Level4):
+class UTempLevel4(Level4):
     chi: Float[ndarray, "ntemp time"]
     eps: Float[ndarray, "ntemp time"]
 
     @classmethod
     def _from_level_below_kwarg(
         cls,
-        level3: TempLevel3,
+        level3: UTempLevel3,
     ) -> dict:
-        cfg = cast(TempConfig, level3.cfg)
+        cfg = cast(UTempConfig, level3.cfg)
         kwarg = super()._from_level_below_kwarg(level3)
 
         chi, eps = temperature_dissipation(
@@ -148,6 +148,6 @@ class TempLevel4(Level4):
         return kwarg
 
 
-class TempProcessing(Processing):
+class UTempProcessing(Processing):
 
-    _level_mapping = {1: TempLevel1, 2: TempLevel2, 3: TempLevel3, 4: TempLevel4}
+    _level_mapping = {1: UTempLevel1, 2: UTempLevel2, 3: UTempLevel3, 4: UTempLevel4}

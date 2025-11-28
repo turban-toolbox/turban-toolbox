@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-from turban.process.temperature.level3 import get_noise
+from turban.process.utemp.level3 import get_noise
 
 top_level = Path(__file__).resolve().parent.parent.parent.parent
 

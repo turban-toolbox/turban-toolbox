@@ -3,8 +3,8 @@ from typing import cast, Literal
 from pathlib import Path
 import numpy as np
 
-from turban.process.temperature.api import TempLevel1
-from turban.process.temperature.config import TempConfig
+from turban.process.utemp.api import UTempLevel1
+from turban.process.utemp.config import UTempConfig
 
 from turban.instruments.mss import mss_mrd
 
@@ -22,10 +22,10 @@ logger = logging.getLogger("turban.instruments.mss")
 def mrd_to_level1(
     fname: str | Path,
     target: Literal["shear", "utemp"],
-    proc_cfg: ShearConfig | TempConfig,
+    proc_cfg: ShearConfig | UTempConfig,
     mss_cfg: MssDeviceConfig | None = None,
     shear_sensitivities: dict[str, float] | None = None,
-) -> ShearLevel1 | TempLevel1:
+) -> ShearLevel1 | UTempLevel1:
     """
     Read a binary .MRD file and convert to level1.
 
@@ -57,12 +57,12 @@ def mrd_to_level1(
         )
 
     elif target == "utemp":
-        level1 = TempLevel1(
+        level1 = UTempLevel1(
             time=np.asarray(data_level1["time_count"]),
             senspeed=np.asarray(data_level1["PSPD_REL"]),
             dtempdt=np.asarray(data_level1["utemp"]),
             section_number=np.ones_like(data_level1["time_count"], dtype=int),
-            cfg=cast(TempConfig, proc_cfg),
+            cfg=cast(UTempConfig, proc_cfg),
         )
 
     for varname in ["SA", "CT", "Press", "DENS"]:
