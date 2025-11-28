@@ -4,17 +4,10 @@ from pytz import timezone
 import math
 import numpy
 import logging
-import sys
 import pkg_resources
-import os
-import hashlib
 import re
-import glob
 
-from . import mss_utils
-import scipy.signal
-import errno
-import copy
+from turban.instruments.mss import mss_utils
 import gsw
 import xarray as xr
 
@@ -35,8 +28,9 @@ with open(version_file) as version_f:
 # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
-
-def read_mrd(filestream, header_only=False, pos_time_only=False, logger=None):
+def read_mrd(
+    filestream, header_only=False, pos_time_only=False, logger=None
+) -> dict[str, list]:
     """Read a binaray SST MRD (Microstructure Raw Data) file
 
     Parameters
@@ -282,7 +276,7 @@ def parse_header(header, logger=None):
     return config
 
 
-def raw_to_level0(mss_config, rawdata, logger=None):
+def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Dataset:
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
@@ -324,7 +318,7 @@ def raw_to_level0(mss_config, rawdata, logger=None):
         level0_dataset.attrs["latitude"] = gps[0][2]
         level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
     else:
-        logger.warning('No GPS data available, setting longitude/latitude to 0.')
+        logger.warning("No GPS data available, setting longitude/latitude to 0.")
         level0_dataset.attrs["longitude"] = 0
         level0_dataset.attrs["latitude"] = 0
         level0_dataset.attrs["date_gps"] = None
@@ -372,7 +366,7 @@ def raw_to_level0(mss_config, rawdata, logger=None):
     return level0_dataset
 
 
-def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
+def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None) -> xr.Dataset:
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
@@ -443,8 +437,9 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
         level1_dataset["PSAL"] = SP
         level1_dataset["PSAL"].attrs["units"] = "1"
 
-
-        SA = gsw.SA_from_SP(SP, level0[press_sensorname], level0.longitude, level0.latitude)
+        SA = gsw.SA_from_SP(
+            SP, level0[press_sensorname], level0.longitude, level0.latitude
+        )
         level1_dataset["SA"] = SA
         level1_dataset["SA"].attrs["units"] = "g kg-1"
         # Calculating conservative temperature
@@ -514,5 +509,14 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None):
         shear[numpy.isinf(shear)] = numpy.nan
         level1_dataset["SHEAR"] = (["n_shear", "index"], shear)
 
-        return level1_dataset
+        level1_dataset["utemp"] = (
+            ["n_temp", "time"],
+            mss_utils.deconvolve_mss_ntchp(
+                level0["NTCHP"].values,
+                level0["NTC"].values,
+                sampfreq=mss_config.sampling_freq,
+                gain=mss_config.gain_utemp,
+            )[numpy.newaxis, :],
+        )
 
+        return level1_dataset

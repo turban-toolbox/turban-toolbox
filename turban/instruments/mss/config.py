@@ -149,8 +149,12 @@ class MssDeviceConfig(BaseModel):
         default=0, description="16bit offset, typically 0, older devices have -32768"
     )
     sampling_freq: float = Field(
-        default=1024,
+        default=1024.0,
         description="The sampling frequency [Hz] of the microstructure probe",
+    )
+    gain_utemp: float = Field(
+        default=1.5,
+        description="Gain of the NTC highpass pre-emphasis differentiator",
     )
     sensors: dict[
         str,
@@ -193,7 +197,7 @@ class MssDeviceConfig(BaseModel):
     @classmethod
     def from_mrd(
         cls,
-        filename: str,
+        filename: str | Path,
         shear_sensitivities: dict[str, float],
         offset: int = 0,
     ):
@@ -291,9 +295,7 @@ class MssDeviceConfig(BaseModel):
                     coefficients=sensor_dict["coeff"],
                     unit=unit,
                 )
-            elif (
-                caltype == "N24"
-            ):  # Internal temperature of oxygensensor
+            elif caltype == "N24":  # Internal temperature of oxygensensor
                 logger.debug(
                     "\tAdding oxygen optode temperature sensor {}".format(sensorname)
                 )
@@ -321,4 +323,3 @@ class MssDeviceConfig(BaseModel):
         Creating a MssDeviceConfig from a prb file
         """
         raise NotImplementedError
-
