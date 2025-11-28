@@ -14,67 +14,6 @@ diffusivity_temp = 0.00000014
 q_b = 3.7
 
 
-def microtemp(
-    temp_emph: Float[ndarray, "time_fast"],
-    senspeed: Float[ndarray, "time_fast"],
-    section_select_idx: list[list[int]],
-    sampfreq: float,
-    segment_length: int,
-    chunklen: int = 5,
-    chunkoverlap: int = 2,
-    outfile: str | None = None,
-) -> tuple[Float[ndarray, "... time_slow"], ...]:
-    """
-    Process temperature microstructure.
-
-    Default values to calculate spectra using 3+2 half-overlapping FFT
-    intervals, i.e. 3*2048 samples.
-    """
-
-    dTdt = fft_grad(temp_emph, 1 / sampfreq)
-
-    dTdt_segments = [dTdt[..., inds] for inds in section_select_idx]
-    senspeed_segments = [senspeed[..., inds] for inds in section_select_idx]
-
-    out = []
-
-    for dTdt_segment, senspeed_segment in zip(dTdt_segments, senspeed_segments):
-        (
-            k,
-            Pk,
-            chi,
-            k_batchelor_estimate,
-        ) = temperature_dissipation(
-            dTdt=dTdt_segment,
-            senspeed=senspeed_segment,
-            chunklen=chunklen,
-            chunkoverlap=chunkoverlap,
-            segment_length=segment_length,
-            sampfreq=sampfreq,
-        )
-
-        out.append(
-            xr.Dataset(
-                data_vars={
-                    "k": (["time_slow", "waveno"], k),
-                    "Pk": (["time_slow", "waveno"], Pk),
-                    # "Pnoise": (["time_slow", "waveno"], Pnoise),
-                    "chi": (["time_slow"], chi),
-                    "k_batchelor_estimate": (["time_slow"], k_batchelor_estimate),
-                }
-            )
-        )
-
-    ds = xr.concat(out, dim="time_slow")
-    if outfile is not None:
-        ds.to_netcdf(outfile, mode="a", group="microtemp")
-
-    return (
-        ds["chi"].values,
-        ds["k_batchelor_estimate"].values,
-    )
-
-
 def tke_dissipation(
     k: Float[ndarray, "time waveno"],
     Pk: Float[ndarray, "time waveno"],
