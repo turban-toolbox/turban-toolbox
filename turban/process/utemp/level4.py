@@ -5,6 +5,7 @@ from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 
 from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_last
+from turban.utils.logging import logger
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
@@ -34,6 +35,7 @@ def temperature_dissipation(
     """
     Calculate chi (temperature variance dissipation)
     """
+    logger.critical('Missing some parts of algorithm. Use with care!')
 
     chi = integrate_chi(waveno, psi_k, psi_noise, waveno_limit_upper)
 
