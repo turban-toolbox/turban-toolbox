@@ -36,6 +36,7 @@ def temperature_gradient_spectra(
     Float[ndarray, "time_slow"],  # senspeeda
     Int[ndarray, "time_slow"],  # section_number_slow
     Float[ndarray, "ntemp waveno"],  # psi_noise
+    Int[ndarray, "time_slow n_chunks n_segments"],  # ii
 ]:
     ii = get_chunking_index(
         section_number,
@@ -81,7 +82,7 @@ def temperature_gradient_spectra(
     # TODO double check whether we should subtract noise here
     # Pk -= Pnoise
 
-    return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow, psi_noise
+    return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow, psi_noise, ii
 
 
 def correction_frequency_response_bilinear(

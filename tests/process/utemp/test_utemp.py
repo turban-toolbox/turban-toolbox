@@ -36,3 +36,4 @@ def test_mss():
     # sl1 = mrd_to_level1(fname, 'shear', cfg, mss_cfg_053)
     ut1 = mrd_to_level1(fname, "utemp", cfg, mss_cfg_053)
     p = TempProcessing(ut1, level=1)
+    ds4 = p.level4.to_xarray()

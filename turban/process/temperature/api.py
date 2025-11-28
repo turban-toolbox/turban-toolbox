@@ -76,25 +76,36 @@ class TempLevel3(Level3):
         data: TempLevel2,
     ) -> dict:
         level2 = data
+        cfg = cast(TempConfig, level2.cfg)
         kwarg = super()._from_level_below_kwarg(level2)
 
-        waveno, psi_k, psi_f, freq, senspeed_avg, section_number_slow, psi_noise = (
-            temperature_gradient_spectra(
-                dtempdt=level2.dtempdt,
-                senspeed=level2.senspeed,
-                segment_length=level2.cfg.segment_length,
-                segment_overlap=level2.cfg.segment_overlap,
-                chunk_length=level2.cfg.chunk_length,
-                chunk_overlap=level2.cfg.chunk_overlap,
-                sampfreq=level2.cfg.sampfreq,
-                waveno_limit_upper=level2.cfg.waveno_limit_upper,
-                diff_gain=level2.cfg.diff_gain,
-                section_number=level2.section_number,
-            )
+        (
+            waveno,
+            psi_k,
+            psi_f,
+            freq,
+            senspeed_avg,
+            section_number_slow,
+            psi_noise,
+            reshape_index,
+        ) = temperature_gradient_spectra(
+            dtempdt=level2.dtempdt,
+            senspeed=level2.senspeed,
+            segment_length=cfg.segment_length,
+            segment_overlap=cfg.segment_overlap,
+            chunk_length=cfg.chunk_length,
+            chunk_overlap=cfg.chunk_overlap,
+            sampfreq=cfg.sampfreq,
+            waveno_limit_upper=cfg.waveno_limit_upper,
+            diff_gain=cfg.diff_gain,
+            section_number=level2.section_number,
         )
 
         kwarg.update(
             dict(
+                time=agg_fast_to_slow(
+                    level2.time, reshape_index=reshape_index, agg_method="takefirst"
+                ),
                 psi_k=psi_k,
                 psi_noise=psi_noise,
                 waveno=waveno,

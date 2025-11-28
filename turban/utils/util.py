@@ -1,6 +1,6 @@
 import json
 from functools import wraps
-from typing import cast
+from typing import cast, Literal
 import warnings
 import numpy as np
 from jaxtyping import Bool
@@ -149,22 +149,32 @@ def fast_to_slow_grad_by_segment(
 @ensure_reshape_index
 def agg_fast_to_slow(
     x: Num[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
-    agg_method: str = "mean",
+    reshape_index: Int[ndarray, "time_slow fft_chunk segment_length"],
+    agg_method: Literal["takefirst"] | str = "mean",
 ) -> Num[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).
 
+    Parameters
+    ----------
+    method: 
+        "takefirst": use first value of every chunk
+        any other: use numpy function (e.g., "mean", "max", ... ) 
+
     `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
     `max`, etc.
     """
-    if agg_method in ("grad"):
+    if agg_method == "takefirst":
+        return x[..., reshape_index[:, 0, 0]]
+    
+    if agg_method == "grad":
         raise NotImplementedError("Cannot calculate gradients yet")
+
+    # no other method fit the bill, so look in numpy:
     ii = diss_chunk_wise_reshape_index(reshape_index)
-    xi = x[..., ii]
-    return getattr(xi, agg_method)(axis=-1)
-    # return getattr(np, agg_method)(xi, axis=-1) # TODO implement
+    xi: Num[ndarray, "*any time_slow chunk_length"] = x[..., ii]
+    return getattr(np, agg_method)(xi, axis=-1)
 
 
 def agg_fast_to_slow_batch(
