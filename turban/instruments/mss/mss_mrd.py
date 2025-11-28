@@ -4,19 +4,10 @@ from pytz import timezone
 import math
 import numpy
 import logging
-import sys
 import pkg_resources
-import os
-import hashlib
 import re
-import glob
 
-from turban.instruments.mss.config import MssDeviceConfig
-
-from . import mss_utils
-import scipy.signal
-import errno
-import copy
+from turban.instruments.mss import mss_utils
 import gsw
 import xarray as xr
 
@@ -285,9 +276,7 @@ def parse_header(header, logger=None):
     return config
 
 
-def raw_to_level0(
-    mss_config: MssDeviceConfig, rawdata: dict[str, list], logger=None
-) -> xr.Dataset:
+def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Dataset:
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
@@ -377,9 +366,7 @@ def raw_to_level0(
     return level0_dataset
 
 
-def level0_to_level1(
-    mss_config: MssDeviceConfig, level0, pspd_rel=None, logger=None
-) -> xr.Dataset:
+def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None) -> xr.Dataset:
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
