@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.signal
 import numpy as np
-from jaxtyping import Int
+from jaxtyping import Num
 from numpy import ndarray, newaxis
 from scipy.signal import butter, lfilter, lfiltic
 
@@ -179,8 +179,8 @@ def gradient_legacy(x, dt):
 
 
 def deconvolve_mss_ntchp(
-    x: Int[ndarray, "time"],
-    x_emph: Int[ndarray, "time"],
+    x: Num[ndarray, "time"],
+    x_emph: Num[ndarray, "time"],
     sampfreq: float,
     gain: float = 1.5,
 ):

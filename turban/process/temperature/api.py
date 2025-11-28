@@ -9,6 +9,7 @@ import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
 from turban.process.temperature.config import TempConfig
+
 # from turban.process.temperature.level2 import process_level2
 from turban.process.temperature.level3 import temperature_gradient_spectra
 from turban.process.temperature.level4 import temperature_dissipation
@@ -54,7 +55,7 @@ class TempLevel2(Level2):
         kwarg.update(
             dict(
                 time=level1.time,
-                utemp=utemp_cleaned,
+                dtempdt=utemp_cleaned,
                 senspeed=level1.senspeed,
                 # num_despike_iter=num_despike_iter,
                 level_below=level1,
@@ -66,7 +67,7 @@ class TempLevel2(Level2):
 @dataclass(kw_only=True)
 class TempLevel3(Level3):
     psi_k: Float[ndarray, "ntemp time freq"]
-    psi_noise: Float[ndarray, "ntemp time freq"]
+    psi_noise: Float[ndarray, "ntemp freq"]
     psi_f: Float[ndarray, "ntemp time freq"]
 
     @classmethod
@@ -87,6 +88,7 @@ class TempLevel3(Level3):
                 chunk_overlap=level2.cfg.chunk_overlap,
                 sampfreq=level2.cfg.sampfreq,
                 waveno_limit_upper=level2.cfg.waveno_limit_upper,
+                diff_gain=level2.cfg.diff_gain,
                 section_number=level2.section_number,
             )
         )
@@ -100,7 +102,7 @@ class TempLevel3(Level3):
                 freq=freq,
                 senspeed=senspeed_avg,
                 section_number=section_number_slow,
-                cfg=level2.cfg,
+                level_below=level2,
             )
         )
         return kwarg
@@ -125,7 +127,13 @@ class TempLevel4(Level4):
             psi_noise=level3.psi_noise,
             waveno_limit_upper=cfg.waveno_limit_upper,
         )
-        kwarg.update(dict(chi=chi, eps=eps, cfg=level3.cfg))
+        kwarg.update(
+            dict(
+                chi=chi,
+                eps=eps,
+                level_below=level3,
+            )
+        )
         return kwarg
 
 
