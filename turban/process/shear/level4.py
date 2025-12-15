@@ -254,7 +254,7 @@ def spectrum_integration(
     )
 
     # 3rd etc. estimates
-    eps_increase = -999.0
+    eps_increase = +999.0
     # start value of iteration convergence measure
     eps = eps2
     eps_previous = eps2
