@@ -254,7 +254,7 @@ def spectrum_integration(
     )
 
     # 3rd etc. estimates
-    eps_increase = -999.0
+    eps_increase = +999.0
     # start value of iteration convergence measure
     eps = eps2
     eps_previous = eps2
@@ -284,7 +284,7 @@ def get_eps_first_estimate(
         * integrate(psi, waveno, np.array(0.0)[newaxis], np.array(10.0)[newaxis])
     )
     # Eq. 24
-    a = 1.25e-9 * nu**3
+    a = 1.25e-9 * nu ** (-3)
     b = 5.5e-8 * nu ** (-2.5)
     eps = (np.sqrt(1.0 + a * eps10) + np.exp(-b * eps10) - 1.0) * eps10
     return eps
