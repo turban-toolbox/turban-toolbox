@@ -119,12 +119,16 @@ def get_quality_metric(
     disregarded. We choose not to, and leave it at the discretion of the user."""
 
     if eps.shape[0] == 2:
-        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
-        shear_disagree = eps_dev >= 2.77 * log_diss_var
+        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :])) 
+        # the mean between the std of the two shear probes is explicitly mentioned in
+        # the ATOMIX paper
+        shear_disagree = eps_dev >= 2.77 * np.mean(np.sqrt(log_diss_var), axis=0)
+        # add nshear dimension
+        shear_disagree = np.tile(shear_disagree, (2,1))
         # The ATOMIX paper gives the following - but I believe they are the same
         # np.where(
         #     eps_source_flag == 1,
-        #     eps_dev >= 2.77 * log_diss_var,
+        #     eps_dev >= 2.77 * log_diss_var,    !!!! not var but std
         #     eps_dev >= 4.2 * log_psi_var / np.sqrt(num_spec_points),
         # )
     else:
