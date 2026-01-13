@@ -104,7 +104,11 @@ class UTempLevel3(Level3):
         kwarg.update(
             dict(
                 time=agg_fast_to_slow(
-                    level2.time, reshape_index=reshape_index, agg_method="take_mid"
+                    level2.time,
+                    section_number_or_data_len=level2.section_number,
+                    chunk_length=level2.cfg.chunk_length,
+                    chunk_overlap=level2.cfg.chunk_overlap,
+                    agg_method="take_mid",
                 ),
                 psi_k=psi_k,
                 psi_noise=psi_noise,
