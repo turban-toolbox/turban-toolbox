@@ -110,50 +110,19 @@ def get_vsink(pressure_raw, sampfreq=1024.0):
     return vsink, pressure_lp
 
 
-def fast_to_slow_grad_by_segment(
-    x: Float[ndarray, "... time_fast"],
-    y: Float[ndarray, "... time_fast"],
-    sampfreq: float,
-    segment_length: int = None,
-    segment_overlap: int = None,
-    chunk_length: int = None,
-    chunk_overlap: int = None,
-    section_number: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] = None,
-) -> Float[ndarray, "... time_slow"]:
-    """
-    Calculate the gradient of `y` with respect to `x`, averaged over each segment.
-    If reshape_index is not supplied, calculates it.
-    """
-    if reshape_index is None:
-        reshape_index = get_chunking_index(
-            section_number,
-            (chunk_length, chunk_overlap),
-            (segment_length, segment_overlap),
-        )
-    else:
-        segment_length = reshape_index.shape[-1]
-
-    x = x[..., reshape_index]
-    y = y[..., reshape_index]
-
-    # dummy time vector in seconds
-    time = np.linspace(1, segment_length / sampfreq, segment_length)
-    dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
-    dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
-    dydx = dydt / dxdt
-    return dydx.mean(axis=-1)  # average gradient over each `chunk_length` segment
-
-
-@ensure_reshape_index
 def agg_fast_to_slow(
     x: Shaped[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "time_slow fft_chunk segment_length"],
+    section_number_or_data_len: Int[ndarray, "num_data"] | int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
     agg_method: Literal["take_first", "take_mid", "take_last"] | str = "mean",
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
 ) -> Shaped[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).
+    If reshape_index is supplied, `section_number_or_data_len`, `chunk_length` and
+    `chunk_overlap` are disregarded
 
     Parameters
     ----------
@@ -166,7 +135,13 @@ def agg_fast_to_slow(
     `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
     `max`, etc.
     """
-    ii = diss_chunk_wise_reshape_index(reshape_index)
+    if reshape_index is None:
+        ii = get_chunking_index(
+            section_number_or_data_len,
+            (chunk_length, chunk_overlap),
+        )
+    else:
+        ii = reshape_index
 
     match agg_method:
         case "take_first":
@@ -192,10 +167,6 @@ def agg_fast_to_slow_batch(
     arr_slow = agg_fast_to_slow(arr_fast, *argv, **kwarg)
     data_slow = {name: arr_slow[ind, :] for ind, name in enumerate(data.keys())}
     return data_slow
-
-
-def fast_to_slow_avg_by_segment():
-    pass
 
 
 def get_chunking_index(
