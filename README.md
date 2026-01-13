@@ -69,7 +69,7 @@ level1 = ShearLevel1(
     section_number=ds2.SECTION_NUMBER.values.astype(int),
 )
 
-p = ShearProcessing(level1, level=1)
+p = ShearProcessing(level1)
 ```
 
 

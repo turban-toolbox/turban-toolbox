@@ -359,9 +359,8 @@ class Processing(ABC):
     def __init__(
         self,
         data: TimeseriesLevel,
-        level: Literal[1, 2, 3, 4],
     ):
-        for l in range(level + 1, 5):
+        for l in range(data._level + 1, 5):
             data = self._level_mapping[l].from_level_below(data)
         self.data = data
 

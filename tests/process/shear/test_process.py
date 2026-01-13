@@ -44,7 +44,7 @@ def test_agg_aux(atomix_mss_nc_filename):
 
     level1 = ShearLevel1.from_atomix_netcdf(atomix_mss_nc_filename)
     level1.add_aux_data(arr["temp"][0, :], "temp", "max", "temp_max")
-    p_from_level1 = ShearProcessing(level1, level=1)
+    p_from_level1 = ShearProcessing(level1)
 
     p_from_atomix = ShearProcessing.from_atomix_netcdf(
         atomix_mss_nc_filename,

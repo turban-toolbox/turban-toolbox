@@ -313,7 +313,7 @@ class ShearProcessing(Processing):
         """
         data = cls._level_mapping[level].from_atomix_netcdf(fname)
         data.add_aux_data(data_aux)
-        return cls(data, level)
+        return cls(data)
 
 
 class NetcdfReader:
