@@ -1,7 +1,7 @@
 import warnings
 from typing import Literal, cast
 from dataclasses import dataclass
-from jaxtyping import Float, Int
+from jaxtyping import Float, Int, Bool
 from netCDF4 import Dataset
 from .config import ShearConfig
 from numpy import newaxis, nan, ndarray
@@ -46,6 +46,7 @@ class ShearLevel1(Level1):
 class ShearLevel2(Level2):
     shear: Float[ndarray, "n_shear time"]
     num_despike_iter: Int[ndarray, "n_shear time"]
+    flag_despiked: Bool[ndarray, "nshear time"]
 
     @classmethod
     def _from_level_below_kwarg(
@@ -55,7 +56,7 @@ class ShearLevel2(Level2):
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
         cfg = cast(ShearConfig, level1.cfg)  # just for type checkers to understand type
-        sh_cleaned, num_despike_iter = process_level2(
+        sh_cleaned, num_despike_iter, flag_despiked = process_level2(
             level1.shear,
             level1.section_number,
             cfg.sampfreq,
@@ -75,6 +76,7 @@ class ShearLevel2(Level2):
                 shear=sh_cleaned,
                 senspeed=level1.senspeed,
                 num_despike_iter=num_despike_iter,
+                flag_despiked=flag_despiked,
                 level_below=level1,
             )
         )
@@ -90,6 +92,7 @@ class ShearLevel2(Level2):
             # TODO: apparently not exported in benchmark files...?
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
+            flag_despiked=np.zeros_like(ds.SHEAR.values, dtype=bool),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
         )
 

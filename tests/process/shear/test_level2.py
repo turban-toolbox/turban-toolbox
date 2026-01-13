@@ -57,7 +57,7 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
 
     segment_length = cfg.segment_length
 
-    shear, ctr = clean_shear(
+    shear, ctr, flag = clean_shear(
         shear,
         sampfreq=sampfreq,
         spike_threshold=8.0,

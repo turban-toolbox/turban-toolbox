@@ -32,15 +32,16 @@ def process_level2(
 ) -> tuple[
     Float[ndarray, "n_shear time"],  # despiked shear
     Int[ndarray, "n_shear time"],  # number of despike iterations
+    Bool[ndarray, "nshear time"], # spike flag
 ]:
     segments = split_data(shear, section_numbers)
     sh_clean_agg = np.nan * np.zeros_like(shear)
     ctr_agg = np.zeros_like(shear, dtype=int)
+    flag_agg = np.zeros_like(shear, dtype=bool)
 
     for marker, data in segments.items():
-        flag2 = -999 * np.zeros(data.shape[0], dtype=int)
         for k, shear in enumerate(data):
-            shear, ctr = clean_shear(
+            shear, ctr, flag = clean_shear(
                 shear,
                 sampfreq=sampfreq,
                 spike_threshold=spike_threshold,
@@ -62,8 +63,9 @@ def process_level2(
             )
             ctr_agg[k, section_numbers == marker] = ctr
             sh_clean_agg[k, section_numbers == marker] = sh_clean
+            flag_agg[k, section_numbers == marker] = flag
 
-    return sh_clean_agg, ctr_agg
+    return sh_clean_agg, ctr_agg, flag_agg
 
 
 def select_sections(
@@ -164,6 +166,7 @@ def clean_shear(
 ) -> tuple[
     Float[ndarray, "time"],  # despiked shear
     Int[ndarray, "time"],  # number of despike iterations on each sample
+    Bool[ndarray, "time"], # spike flag
 ]:
     """Section 3.2.2"""
     N = len(shear)
@@ -177,6 +180,7 @@ def clean_shear(
         cutoff_freq_lp=cutoff_freq_lp,
     )
     ctr = np.zeros_like(shear, dtype=int)
+    flag = np.zeros_like(shear, dtype=bool)
     while np.any(spikes) and np.all(ctr <= max_tries):
         spike_sections = boolarr_to_sections(spikes)
         spike_markers = sections_to_marker(spike_sections, N)
@@ -187,6 +191,7 @@ def clean_shear(
             spike_replace_after=spike_replace_after,
         )
         ctr[spikes] += 1
+        flag[spikes] = True
         spikes = detect_shear_spikes(
             shear,
             sampfreq,
@@ -196,7 +201,7 @@ def clean_shear(
             cutoff_freq_lp=cutoff_freq_lp,
         )
 
-    return shear, ctr
+    return shear, ctr, flag
 
 
 from numba import jit, float64
