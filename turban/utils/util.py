@@ -3,11 +3,10 @@ from functools import wraps
 from typing import cast, Literal
 import warnings
 import numpy as np
-from jaxtyping import Bool
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
-from jaxtyping import Float, Int, Num
+from jaxtyping import Float, Int, Num, Bool, Shaped
 from netCDF4 import Dataset
 import xarray as xr
 
@@ -148,10 +147,10 @@ def fast_to_slow_grad_by_segment(
 
 @ensure_reshape_index
 def agg_fast_to_slow(
-    x: Num[ndarray, "*any time_fast"],
+    x: Shaped[ndarray, "*any time_fast"],
     reshape_index: Int[ndarray, "time_slow fft_chunk segment_length"],
     agg_method: Literal["take_first", "take_mid", "take_last"] | str = "mean",
-) -> Num[ndarray, "*any time_slow"]:
+) -> Shaped[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).

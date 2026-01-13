@@ -154,7 +154,7 @@ class ShearLevel3(Level3):
         )
         kwarg.update(
             dict(
-                time=time_slow,  # TODO get from level 2
+                time=time_slow,
                 Pk=Pk,
                 waveno=k,
                 Pf=Pf,
