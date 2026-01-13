@@ -35,7 +35,7 @@ class ShearLevel1(Level1):
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values.astype(float),
-            senspeed=ds.PSPD_REL.values,
+            senspeed=ds.PSPD_REL.values if "PSPD_REL" in ds else ds2.PSPD_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
             cfg=cast(ShearConfig, ShearConfig.from_atomix_netcdf(fname)),
@@ -54,7 +54,7 @@ class ShearLevel2(Level2):
     ):
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
-        cfg = cast(ShearConfig, level1.cfg) # just for type checkers to understand type
+        cfg = cast(ShearConfig, level1.cfg)  # just for type checkers to understand type
         sh_cleaned, num_despike_iter = process_level2(
             level1.shear,
             level1.section_number,
@@ -145,16 +145,16 @@ class ShearLevel3(Level3):
 
         kwarg.update(
             dict(
-            time=np.ones_like(senspeed),  # TODO get from level 2
-            Pk=Pk,
-            waveno=k,
-            Pf=Pf,
-            freq=freq,
-            senspeed=senspeed,
-            section_number=section_number,
-            spike_fraction=spike_fraction,
-            max_despike_iter=max_despike_iter,
-            level_below=data,
+                time=np.ones_like(senspeed),  # TODO get from level 2
+                Pk=Pk,
+                waveno=k,
+                Pf=Pf,
+                freq=freq,
+                senspeed=senspeed,
+                section_number=section_number,
+                spike_fraction=spike_fraction,
+                max_despike_iter=max_despike_iter,
+                level_below=data,
             )
         )
         return kwarg
@@ -320,8 +320,9 @@ class NetcdfReader:
     """Load any netcdf with variable mapping from turban standard name (see variables.py)
     to name in the netcdf.
     NB This class is still under construction.
-    
+
     TODO Load the variable mapping directly from variables.py."""
+
     def __init__(self, varmap: dict[str, str] | Literal["atomix"] | None = None):
         if varmap is None:
             self._map = {}
