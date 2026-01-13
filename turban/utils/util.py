@@ -179,7 +179,7 @@ def agg_fast_to_slow(
             raise NotImplementedError("Cannot calculate gradients yet")
 
     # no other method fit the bill, so look in numpy:
-    xi: Num[ndarray, "*any time_slow chunk_length"] = x[..., ii]
+    xi: Shaped[ndarray, "*any time_slow chunk_length"] = x[..., ii]
     return getattr(np, agg_method)(xi, axis=-1)
 
 
