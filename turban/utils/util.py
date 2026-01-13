@@ -150,7 +150,7 @@ def fast_to_slow_grad_by_segment(
 def agg_fast_to_slow(
     x: Num[ndarray, "*any time_fast"],
     reshape_index: Int[ndarray, "time_slow fft_chunk segment_length"],
-    agg_method: Literal["takefirst"] | str = "mean",
+    agg_method: Literal["take_first", "take_mid", "take_last"] | str = "mean",
 ) -> Num[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
@@ -158,21 +158,28 @@ def agg_fast_to_slow(
 
     Parameters
     ----------
-    method: 
-        "takefirst": use first value of every chunk
-        any other: use numpy function (e.g., "mean", "max", ... ) 
+    method:
+        "take_first": use first value of every chunk
+        "take_mid": use midpoint value of every chunk
+        "take_last": use last value of every chunk
+        any other: use numpy function (e.g., "mean", "max", ... )
 
     `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
     `max`, etc.
     """
-    if agg_method == "takefirst":
-        return x[..., reshape_index[:, 0, 0]]
-    
-    if agg_method == "grad":
-        raise NotImplementedError("Cannot calculate gradients yet")
+    ii = diss_chunk_wise_reshape_index(reshape_index)
+
+    match agg_method:
+        case "take_first":
+            return x[..., ii[:, 0]]
+        case "take_mid":
+            return x[..., ii[:, ii.shape[1] // 2]]
+        case "take_last":
+            return x[..., ii[:, -1]]
+        case "grad":
+            raise NotImplementedError("Cannot calculate gradients yet")
 
     # no other method fit the bill, so look in numpy:
-    ii = diss_chunk_wise_reshape_index(reshape_index)
     xi: Num[ndarray, "*any time_slow chunk_length"] = x[..., ii]
     return getattr(np, agg_method)(xi, axis=-1)
 
