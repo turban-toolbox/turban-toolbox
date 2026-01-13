@@ -277,7 +277,7 @@ class ShearLevel4(Level4):
 
         kwarg.update(
             dict(
-                time=np.ones_like(level3.senspeed),  # TODO get from level 2
+                time=level3.time,
                 eps=eps,
                 eps_source_flag=eps_source_flag,
                 log_diss_var=log_diss_var,
