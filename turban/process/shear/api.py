@@ -25,7 +25,7 @@ from turban.process.generic.api import (
 
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
-    shear: Float[ndarray, "n_shear time"]
+    shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
 
     @classmethod
@@ -44,8 +44,8 @@ class ShearLevel1(Level1):
 
 @dataclass(kw_only=True)
 class ShearLevel2(Level2):
-    shear: Float[ndarray, "n_shear time"]
-    num_despike_iter: Int[ndarray, "n_shear time"]
+    shear: Float[ndarray, "nshear time"]
+    num_despike_iter: Int[ndarray, "nshear time"]
 
     @classmethod
     def _from_level_below_kwarg(

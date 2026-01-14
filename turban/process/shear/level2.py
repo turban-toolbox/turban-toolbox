@@ -18,7 +18,7 @@ data_and_bounds_type = list[
 
 
 def process_level2(
-    shear: Float[ndarray, "n_shear time"],
+    shear: Float[ndarray, "nshear time"],
     section_numbers: Int[ndarray, "time"],
     sampfreq: float,
     segment_length: int,
@@ -30,8 +30,8 @@ def process_level2(
     spike_include_before: int,
     spike_include_after: int,
 ) -> tuple[
-    Float[ndarray, "n_shear time"],  # despiked shear
-    Int[ndarray, "n_shear time"],  # number of despike iterations
+    Float[ndarray, "nshear time"],  # despiked shear
+    Int[ndarray, "nshear time"],  # number of despike iterations
 ]:
     segments = split_data(shear, section_numbers)
     sh_clean_agg = np.nan * np.zeros_like(shear)
