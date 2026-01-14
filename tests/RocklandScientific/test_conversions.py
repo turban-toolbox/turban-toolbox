@@ -5,11 +5,11 @@ import numpy as np
 import pytest
 from scipy.io import loadmat
 
-from urider import rsIO
+from turban.instruments.RocklandScientific import rsIO
 
 
 data_url = "https://share.hereon.de/index.php/s/AqMdY8Q47FPQHQR"
-datadir = "data"
+datadir = "data/RocklandScientific"
 
 
 def extract_data(pParameter, mParameter, pdata, mdata):

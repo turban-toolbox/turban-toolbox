@@ -188,7 +188,7 @@ class ChannelMatrix(object):
         self.number_of_elements = np.prod(self.matrix.shape)
         self.channels = self._create_channels(microrider_config)
         
-    def _get_matrix(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> np_typing.NDArray[np.float64]:
+    def _get_matrix(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> np_typing.NDArray[np.int64]:
         matrix = []
         matrix_section = microrider_config.get_section('matrix')
         # we don't always have the number of rows given anymore.
@@ -205,6 +205,7 @@ class ChannelMatrix(object):
         for row in matrix:
             _s = " ".join([f"{i:3d}" for i in list(row)])
             logger.info(f"| {_s} |")
+        return_value = np.array(matrix)
         return np.array(matrix)
 
     def _create_channels(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> dict[str, Channel]:
@@ -510,7 +511,7 @@ class MicroRiderData(object):
         
         
 
-    def add_channel_data(self, data_snr : np_typing.NDArray[np.float64]) -> None:
+    def add_channel_data(self, data_snr : np_typing.NDArray[np.int16]) -> None:
         ''' Adds the channel data, from array with dtype i2/u2
 
         Parameters
@@ -620,7 +621,7 @@ class MicroRiderData(object):
         
         new_channel_name = f"{co_channel_name}_hires"
         new_channel = co_channel.copy(new_channel_name) # copy config from T1, name it T1_res
-        new_channel.data = rsConversions.Deconvolve(X_dX, X, fs, diff_gain).X_hires
+        new_channel.data = rsConversions.Deconvolve(X_dX.astype(np.float64), X.astype(np.float64), fs, diff_gain).X_hires
         new_channel.convert_to_units()
         self.channel_matrix.channels[new_channel_name] = new_channel
         # interpolate co channel.
@@ -694,7 +695,8 @@ def read_p_file(filename: str, setupstring_filename: str = "") -> MicroRiderData
         # Extract header and data
     data_hdr = bindata[:, :header_data.record_header_size].astype(dt_hdr) # recast as unsigned
     n = data.channel_matrix.number_of_elements
-    data_snr = bindata[:, header_data.record_header_size:].reshape(-1, n)
+    # Make sure we end up with int16, as we may get '>i2'
+    data_snr = bindata[:, header_data.record_header_size:].reshape(-1, n).astype(np.int16) 
     data.add_channel_data(data_snr)
     #data.combine_split_channels() # <- we don't have split channels. Cannot test.
     data.convert_channels()

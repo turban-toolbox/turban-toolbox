@@ -5,13 +5,13 @@ import numpy as np
 import pytest
 from scipy.io import loadmat
 
-from urider import rsIO, rsConfig_parser, rsCommon
+from turban.instruments.RocklandScientific import rsIO, rsConfig_parser, rsCommon
 
 def asDict(mat_variable):
     d = dict([(k,v) for k,v in zip(mat_variable.dtype.names, mat_variable.tolist())])
     return d
 
-datadir = "data"
+datadir = "data/RocklandScientific"
 
 def test_header_data_058():
     header_parser = rsIO.HeaderParser()
@@ -54,9 +54,9 @@ def microrider_config_data(request):
     variable = request.param
     match variable:
         case "058":
-            fn = "data/setupstring_058.txt"
+            fn = os.path.join(datadir, "setupstring_058.txt")
         case "0413":
-            fn = "data/setupstring_0413.txt"
+            fn = os.path.join(datadir, "setupstring_0413.txt")
     with open(fn, "r") as fp:
         setupstring = "\n".join(fp.readlines())
     microrider_config = rsConfig_parser.MicroRiderConfig()
@@ -70,17 +70,17 @@ def test_channel_matrix(microrider_config_data):
 
 
 def test_channel_config():
-    channel_config = rsCommon.ChannelConfig(name="ch255", id=255, type=-1)
+    channel_config = rsCommon.ChannelConfig(name="ch255", id=255, type="")
     assert channel_config.name == "ch255"
     assert channel_config.id == 255
-    assert channel_config.type == -1
+    assert channel_config.type == ""
     channel_config.update("name", "CH255")
     assert channel_config.name == "CH255"
     with pytest.raises(AttributeError, match="ChannelConfig has no attribute not_exsting."):
         channel_config.update("not_exsting", 13)
         
 def test_channel_config_is_set():
-    channel_config = rsCommon.ChannelConfigThermistor(name="T1", id=12, type=83)
+    channel_config = rsCommon.ChannelConfigThermistor(name="T1", id=12, type="therm")
     assert channel_config.is_set("name")
     assert not channel_config.is_set("a")
     with pytest.raises(AttributeError, match="ChannelConfigThermistor has no attribute a0"):
@@ -99,8 +99,8 @@ def microrider_data(request):
     variable = request.param
     match variable:
         case "058":
-            fn = "data/DAT_058.P"
-            fns = "data/setupstring_058.txt"
+            fn = os.path.join(datadir ,"DAT_058.P")
+            fns = os.path.join(datadir, "setupstring_058.txt")
             # The values below from the odas library
             expected = dict(length_t_fast=5935616,
                             t_fast_max=11592.255,
@@ -108,8 +108,8 @@ def microrider_data(request):
                             t_slow_max=11592.242)
 
         case "0413":
-            fn = "data/data_0413.p"
-            fns = "data/setupstring_0413.txt"
+            fn = os.path.join(datadir, "data_0413.p")
+            fns = os.path.join(datadir, "setupstring_0413.txt")
             # The values below from the odas library
             expected = dict(length_t_fast=247296,
                             length_t_slow=30912,

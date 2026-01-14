@@ -1,20 +1,21 @@
 import hashlib
-
+import os
 import pytest
 import json
-from urider import rsConfig_parser
+from  turban.instruments.RocklandScientific import rsConfig_parser
 
+datadir = "data/RocklandScientific"
 
 @pytest.fixture
 def setupstring_data(request):
     variable = request.param
     match variable:
         case "058":
-            fn = "data/setupstring_058.txt"
+            fn = os.path.join(datadir, "setupstring_058.txt")
             hash_value = "f4f5c67b547c89f25ae0778c5194428f"
             number_of_channels = 19
         case "0413":
-            fn = "data/setupstring_0413.txt"
+            fn = os.path.join(datadir, "setupstring_0413.txt")
             hash_value = "81a36f63cf537a619d9124f7d3d86cf9"
             number_of_channels = 18
     with open(fn, "r") as fp:

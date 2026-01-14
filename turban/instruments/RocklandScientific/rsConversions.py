@@ -24,7 +24,7 @@ class Converter(ABC):
         self.config: common.ChannelConfigABC = config
         self.defaults: common.ChannelConfigABC
     
-    def __call__(self, v: np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+    def __call__(self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
         return self.convert(v)
 
     def get_parameter(self, p: str) -> int | float:
@@ -235,7 +235,7 @@ class InclT(Incl):
 
     def __init__(self, config: common.ChannelConfigABC):
         super().__init__(config)
-        self.defaults = common.ChannelConfigInclinometer(coef0=624, coef1=-0.47, units = '[ °C ]')
+        self.defaults = common.ChannelConfigInclinometer(coef0=624., coef1=-0.47, units = '[ °C ]')
 
 
 class Aem1g_a(Converter):
@@ -243,7 +243,7 @@ class Aem1g_a(Converter):
 
     def __init__(self, config: common.ChannelConfigABC):
         super().__init__(config)
-        self.defaults = common.ChannelConfigU_EM(bias=0, units='[ m s^{-1} ]')
+        self.defaults = common.ChannelConfigU_EM(bias=0.0, units='[ m s^{-1} ]')
         
     def convert(self, v: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
         bias = self.get_parameter('bias')

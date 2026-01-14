@@ -3,8 +3,8 @@ import copy
 from dataclasses import dataclass, field, fields
 from numpy.typing import NDArray
 from numpy import float64
-from typing import Any, Self, Type, TypeVar, Callable
-
+from typing import Any, Self, TypeVar
+from collections.abc import Callable
 
 @dataclass(kw_only=True)
 class ByteHeader:
@@ -103,10 +103,10 @@ class ChannelConfigABC:
 # Create a registry of ChannelConfig data classes:
 
 T = TypeVar('T', bound=ChannelConfigABC) # A type machting also all its derivates.
-_CHANNEL_CONFIG_REGISTRY : dict[str, Type[ChannelConfigABC]] = {}
+_CHANNEL_CONFIG_REGISTRY : dict[str, type[ChannelConfigABC]] = {}
 
-def register_channel_config(names: list[str]) -> Callable[[Type[T]], Type[T]]:
-    def wrapper(cls: Type[T]) -> Type[T]:
+def register_channel_config(names: list[str]) -> Callable[[type[T]], type[T]]:
+    def wrapper(cls: type[T]) -> type[T]:
         for name in names:
             _CHANNEL_CONFIG_REGISTRY[name] = cls
         return cls
@@ -219,7 +219,7 @@ class ChannelConfigU_EM(ChannelConfigABC):
     cal_date: str = field(default=DefaultStr)
 
 
-def channel_config_factory(name: str) -> Type[ChannelConfigABC]:
+def channel_config_factory(name: str) -> type[ChannelConfigABC]:
     if name not in _CHANNEL_CONFIG_REGISTRY:
         raise ValueError(f"{name} is not a valid channel name.")
     return _CHANNEL_CONFIG_REGISTRY[name]
