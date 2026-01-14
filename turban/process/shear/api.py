@@ -84,7 +84,7 @@ class ShearLevel2(Level2):
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
-            time=ds.TIME.values.astype(float),
+            time=ds.TIME.values,
             shear=ds.SHEAR.values,
             senspeed=ds.PSPD_REL.values,
             # TODO: apparently not exported in benchmark files...?
@@ -175,7 +175,7 @@ class ShearLevel3(Level3):
         )
 
         return cls(
-            time=ds["TIME"].values.astype(float),
+            time=ds["TIME"].values,
             Pk=ds["SH_SPEC"].values,
             waveno=ds["KCYC"].values,
             Pf=ds["SH_SPEC"].values * np.nan,
