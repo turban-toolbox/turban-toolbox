@@ -32,7 +32,7 @@ def test_despike_benchmark(atomix_mss_nc_filename):
     # ti = slice(122_000, 125_000)
     # ti = slice(103_000, 107_000)
 
-    isel = dict(n_shear=0, time=ti)
+    isel = dict(nshear=0, time=ti)
     # currently, no spike is detected in this segment!
     x = ds1.isel(**isel).shear.values
     assert np.any(detect_shear_spikes(x, 1024.0, 8.0, 512, 512, 0.5))
@@ -81,7 +81,7 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
     fig = plt.figure(figsize=(9, 9))
     ax = fig.subplots()
     plotarg = dict(marker=".", lw=0.1)
-    isel = dict(n_shear=0, time=tip)
+    isel = dict(nshear=0, time=tip)
 
     ds1.isel(**isel).shear.plot(**plotarg, ax=ax)
     ds2_bm.isel(**isel).shear.plot(**plotarg, ax=ax)
