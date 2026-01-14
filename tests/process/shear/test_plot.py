@@ -8,7 +8,7 @@ from turban.process.shear.api import (
     ShearConfig,
     ShearLevel2,
 )
-from turban.utils.plot.shear import plot_level1, plot_level2, plot_level3
+from turban.utils.plot.shear import plot_level1, plot_level2, plot_level3, plot_level4
 
 from tests.fixtures import atomix_mss_nc_filename
 
@@ -22,4 +22,5 @@ def test_plot(atomix_mss_nc_filename):
     plot_level1(l1)
     plot_level2(p.level2, p.level1)
     plot_level3(p.level3)
+    plot_level4(p.level4)
     plt.show()

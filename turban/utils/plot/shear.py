@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 
-from turban.utils.plot.generic import plot_section_numbers
+from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.api import (
     ShearProcessing,
     ShearLevel1,
@@ -96,6 +96,34 @@ def plot_level3(data: ShearLevel3):
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
+
+    plt.tight_layout()
+    return fig, axs
+
+def plot_level4(data: ShearLevel4):
+    """Plot eps time series and quality metrics for each sensor"""
+    ds = data.to_xarray()
+    nshear = len(ds.nshear)
+
+    # Create figure with panels for eps and quality metrics
+    fig, axs = plt.subplots(nshear + 1, 1, figsize=(12, 3 + 2 * nshear), sharex=True)
+    if nshear == 0:
+        axs = [axs]
+
+    # Panel 1: Eps time series for all sensors
+    ax = axs[0]
+    for i in range(nshear):
+        ds.eps.isel(nshear=i).plot(ax=ax, x="time", label=f"Shear {i+1}")
+    ax.set_yscale("log")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.set_title("Turbulent Dissipation Rate")
+
+    # Remaining panels: Quality metrics for each sensor
+    for i in range(nshear):
+        ax = axs[i + 1]
+        plot_quality_metric(ax, ds.time.values, ds.quality_metric.isel(nshear=i).values)
+        ax.set_title(f"Shear {i+1} Quality Metrics")
 
     plt.tight_layout()
     return fig, axs
