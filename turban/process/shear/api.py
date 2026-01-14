@@ -97,7 +97,7 @@ class ShearLevel2(Level2):
 @dataclass(kw_only=True)
 class ShearLevel3(Level3):
     psi_k_sh: Float[ndarray, "nshear time waveno"]
-    Pf: Float[ndarray, "nshear time waveno"]
+    psi_f_sh: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
@@ -110,7 +110,7 @@ class ShearLevel3(Level3):
         kwarg = super()._from_level_below_kwarg(data)
         level2 = data
         level1 = data.level_below
-        k, psi_k_sh, Pf, freq, senspeed, section_number = process_level3(
+        k, psi_k_sh, psi_f_sh, freq, senspeed, section_number = process_level3(
             shear=level2.shear,
             senspeed=level2.senspeed,
             section_number=level1.section_number,
@@ -153,7 +153,7 @@ class ShearLevel3(Level3):
                 time=time_slow,
                 psi_k_sh=psi_k_sh,
                 waveno=k,
-                Pf=Pf,
+                psi_f_sh=psi_f_sh,
                 freq=freq,
                 senspeed=senspeed,
                 section_number=section_number,
@@ -174,7 +174,7 @@ class ShearLevel3(Level3):
             time=ds["TIME"].values,
             psi_k_sh=ds["SH_SPEC"].values,
             waveno=ds["KCYC"].values,
-            Pf=ds["SH_SPEC"].values * np.nan,
+            psi_f_sh=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
             senspeed=ds["PSPD_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
