@@ -13,6 +13,7 @@ def process_level4(
     psi: Float[ndarray, "nshear time waveno"],
     waveno: Float[ndarray, "time waveno"],
     senspeed: Float[ndarray, "time"],
+    molvisc: Float[ndarray, "time"] | float,
     waveno_cutoff_spatial_corr: float | None,
     freq_cutoff_antialias: float | None,
     freq_cutoff_corrupt: float | None,
@@ -33,9 +34,10 @@ def process_level4(
     Produce epsilon estimates from shear power spectra.
     """
     eps_crit = 1e-5
-    molvisc = np.array(1.6e-6)[
-        newaxis
-    ]  # TODO: get from temperature (aggregate in level3)
+
+    if isinstance(molvisc, float):
+        molvisc = np.array(molvisc)[newaxis]
+
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 

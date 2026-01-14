@@ -16,6 +16,7 @@ class ShearConfig(SegmentConfig):
     spike_include_before: int = 10  # despiking in level 2
     spike_include_after: int = 20  # despiking in level 2
     cutoff_freq_lp: float = 0.5  # despiking in level 2
+    molvisc_fallback: float = 1.6e-6  # used for level4 when not available from level3
 
     @staticmethod
     def _attrs_from_atomix_netcdf(fname):
