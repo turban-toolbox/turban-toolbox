@@ -19,7 +19,7 @@ def process_level3(
     section_number: Int[ndarray, "time_fast"],
 ) -> tuple[
     Float[ndarray, "time_slow k"],  # k
-    Float[ndarray, "nshear time_slow waveno"],  # Pk
+    Float[ndarray, "nshear time_slow waveno"],  # psi_k_sh
     Float[ndarray, "nshear time_slow waveno"],  # Pf
     Float[ndarray, "waveno"],  # freq
     Float[ndarray, "time_slow"],  # senspeeda
