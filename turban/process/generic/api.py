@@ -284,13 +284,6 @@ class Level3(HasLevelBelow, AuxiliaryData):
         """
         slow = {}
 
-        # sample_data = data[data.keys()[0]][1]
-        cidx = get_chunking_index(
-            section_number,
-            (chunk_length, chunk_overlap),
-            (chunk_length, 0),
-        )
-
         for varname, (dims, arr, rename_dict) in data.items():
             for agg_method, varname_new in rename_dict.items():
                 if varname_new is None:
@@ -299,7 +292,9 @@ class Level3(HasLevelBelow, AuxiliaryData):
                     dims,
                     agg_fast_to_slow(
                         arr,
-                        reshape_index=cidx,
+                        section_number_or_data_len=section_number,
+                        chunk_length=chunk_length,
+                        chunk_overlap=chunk_overlap,
                         agg_method=agg_method,
                     ),
                 )

@@ -135,8 +135,6 @@ class ShearLevel3(Level3):
 
         max_despike_iter = agg_fast_to_slow(
             level2.num_despike_iter,
-            segment_length=level2.cfg.segment_length,
-            segment_overlap=level2.cfg.segment_overlap,
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
             section_number_or_data_len=level1.section_number,
@@ -145,8 +143,6 @@ class ShearLevel3(Level3):
 
         time_slow = agg_fast_to_slow(
             level2.time,
-            segment_length=level2.cfg.segment_length,
-            segment_overlap=level2.cfg.segment_overlap,
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
             section_number_or_data_len=level1.section_number,

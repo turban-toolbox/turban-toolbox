@@ -30,8 +30,6 @@ def test_spectra_arr_shape():
     y2 = agg_fast_to_slow(
         x,
         section_number_or_data_len=N,
-        segment_length=segment_length,
-        segment_overlap=segment_overlap,
         chunk_length=chunk_length,
         chunk_overlap=chunk_overlap,
     )

@@ -155,8 +155,6 @@ def test_average_fast_to_slow():
     y = agg_fast_to_slow(
         x,
         section_number_or_data_len=x.shape[-1],
-        segment_length=4,
-        segment_overlap=2,
         chunk_length=6,
         chunk_overlap=2,
     )
@@ -169,8 +167,6 @@ def test_agg_fast_to_slow():
     xm = agg_fast_to_slow(
         x,
         section_number_or_data_len=len(x),
-        segment_length=4,
-        segment_overlap=2,
         chunk_length=10,
         chunk_overlap=0,
         agg_method="max",

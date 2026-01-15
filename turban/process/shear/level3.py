@@ -42,7 +42,12 @@ def process_level3(
     )
 
     # platform speed
-    senspeeda = agg_fast_to_slow(senspeed, reshape_index=ii)
+    senspeeda = agg_fast_to_slow(
+        senspeed,
+        section_number_or_data_len=section_number,
+        chunk_length=chunk_length,
+        chunk_overlap=chunk_overlap,
+    )
 
     section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
 
@@ -52,9 +57,7 @@ def process_level3(
     psi_k = psi_f * senspeeda[newaxis, :, newaxis]
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 
-    _ = apply_compensation_spatial_response(
-        psi_k, waveno, spatial_response_wavenum
-    )
+    _ = apply_compensation_spatial_response(psi_k, waveno, spatial_response_wavenum)
 
     # apply_removal_coherent_vibrations(P) # TODO
 
