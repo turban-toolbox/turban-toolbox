@@ -34,7 +34,7 @@ class ShearLevel1(Level1):
         # TODO: handle section_number through level 2
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
-            time=ds.TIME.values.astype(float),
+            time=ds.TIME.values,
             senspeed=ds.PSPD_REL.values if "PSPD_REL" in ds else ds2.PSPD_REL.values,
             shear=ds.SHEAR.values,
             section_number=ds2["SECTION_NUMBER"].values.astype(int),
@@ -84,7 +84,7 @@ class ShearLevel2(Level2):
     def from_atomix_netcdf(cls, fname: str):
         ds = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
-            time=ds.TIME.values.astype(float),
+            time=ds.TIME.values,
             shear=ds.SHEAR.values,
             senspeed=ds.PSPD_REL.values,
             # TODO: apparently not exported in benchmark files...?
@@ -143,9 +143,18 @@ class ShearLevel3(Level3):
             agg_method="max",
         )
 
+        time_slow = agg_fast_to_slow(
+            level2.time,
+            segment_length=level2.cfg.segment_length,
+            segment_overlap=level2.cfg.segment_overlap,
+            chunk_length=level2.cfg.chunk_length,
+            chunk_overlap=level2.cfg.chunk_overlap,
+            section_number_or_data_len=level1.section_number,
+            agg_method="take_mid",
+        )
         kwarg.update(
             dict(
-                time=np.ones_like(senspeed),  # TODO get from level 2
+                time=time_slow,
                 Pk=Pk,
                 waveno=k,
                 Pf=Pf,
@@ -166,7 +175,7 @@ class ShearLevel3(Level3):
         )
 
         return cls(
-            time=ds["TIME"].values.astype(float),
+            time=ds["TIME"].values,
             Pk=ds["SH_SPEC"].values,
             waveno=ds["KCYC"].values,
             Pf=ds["SH_SPEC"].values * np.nan,
@@ -268,7 +277,7 @@ class ShearLevel4(Level4):
 
         kwarg.update(
             dict(
-                time=np.ones_like(level3.senspeed),  # TODO get from level 2
+                time=level3.time,
                 eps=eps,
                 eps_source_flag=eps_source_flag,
                 log_diss_var=log_diss_var,

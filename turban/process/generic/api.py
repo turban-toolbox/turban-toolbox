@@ -7,7 +7,7 @@ from typing import get_type_hints, ClassVar, cast
 from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
-from jaxtyping import Float, Int, AbstractArray, Num
+from jaxtyping import Float, Int, AbstractArray, Num, Shaped
 from turban.process.generic.config import SegmentConfig
 from numpy import newaxis, nan, ndarray
 import numpy as np
@@ -54,7 +54,7 @@ def get_type_hints_recursive(obj) -> dict:
 
 @dataclass(kw_only=True)
 class TimeseriesLevel:
-    time: Float[ndarray, "time"]
+    time: Shaped[ndarray, "time"]
 
     _coords: ClassVar[list[str]] = ["time"]
     _level: ClassVar[int]

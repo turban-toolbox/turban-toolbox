@@ -86,7 +86,7 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
     ds1.isel(**isel).shear.plot(**plotarg, ax=ax)
     ds2_bm.isel(**isel).shear.plot(**plotarg, ax=ax)
     ax.plot(
-        np.arange(len(shear[tip0])),
+        ds1.time.values[tip],
         shear[tip0],
         **plotarg,
     )
