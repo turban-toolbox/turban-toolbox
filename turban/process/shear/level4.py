@@ -13,9 +13,10 @@ def process_level4(
     psi: Float[ndarray, "nshear time waveno"],
     waveno: Float[ndarray, "time waveno"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
     data_length: Float[ndarray, "time"],
     log_psi_var: float,
 ) -> tuple[
@@ -52,6 +53,7 @@ def process_level4(
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
+        waveno_spectral_min,
     )
 
     k_kolmogorov = (eps1 / molvisc**3) ** 0.25
@@ -238,9 +240,10 @@ def spectrum_integration(
     eps1: Float[ndarray, "nshear time"],
     molvisc: Float[ndarray, "time"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
 ) -> tuple[
     Float[ndarray, "nshear time"],
     Float[ndarray, "nshear time"],
@@ -256,6 +259,7 @@ def spectrum_integration(
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
+        waveno_spectral_min,
     )
 
     # 3rd etc. estimates
@@ -301,28 +305,38 @@ def get_eps_second_estimate(
     eps: Float[ndarray, "nshear time"],  # from first estimate
     molvisc: Float[ndarray, "time"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Float[ndarray, "nshear time"],  # cutoff waveno
 ]:
     k95: Float[ndarray, "nshear time"] = 0.12 * (eps / molvisc**3) ** 0.25
-    waveno_spectral_min = 9999.0  # TODO
-    waveno_cutoff_antialias: Float[ndarray, "time"] = (
-        0.9 * freq_cutoff_antialias / senspeed
-    )
-    waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / senspeed
+    # make a vector that collects all wavenumber cutoffs
+    waveno_cutoffs = [k95]
+
+    # populate vector with other conditions, as available
+    if freq_cutoff_antialias is not None:
+        waveno_cutoff_antialias: Float[ndarray, "time"] = (
+            0.9 * freq_cutoff_antialias / senspeed
+        )
+        waveno_cutoffs.append(np.array(waveno_cutoff_antialias)[newaxis, :])
+
+    if freq_cutoff_corrupt is not None:
+        waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / senspeed
+        waveno_cutoffs.append(np.array(waveno_cutoff_corrupt)[newaxis, :])
+
+    if waveno_cutoff_spatial_corr is not None:
+        waveno_cutoffs.append(np.array(waveno_cutoff_spatial_corr)[newaxis, newaxis])
+
+    if waveno_spectral_min is not None:
+        waveno_cutoffs.append(np.array(waveno_spectral_min)[newaxis, newaxis])
+
     ku: Float[ndarray, "nshear time"] = np.min(
         np.stack(
-            np.broadcast_arrays(
-                k95,
-                np.array(waveno_spectral_min)[newaxis, newaxis],
-                np.array(waveno_cutoff_spatial_corr)[newaxis, newaxis],
-                np.array(waveno_cutoff_antialias)[newaxis, :],
-                np.array(waveno_cutoff_corrupt)[newaxis, :],
-            ),
+            np.broadcast_arrays(*waveno_cutoffs),
             axis=-1,
         ),
         axis=-1,

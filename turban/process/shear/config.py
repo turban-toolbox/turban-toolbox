@@ -3,11 +3,12 @@ from turban.process.generic.config import SegmentConfig
 
 
 class ShearConfig(SegmentConfig):
-    freq_cutoff_antialias: float = 999.0  # TODO
-    freq_cutoff_corrupt: float = 999.0  # TODO
+    freq_cutoff_antialias: float | None = None
+    freq_cutoff_corrupt: float | None = None  #
     freq_highpass: float = 0.15  # [Hz]
     spatial_response_wavenum: float = 50.0  # [1/m]
-    waveno_cutoff_spatial_corr: float = 999.0  # [1/m] # TODO
+    waveno_cutoff_spatial_corr: float | None = None  # [1/m] #
+    waveno_spectral_min: float | None = None
     spike_threshold: float = 8.0  # despiking in level 2
     max_tries: int = 10  # despiking in level 2
     spike_replace_before: int = 512  # despiking in level 2

@@ -260,6 +260,7 @@ class ShearLevel4(Level4):
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+            waveno_spectral_min=level3.cfg.waveno_spectral_min,
             data_length=level3.data_length,
             log_psi_var=level3.log_psi_var,
         )
