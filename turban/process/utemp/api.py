@@ -7,7 +7,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
+from turban.utils.util import agg_fast_to_slow
 from turban.process.utemp.config import UTempConfig
 
 # from turban.process.utemp.level2 import process_level2

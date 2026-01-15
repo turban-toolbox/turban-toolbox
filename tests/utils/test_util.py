@@ -9,27 +9,10 @@ from turban.utils.util import (
     reshape_halfoverlap_first,
     reshape_halfoverlap_last,
     agg_fast_to_slow,
-    get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
     get_chunking_index,
     boolarr_to_sections,
 )
-
-
-def test_get_cleaned_fraction():
-    x = np.arange(20)
-    xc = x.copy()
-    xc[2:4] = 0  # clean two samples in the first diss_chunk of 10 samples
-    cl_frac = get_cleaned_fraction(
-        x,
-        xc,
-        section_number_or_data_len=len(x),
-        segment_length=4,
-        segment_overlap=2,
-        chunk_length=10,
-        chunk_overlap=0,
-    )
-    assert np.all(cl_frac == np.array([2 / 10, 0]))
 
 
 def test_diss_chunk_wise_reshape_index():

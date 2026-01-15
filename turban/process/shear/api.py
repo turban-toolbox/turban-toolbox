@@ -8,7 +8,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
+from turban.utils.util import agg_fast_to_slow
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
