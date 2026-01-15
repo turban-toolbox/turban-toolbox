@@ -230,7 +230,7 @@ def parse_header(header, logger=None):
     # for i in range(17,len(hs)-1):
     for i in range(len(hs)):
         # logger.debug('Testing line {:s}'.format(hs[i]))
-        hstmp = re.sub("\s+", " ", hs[i])  # replace multiple blanks with one
+        hstmp = re.sub(r"\s+", " ", hs[i])  # replace multiple blanks with one
         hsp = hstmp.split(" ")
         # check if we have a sensor line
         # each sensor should have 12 entries
