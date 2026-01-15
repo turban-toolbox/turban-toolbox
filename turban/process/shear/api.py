@@ -8,7 +8,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
+from turban.utils.util import agg_fast_to_slow
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import process_level4, get_quality_metric
@@ -123,15 +123,15 @@ class ShearLevel3(Level3):
             chunk_overlap=level2.cfg.chunk_overlap,
         )
 
-        spike_fraction = get_cleaned_fraction(
-            x=level1.shear,
-            x_clean=level2.shear,
-            segment_length=level2.cfg.segment_length,
-            segment_overlap=level2.cfg.segment_overlap,
+        spikes_per_chunk = agg_fast_to_slow(
+            level2.num_despike_iter > 0, # has been despiked
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
             section_number_or_data_len=level1.section_number,
+            agg_method="sum", # count number of occurences
         )
+
+        spike_fraction = spikes_per_chunk / level2.cfg.chunk_length
 
         max_despike_iter = agg_fast_to_slow(
             level2.num_despike_iter,

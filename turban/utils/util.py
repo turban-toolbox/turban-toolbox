@@ -382,20 +382,6 @@ def integrate(
     return np.trapz(y_zero, x=x, axis=-1)
 
 
-@ensure_reshape_index
-def get_cleaned_fraction(
-    x: Float[ndarray, "*any time_fast"],
-    x_clean: Float[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
-) -> Float[ndarray, "*any time_slow"]:
-    is_cleaned = x != x_clean
-    ii = diss_chunk_wise_reshape_index(reshape_index)
-
-    num_cleaned_samples = is_cleaned[..., ii].sum(axis=-1)
-    num_total_samples = ii.shape[-1]
-    return num_cleaned_samples / num_total_samples
-
-
 def diss_chunk_wise_reshape_index(
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
 ) -> Int[ndarray, "diss_chunk chunk_length"]:
