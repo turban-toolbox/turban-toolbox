@@ -45,6 +45,5 @@ def plot_quality_metric(
     q = np.stack(list(flag_dict.values()), axis=0)
     flag = list(flag_dict.keys())
 
-    # ax.imshow(q, cmap=green_red_cmap)
-    plt.pcolormesh(time, range(len(flag)), q, cmap=green_red_cmap)
+    ax.pcolormesh(time, range(len(flag)), q, cmap=green_red_cmap)
     ax.set_yticks(range(len(flag)), flag)
