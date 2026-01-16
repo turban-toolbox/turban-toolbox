@@ -100,6 +100,7 @@ def plot_level3(data: ShearLevel3):
     plt.tight_layout()
     return fig, axs
 
+
 def plot_level4(data: ShearLevel4):
     """Plot eps time series and quality metrics for each sensor"""
     ds = data.to_xarray()
@@ -122,7 +123,9 @@ def plot_level4(data: ShearLevel4):
     # Remaining panels: Quality metrics for each sensor
     for i in range(nshear):
         ax = axs[i + 1]
-        plot_quality_metric(ax, ds.time.values, ds.quality_metric.isel(nshear=i).values)
+        plot_quality_metric(
+            ax, ds.time.values, ds.quality_metric.isel(nshear=i).values, maxq=16
+        )
         ax.set_title(f"Shear {i+1} Quality Metrics")
 
     plt.tight_layout()
