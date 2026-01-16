@@ -37,13 +37,18 @@ def plot_quality_metric(
     ax,
     time: Shaped[ndarray, "*any time"],
     q: Int[ndarray, "*any time"],
+    q_codes: dict | None = None,
     **kwarg,
 ):
     green_red_cmap = LinearSegmentedColormap.from_list("GreenRedCmap", ["green", "red"])
 
     flag_dict = unwrap_base2(q, **kwarg)
+
     q = np.stack(list(flag_dict.values()), axis=0)
-    flag = list(flag_dict.keys())
+    if q_codes is None:
+        flag = list(flag_dict.keys())
+    else:
+        flag = [q_codes[k] for k in flag_dict.keys()]
 
     ax.pcolormesh(time, range(len(flag)), q, cmap=green_red_cmap)
     ax.set_yticks(range(len(flag)), flag)

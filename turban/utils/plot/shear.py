@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
+from turban.process.shear.level4 import QUALITY_METRIC_CODES
 from turban.process.shear.api import (
     ShearProcessing,
     ShearLevel1,
@@ -124,7 +125,11 @@ def plot_level4(data: ShearLevel4):
     for i in range(nshear):
         ax = axs[i + 1]
         plot_quality_metric(
-            ax, ds.time.values, ds.quality_metric.isel(nshear=i).values, maxq=16
+            ax,
+            ds.time.values,
+            ds.quality_metric.isel(nshear=i).values,
+            q_codes=QUALITY_METRIC_CODES,
+            maxq=16,
         )
         ax.set_title(f"Shear {i+1} Quality Metrics")
 

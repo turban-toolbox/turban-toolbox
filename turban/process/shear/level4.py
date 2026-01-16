@@ -103,6 +103,15 @@ def process_level4(
     )
 
 
+QUALITY_METRIC_CODES = {
+    1: "FOM",
+    2: "Spike fraction",
+    4: "Eps disagree",
+    8: "Despike iterations",
+    16: "Variance resolved",
+}
+
+
 def get_quality_metric(
     eps: Float[ndarray, "nshear time"],
     eps_source_flag: Int[ndarray, "nshear time"],
@@ -120,7 +129,7 @@ def get_quality_metric(
     disregarded. We choose not to, and leave it at the discretion of the user."""
 
     if eps.shape[0] == 2:
-        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :] 
+        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
         # the mean between the std of the two shear probes is explicitly mentioned in
         # the ATOMIX paper
         shear_disagree = eps_dev >= 2.77 * np.mean(np.sqrt(log_diss_var), axis=0)
