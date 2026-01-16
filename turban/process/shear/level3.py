@@ -7,7 +7,7 @@ from turban.utils.spectra import spectrum
 
 
 def process_level3(
-    shear: Float[ndarray, "n_shear time_fast"],
+    shear: Float[ndarray, "nshear time_fast"],
     senspeed: Float[ndarray, "time_fast"],
     segment_length: int,
     segment_overlap: int,
@@ -19,8 +19,8 @@ def process_level3(
     section_number: Int[ndarray, "time_fast"],
 ) -> tuple[
     Float[ndarray, "time_slow k"],  # k
-    Float[ndarray, "n_shear time_slow waveno"],  # Pk
-    Float[ndarray, "n_shear time_slow waveno"],  # Pf
+    Float[ndarray, "nshear time_slow waveno"],  # psi_k_sh
+    Float[ndarray, "nshear time_slow waveno"],  # psi_f_sh
     Float[ndarray, "waveno"],  # freq
     Float[ndarray, "time_slow"],  # senspeeda
     Int[ndarray, "time_slow"],  # section_number_slow
@@ -65,7 +65,7 @@ def process_level3(
 
 
 def apply_compensation_spatial_response(
-    psi_k: Float[ndarray, "n_shear time_slow k"],
+    psi_k: Float[ndarray, "nshear time_slow k"],
     waveno: Float[ndarray, "time_slow k"],
     waveno_0: float,
 ) -> Float[ndarray, "time_slow k"]:
@@ -77,7 +77,7 @@ def apply_compensation_spatial_response(
 
 
 def apply_compensation_highpass(
-    psi_f: Float[ndarray, "n_shear time_slow f"],
+    psi_f: Float[ndarray, "nshear time_slow f"],
     freq: Float[ndarray, "f"],
     freq_highpass: float,
 ) -> Float[ndarray, "f"]:

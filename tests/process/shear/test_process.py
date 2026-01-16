@@ -103,7 +103,7 @@ def test_baltic_benchmark(atomix_mss_nc_filename):
     ds3 = xr.load_dataset(atomix_mss_nc_filename, group="L3_spectra").rename(
         {
             "N_SHEAR_SENSORS": "nshear",
-            "SH_SPEC": "Pk",
+            "SH_SPEC": "psi_k_sh",
             "KCYC": "k",
             "WAVENUMBER": "wavenumber",
         }

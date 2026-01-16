@@ -70,7 +70,7 @@ def spectrum(
 def apply_var_conserve(
     psi: Float[ndarray, "*any freq"],
     dfreq: float,
-    signal_reshape: Float[ndarray, "n_shear chunks freq"],
+    signal_reshape: Float[ndarray, "nshear chunks freq"],
 ) -> Float[ndarray, "*any"]:
     """
     Scale `psi` such that its integral along last axis (`freq`) equals variance of input signal.

@@ -20,7 +20,7 @@ def test_spectra_atomix_baltic():
     L2_nc_sh = nc.groups["L2_cleaned"]["SHEAR"][:]
 
     L3_nc_k = nc.groups["L3_spectra"].variables["KCYC"][:]
-    L3_nc_Pk = nc.groups["L3_spectra"].variables["SH_SPEC"][:]
+    L3_nc_psi_k_sh = nc.groups["L3_spectra"].variables["SH_SPEC"][:]
     L3_nc_p = nc.groups["L3_spectra"].variables["PRES"][:]
 
     L4_nc_epsi = nc.groups["L4_dissipation"]["EPSI"][:]
@@ -48,8 +48,8 @@ def test_spectra_atomix_baltic():
     kmax = nc.groups["L4_dissipation"].variables["KMAX"][0, ik]
 
     fig, ax = plt.subplots()
-    pnc = ax.plot(L3_nc_k[:, ik], L3_nc_Pk[0, :, ik])
-    ptu = ax.plot(p.level3.waveno[ik, :], p.level3.Pk[0, ik, :])
+    pnc = ax.plot(L3_nc_k[:, ik], L3_nc_psi_k_sh[0, :, ik])
+    ptu = ax.plot(p.level3.waveno[ik, :], p.level3.psi_k_sh[0, ik, :])
     YL = ax.get_ylim()
     p3 = ax.plot([kmin] * 2, YL, "-k")
     p4 = ax.plot([kmax] * 2, YL, "-r")

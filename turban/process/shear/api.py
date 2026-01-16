@@ -25,7 +25,7 @@ from turban.process.generic.api import (
 
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
-    shear: Float[ndarray, "n_shear time"]
+    shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
 
     @classmethod
@@ -44,8 +44,8 @@ class ShearLevel1(Level1):
 
 @dataclass(kw_only=True)
 class ShearLevel2(Level2):
-    shear: Float[ndarray, "n_shear time"]
-    num_despike_iter: Int[ndarray, "n_shear time"]
+    shear: Float[ndarray, "nshear time"]
+    num_despike_iter: Int[ndarray, "nshear time"]
 
     @classmethod
     def _from_level_below_kwarg(
@@ -96,8 +96,8 @@ class ShearLevel2(Level2):
 
 @dataclass(kw_only=True)
 class ShearLevel3(Level3):
-    Pk: Float[ndarray, "nshear time waveno"]
-    Pf: Float[ndarray, "nshear time waveno"]
+    psi_k_sh: Float[ndarray, "nshear time waveno"]
+    psi_f_sh: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
@@ -110,7 +110,7 @@ class ShearLevel3(Level3):
         kwarg = super()._from_level_below_kwarg(data)
         level2 = data
         level1 = data.level_below
-        k, Pk, Pf, freq, senspeed, section_number = process_level3(
+        k, psi_k_sh, psi_f_sh, freq, senspeed, section_number = process_level3(
             shear=level2.shear,
             senspeed=level2.senspeed,
             section_number=level1.section_number,
@@ -151,9 +151,9 @@ class ShearLevel3(Level3):
         kwarg.update(
             dict(
                 time=time_slow,
-                Pk=Pk,
+                psi_k_sh=psi_k_sh,
                 waveno=k,
-                Pf=Pf,
+                psi_f_sh=psi_f_sh,
                 freq=freq,
                 senspeed=senspeed,
                 section_number=section_number,
@@ -172,9 +172,9 @@ class ShearLevel3(Level3):
 
         return cls(
             time=ds["TIME"].values,
-            Pk=ds["SH_SPEC"].values,
+            psi_k_sh=ds["SH_SPEC"].values,
             waveno=ds["KCYC"].values,
-            Pf=ds["SH_SPEC"].values * np.nan,
+            psi_f_sh=ds["SH_SPEC"].values * np.nan,
             freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
             senspeed=ds["PSPD_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
@@ -204,13 +204,13 @@ class ShearLevel3(Level3):
         )
 
     @property
-    def Pk_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
+    def psi_k_sh_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
         """95% confidence interval of power spectrum.
         Eq. 23 in the ATOMIX paper"""
         return np.concatenate(
             (
-                self.Pk * np.exp(1.96 * self.log_psi_var)[newaxis, ...],
-                self.Pk * np.exp(-1.96 * self.log_psi_var)[newaxis, ...],
+                self.psi_k_sh * np.exp(1.96 * self.log_psi_var)[newaxis, ...],
+                self.psi_k_sh * np.exp(-1.96 * self.log_psi_var)[newaxis, ...],
             ),
             axis=0,
         )
@@ -250,7 +250,7 @@ class ShearLevel4(Level4):
             log_diss_mad,
             num_spec_points,
         ) = process_level4(
-            psi=level3.Pk,
+            psi=level3.psi_k_sh,
             waveno=level3.waveno,
             senspeed=level3.senspeed,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,

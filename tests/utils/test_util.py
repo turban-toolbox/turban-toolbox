@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 from turban.utils.util import (
+    unwrap_base2,
     fft_grad,
     reshape_overlap_index,
     reshape_any_first,
@@ -13,6 +14,16 @@ from turban.utils.util import (
     get_chunking_index,
     boolarr_to_sections,
 )
+
+
+def test_unwrap_unwrap_base2():
+    q = np.array([0, 1, 2, 3, 9])
+    qd = unwrap_base2(q, maxq=16)
+    assert np.all(qd[1] == np.array([False, True, False, True, True]))
+    assert np.all(qd[2] == np.array([False, False, True, True, False]))
+    assert np.all(qd[4] == np.array([False, False, False, False, False]))
+    assert np.all(qd[8] == np.array([False, False, False, False, True]))
+    assert np.all(qd[16] == np.array([False, False, False, False, False]))
 
 
 def test_diss_chunk_wise_reshape_index():

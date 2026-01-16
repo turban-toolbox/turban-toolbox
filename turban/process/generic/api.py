@@ -14,6 +14,7 @@ import numpy as np
 import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
+from turban.variables import VARIABLES
 
 # For Level1/2
 AuxDataTypehintLevel12 = dict[
@@ -75,7 +76,10 @@ class TimeseriesLevel:
 
     def to_xarray(self):
         data_vars, coords = self.arrays_as_xr_dicts()
-        return xr.Dataset(data_vars=data_vars, coords=coords)
+        ds = xr.Dataset(data_vars=data_vars, coords=coords)
+        for varname in set(list(ds.data_vars) + list(ds.coords)):
+            ds[varname].attrs.update(VARIABLES.get(varname, {}))
+        return ds
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):

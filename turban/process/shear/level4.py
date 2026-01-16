@@ -2,6 +2,7 @@ import warnings
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Bool
+import xarray as xr
 
 from turban.utils.util import integrate
 
@@ -102,6 +103,15 @@ def process_level4(
     )
 
 
+QUALITY_METRIC_CODES = {
+    1: "FOM",
+    2: "Spike fraction",
+    4: "Eps disagree",
+    8: "Despike iterations",
+    16: "Variance resolved",
+}
+
+
 def get_quality_metric(
     eps: Float[ndarray, "nshear time"],
     eps_source_flag: Int[ndarray, "nshear time"],
@@ -119,7 +129,7 @@ def get_quality_metric(
     disregarded. We choose not to, and leave it at the discretion of the user."""
 
     if eps.shape[0] == 2:
-        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :] 
+        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
         # the mean between the std of the two shear probes is explicitly mentioned in
         # the ATOMIX paper
         shear_disagree = eps_dev >= 2.77 * np.mean(np.sqrt(log_diss_var), axis=0)
@@ -147,15 +157,6 @@ def get_quality_metric(
     quality_metric += np.where(resolved_var_frac < 0.6, 16, 0)
 
     return quality_metric
-
-
-def unwrap_quality_metric(q: Int[ndarray, "*any"]) -> dict[int, Bool[ndarray, "*any"]]:
-    flag_arr: Bool[ndarray, "*any"] = np.unpackbits(
-        q.astype(np.uint8)[np.newaxis], axis=0, bitorder="little"
-    ).astype(bool)
-    base = [2**i for i in range(8)]
-    flag_dict = {name: val for name, val in zip(base, flag_arr)}
-    return flag_dict
 
 
 def get_log_diss_var(
