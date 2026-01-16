@@ -23,4 +23,3 @@ def test_plot(atomix_mss_nc_filename):
     plot_level2(p.level2, p.level1)
     plot_level3(p.level3)
     plot_level4(p.level4)
-    plt.show()
