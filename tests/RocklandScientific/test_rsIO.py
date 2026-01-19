@@ -1,17 +1,72 @@
 from itertools import chain
+import io
 import os
+import pytest
+import requests
+import shutil
+import zipfile
 
 import numpy as np
-import pytest
 from scipy.io import loadmat
 
 from turban.instruments.RocklandScientific import rsIO, rsConfig_parser, rsCommon
 
-def asDict(mat_variable):
-    d = dict([(k,v) for k,v in zip(mat_variable.dtype.names, mat_variable.tolist())])
-    return d
-
 datadir = "data/RocklandScientific"
+data_url = "https://share.hereon.de/index.php/s/AqMdY8Q47FPQHQR/download"
+archive_name = "TurbanData"
+
+#data_url = "https://share.hereon.de/index.php/s/Ek2JGYnZWgPx8FR/download"
+#archive_name = "test"
+
+def download_and_extract_zip(url, output_filename, extract_path):
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        with open(output_filename, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+        with zipfile.ZipFile(output_filename, 'r') as zip_ref:
+            zip_ref.extractall(extract_path)
+        print(f"Successfully downloaded and extracted {url}")
+        archive_path = os.path.join(extract_path, archive_name)
+        fns = os.listdir(archive_path)
+        for fn in fns:
+            src = os.path.join(archive_path, fn)
+            dst = os.path.join(datadir, fn)
+            shutil.move(src, dst)
+        os.unlink(output_filename)
+        os.rmdir(archive_path)
+    except requests.RequestException as e:
+        print(f"Download error: {e}")
+    except zipfile.BadZipFile:
+        print("Error: Invalid zip file")
+
+
+
+def test_presence_of_test_data():
+    fns = os.listdir(datadir)
+    expected_datafiles = "DAT_058.P data_0413.p DAT_058.mat data_0413.mat".split()
+    present = True
+    for fn in expected_datafiles:
+        if fn not in fns:
+            present = False
+            break
+    if not present:
+        download_and_extract_zip(data_url,
+                                 output_filename = "/tmp/TurbanData.zip",
+                                 extract_path = "/tmp")
+        present = True
+        fns = os.listdir(datadir)
+        for fn in expected_datafiles:
+            if fn not in fns:
+                present = False
+                break
+        assert present
+    assert present
+
+
+
+
 
 def test_header_data_058():
     header_parser = rsIO.HeaderParser()
