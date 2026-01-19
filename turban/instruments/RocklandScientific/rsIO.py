@@ -2,7 +2,6 @@ import enum
 
 from functools import partial
 import io
-import logging
 import os.path
 import re
 import struct
@@ -16,10 +15,7 @@ from scipy.interpolate import interp1d as si_interp1d
 from . import  rsConversions
 from . import rsConfig_parser
 from .rsCommon import ByteHeader, Header, ChannelConfigABC, ChannelConfig, channel_config_factory
-
-logger = logging.getLogger(__name__)
-
-
+from . import logger
 
 
 class HeaderEnum(enum.IntEnum):
