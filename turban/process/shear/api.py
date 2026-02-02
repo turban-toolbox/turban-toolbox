@@ -231,7 +231,7 @@ class ShearLevel4(Level4):
     eps_source_flag: Int[ndarray, "nshear time"]
     log_diss_var: Float[ndarray, "nshear time"]
     log_diss_mad: Float[ndarray, "nshear time"]
-    kolm_length: Float[ndarray, "nshear time"]
+    kolmlen: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
     quality_metric: Int[ndarray, "nshear time"]
@@ -248,7 +248,7 @@ class ShearLevel4(Level4):
             eps,
             eps_source_flag,
             log_diss_var,
-            kolm_length,
+            kolmlen,
             resolved_var_frac,
             fom,
             log_diss_mad,
@@ -282,7 +282,7 @@ class ShearLevel4(Level4):
                 eps_source_flag=eps_source_flag,
                 log_diss_var=log_diss_var,
                 log_diss_mad=log_diss_mad,
-                kolm_length=kolm_length,
+                kolmlen=kolmlen,
                 resolved_var_frac=resolved_var_frac,
                 num_spec_points=num_spec_points,
                 quality_metric=quality_metric,

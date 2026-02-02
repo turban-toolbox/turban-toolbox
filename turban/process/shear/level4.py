@@ -69,11 +69,11 @@ def process_level4(
     num_spec_points = (waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]).sum(
         axis=-1
     ) - 1
-    kolm_length = (molvisc[newaxis, :] ** 3 / eps) ** 0.25
+    kolmlen = (molvisc[newaxis, :] ** 3 / eps) ** 0.25
 
     log_diss_var = get_log_diss_var(
         eps_source_flag,
-        kolm_length,
+        kolmlen,
         data_length,
         resolved_var_frac,
         num_spec_points,
@@ -97,7 +97,7 @@ def process_level4(
         eps,
         eps_source_flag,
         log_diss_var,
-        kolm_length,
+        kolmlen,
         resolved_var_frac,
         fom,
         log_diss_mad,
@@ -163,7 +163,7 @@ def get_quality_metric(
 
 def get_log_diss_var(
     eps_source_flag: Int[ndarray, "nshear time"],
-    kolm_length: Float[ndarray, "nshear time"],
+    kolmlen: Float[ndarray, "nshear time"],
     data_length: Float[ndarray, "time"],
     resolved_var_frac: Float[ndarray, "nshear time"],
     num_spec_points: Int[ndarray, "nshear time"],
@@ -172,7 +172,7 @@ def get_log_diss_var(
     """Notes:
     `eps_source_flag`: 1: spec_int, 2: isr_fit
     """
-    data_length_nondim = data_length[newaxis, :] / kolm_length * resolved_var_frac**0.75
+    data_length_nondim = data_length[newaxis, :] / kolmlen * resolved_var_frac**0.75
     log_diss_var_spec_int = 5.5 / (1 + (data_length_nondim / 4) ** (7 / 9))
 
     log_diss_var_isr_fit = 1.5 * log_psi_var / np.sqrt(num_spec_points)
