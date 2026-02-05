@@ -41,6 +41,12 @@ class SegmentConfig(BaseModel):
 
     def add_to_xarray(self, ds: xr.Dataset):
         ds.attrs.update(self.model_dump())
+        # another option that would allow setting further attributes from variables.py:
+        # (would require corresponding changes in from_xarray)
+        # if hasattr(self, "cfg"):
+        #     # set cfg as 0-dim data variables
+        #     for key, val in self.cfg.model_dump().items():
+        #         ds[key] = ([], val)
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):
