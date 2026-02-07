@@ -10,3 +10,6 @@ build:
   tools:
     python: "3.13"
 
+mkdocs:
+  # Path to your MkDocs configuration file.
+  configuration: mkdocs.yml
