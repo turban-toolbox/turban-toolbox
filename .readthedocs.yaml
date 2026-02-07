@@ -10,6 +10,13 @@ build:
   tools:
     python: "3.13"
 
+
+python:
+  install:
+    - method: pip
+      path: .
+    - requirements: docs/requirements.txt  # Requirements for extra packages
+
 mkdocs:
   # Path to your MkDocs configuration file.
   configuration: mkdocs.yml
