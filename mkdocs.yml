@@ -1,0 +1,22 @@
+site_name: Turban Toolbox
+site_description: Turbulence Analysis Toolbox (Oceanography/Marine Science)
+site_author: Peter Holtermann
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: blue
+  features:
+    - navigation.sections
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings: 
+      handlers:
+        python:
+          setup_python_path: true
+
+nav:
+  - Home: index.md
