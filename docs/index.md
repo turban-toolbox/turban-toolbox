@@ -1,4 +1,4 @@
-# Welcome to the Turbulence analysis (TURBAN) toolbox
+# Welcome to the Turbulence analysis (TURBAN) toolbox manual
 
 This is the main page.
 
