@@ -11,12 +11,25 @@ theme:
     - navigation.sections
     - content.code.copy
 
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["."] # Allows access to /tests and other root folders
+  - pymdownx.superfences # Required for code blocks
+  - pymdownx.arithmatex:
+      generic: true # Enables LaTeX support for Oceanography formulas
+
+extra_javascript:
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+
 plugins:
   - search
   - mkdocstrings: 
       handlers:
         python:
           setup_python_path: true
+          options:
+            docstring_style: google # Using the modern Google style
 
 nav:
   - Home: index.md
+  - Quickstart: quickstart.md
