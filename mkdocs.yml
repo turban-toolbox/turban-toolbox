@@ -19,7 +19,8 @@ markdown_extensions:
       generic: true # Enables LaTeX support for Oceanography formulas
 
 extra_javascript:
-  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
 
 plugins:
   - search

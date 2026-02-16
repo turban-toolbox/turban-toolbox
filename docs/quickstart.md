@@ -8,7 +8,7 @@ $$
 N^2 = -\frac{g}{\rho_0} \frac{\partial \rho}{\partial z}
 $$
 
-and is used throughout the toolbox.
+and is used throughout the toolbox with this definition.
 
 
 ```python title="tests/mss.py"
