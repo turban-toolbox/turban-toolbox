@@ -28,7 +28,7 @@ plugins:
         python:
           setup_python_path: true
           options:
-            docstring_style: google # Using the modern Google style
+            docstring_style: numpy
 
 nav:
   - Home: index.md
