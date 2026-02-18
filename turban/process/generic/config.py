@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from netCDF4 import Dataset
+import xarray as xr
 import numpy as np
 
 
@@ -37,3 +38,10 @@ class SegmentConfig(BaseModel):
             self.segment_length - self.segment_overlap,
         )  # start of each fft segment within a chunk
         return len(fft_segment_start)
+
+    def add_to_xarray(self, ds: xr.Dataset):
+        ds.attrs.update(self.model_dump())
+
+    @classmethod
+    def from_xarray(cls, ds: xr.Dataset):
+        return cls.model_validate(ds.attrs)

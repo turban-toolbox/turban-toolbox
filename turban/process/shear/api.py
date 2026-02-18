@@ -27,6 +27,7 @@ from turban.process.generic.api import (
 class ShearLevel1(Level1):
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
+    cfg: ShearConfig
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
@@ -46,6 +47,7 @@ class ShearLevel1(Level1):
 class ShearLevel2(Level2):
     shear: Float[ndarray, "nshear time"]
     num_despike_iter: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
@@ -101,6 +103,7 @@ class ShearLevel3(Level3):
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
@@ -124,11 +127,11 @@ class ShearLevel3(Level3):
         )
 
         spikes_per_chunk = agg_fast_to_slow(
-            level2.num_despike_iter > 0, # has been despiked
+            level2.num_despike_iter > 0,  # has been despiked
             chunk_length=level2.cfg.chunk_length,
             chunk_overlap=level2.cfg.chunk_overlap,
             section_number_or_data_len=level1.section_number,
-            agg_method="sum", # count number of occurences
+            agg_method="sum",  # count number of occurences
         )
 
         spike_fraction = spikes_per_chunk / level2.cfg.chunk_length
@@ -232,6 +235,7 @@ class ShearLevel4(Level4):
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
     quality_metric: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
