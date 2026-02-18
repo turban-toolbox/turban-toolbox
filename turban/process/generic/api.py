@@ -402,14 +402,14 @@ class Processing(ABC):
 
     def to_xarray(self):
         """Export"""
-        out_data = []
+        out_data = {}
         for data in [self.level1, self.level2, self.level3, self.level4]:
-            if data is None:
-                out = None
-            else:
+            if data is not None:
                 out = data.to_xarray()
-            out_data.append(out)
-        return out_data
+                out_data[f"level{data._level}"] = xr.DataTree(out)
+                
+        data_tree = xr.DataTree(children=out_data)
+        return data_tree
 
 
 # def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
