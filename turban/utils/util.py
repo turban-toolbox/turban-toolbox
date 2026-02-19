@@ -11,6 +11,14 @@ from netCDF4 import Dataset
 import xarray as xr
 
 
+def kolmogorov_length(
+    eps: Float[ndarray, "*any"],
+    molvisc: Float[ndarray, "*any"],
+) -> Float[ndarray, "*any"]:
+    """The Kolmogorov length scale"""
+    return (molvisc**3 / eps) ** 0.25
+
+
 def ensure_reshape_index(func):
     """Make sure that `func` has `reshape_index` available by alternatively supplying
     segment_length etc."""

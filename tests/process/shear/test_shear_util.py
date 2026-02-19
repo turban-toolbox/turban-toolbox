@@ -3,10 +3,7 @@ import numpy as np
 from numpy import newaxis
 import matplotlib.pyplot as plt
 
-from turban.process.shear.level4 import (
-    model_spectrum,
-    model_spectrum_lueck,
-)
+from turban.process.shear.util import model_spectrum, model_spectrum_lueck
 
 
 def test_model_spectrum():

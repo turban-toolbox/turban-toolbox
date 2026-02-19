@@ -5,6 +5,8 @@ from jaxtyping import Float, Int, Bool
 import xarray as xr
 
 from turban.utils.util import integrate
+from turban.process.shear.util import model_spectrum
+from turban.utils.util import kolmogorov_length
 
 
 def process_level4(
@@ -338,42 +340,3 @@ def get_spectral_variance_resolved_fraction(
     # Eq. 11; I_L (3rd model)
     k43 = (waveno * kolmlen) ** (4.0 / 3.0)
     return np.tanh(65.5 * k43) - 9.0 * k43 * np.exp((-54.5 * k43))
-
-
-def kolmogorov_length(
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any"]:
-    """The Kolmogorov length scale"""
-    return (molvisc**3 / eps) ** 0.25
-
-
-def psi_nondim_factor(
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any"]:
-    """To pass from non-dimensional to dimensional shear spectra, see Eq. 6"""
-    return (eps**3 / molvisc) ** 0.25
-
-
-def model_spectrum(
-    waveno: Float[ndarray, "*any waveno"],
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any waveno"]:
-    """Uses the Lueck spectrum (Eq. 9) - consistent with
-    `get_spectral_variance_resolved_fraction`"""
-    k_nondim = waveno * kolmogorov_length(eps, molvisc)[..., newaxis]
-    psi_nondim = model_spectrum_lueck(k_nondim)
-    return psi_nondim * psi_nondim_factor(eps, molvisc)[..., newaxis]
-
-
-def model_spectrum_lueck(
-    waveno_nondim: Float[ndarray, "*any waveno"],  # nondimensional waveno
-) -> Float[ndarray, "*any waveno"]:
-    """Non-dimensional form, Eq. 9"""
-    y = (waveno_nondim / 0.015) ** 2
-    fac1 = 8.048 * waveno_nondim ** (1 / 3) / (1 + (21.7 * waveno_nondim) ** 3)
-    fac2 = 1 / (1 + (6.6 * waveno_nondim) ** 2.5)
-    fac3 = 1 + 0.36 * y / ((y - 1) ** 2 + 2 * y)
-    return fac1 * fac2 * fac3
