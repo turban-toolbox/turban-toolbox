@@ -52,6 +52,8 @@ _vars = {
     "sampfreq/unit": "Hz",
     "senspeed/atomix_name": "PSPD",
     "senspeed/explanation": "Speed of the sensor relative to water",
+    "senspeed/long_name": "Platform speed through water",
+    "senspeed/unit": "m s-1",
     "shear/atomix_name": "SH",
     "shear/explanation": "Current shear",
     "shear/unit": "s-1",

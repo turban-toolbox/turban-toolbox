@@ -186,7 +186,7 @@ def plot_level2(*data: Any):
 
 
 def plot_level3(*data: Any):
-    """Plot shear spectra for each sensor"""
+    """Plot shear spectra and time series."""
     levels = _parse_level_inputs(*data)
     data_l3 = levels.get(3)
     data_l4 = levels.get(4, None)
@@ -195,32 +195,64 @@ def plot_level3(*data: Any):
     ds4 = _to_dataset(data_l4) if data_l4 is not None else None
     nshear = len(ds3.nshear)
 
-    fig, axs = plt.subplots(nshear, 1, figsize=(8, 2 + 2 * nshear), sharex=True)
-    if nshear == 1:
-        axs = [axs]
+    non_aux_vars = {
+        "psi_k_sh",
+        "psi_f_sh",
+        "senspeed",
+        "section_number",
+        "spike_fraction",
+        "max_despike_iter",
+    }
+    aux_vars = [
+        var
+        for var in ds3.data_vars
+        if var in data_l3._aux_data.keys()
+        and "time" in ds3[var].dims
+    ]
+    ts_vars = ["senspeed", *aux_vars]
 
-    for i, ax in enumerate(axs):
+    n_ts = len(ts_vars)
+    fig = plt.figure(figsize=(4 * nshear, 3 + 2.2 * (1 + n_ts)))
+    gs = fig.add_gridspec(nrows=1 + n_ts, ncols=nshear)
+
+    spectra_axes = [fig.add_subplot(gs[0, i]) for i in range(nshear)]
+    ts_axes = [fig.add_subplot(gs[1 + i, :]) for i in range(n_ts)]
+
+    for i, ax in enumerate(spectra_axes):
         # Plot Pk vs wavenumber with time overlaid
         ds_sensor = ds3.isel(nshear=i)
         ds_sensor["psi_k_sh"].plot(ax=ax, x="waveno", hue="time", add_legend=False)
 
         if ds4 is not None:
-            waveno = 10 ** np.linspace(
-                np.log10(np.nanmin(ds3.waveno.isel(waveno=slice(1, None)))),
-                np.log10(np.nanmax(ds3.waveno)),
-            )
-            eps = ds4["eps"].mean("nshear").values
-            kolm_length = ds4["kolm_length"].mean("nshear").values
-            molvisc = (eps * kolm_length**4) ** (1 / 3)
-            psi = model_spectrum(waveno, eps, molvisc)
+            waveno_sensor = np.asarray(ds_sensor["waveno"].values)
+            waveno_pos = waveno_sensor[np.isfinite(waveno_sensor) & (waveno_sensor > 0)]
+            if waveno_pos.size > 0:
+                waveno = np.logspace(
+                    np.log10(np.nanmin(waveno_pos)),
+                    np.log10(np.nanmax(waveno_pos)),
+                    200,
+                )
+                eps = ds4["eps"].isel(nshear=i).values
+                kolm_length = ds4["kolm_length"].isel(nshear=i).values
+                molvisc = (eps * kolm_length**4) ** (1 / 3)
+                psi = model_spectrum(waveno, eps, molvisc)
 
-            ax.plot(waveno, psi.T, color="k", alpha=0.12, linewidth=0.6)
+                ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls='-')
 
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
-        # ax.legend(loc="best")
+
+    # add sensor speed and auxiliary variables
+    for ax, var in zip(ts_axes, ts_vars):
+        ds3[var].plot(ax=ax, color="k", linewidth=1)
+        ax.grid(True, alpha=0.3)
+
+    ts_axes[-1].set_xlabel("Time")
+    plot_section_numbers(ts_axes, ds3.time.values, ds3.section_number.values)
+
+    axs = [*spectra_axes, *ts_axes]
 
     fig.suptitle("Level 3")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
