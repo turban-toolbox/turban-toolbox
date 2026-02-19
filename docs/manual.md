@@ -74,6 +74,8 @@ When a user needs to change an alorithm beyond a simple parameter, there are two
 2. Python allows "monkey patching" individual functions (i.e. replacing them with our own implementations), as in:
 ```python
 from turban.process.shear import level3 
+from numpy import ndarray
+from jaxtyping import Float
 
 def my_apply_compensation_highpass(
     x: Float[ndarray, "n_shear time_slow f"],
