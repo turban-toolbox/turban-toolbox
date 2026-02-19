@@ -120,6 +120,13 @@ def _clip(ds: xr.Dataset, subset: SubsetSpec | None = None):
     return ds
 
 
+def _subset_suffix(subset: SubsetSpec | None) -> str:
+    if subset is None or len(subset) == 0:
+        return ""
+    subset_str = "; ".join(f"{var}∈[{vmin}, {vmax}]" for var, vmin, vmax in subset)
+    return f"\nsubset: {subset_str}"
+
+
 def plot_level1(*data: Any, subset: SubsetSpec | None = None):
     """Plot Level 1 data with shear and senspeed in two panels."""
     levels = _parse_level_inputs(*data)
@@ -154,7 +161,7 @@ def plot_level1(*data: Any, subset: SubsetSpec | None = None):
 
     plot_section_numbers(list(axs), ds.time.values, ds.section_number.values)
 
-    fig.suptitle("Level 1")
+    fig.suptitle(f"Level 1{_subset_suffix(subset)}")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
@@ -197,7 +204,7 @@ def plot_level2(*data: Any, subset: SubsetSpec | None = None):
 
     plot_section_numbers(axs, ds.time.values, ds.section_number.values)
 
-    fig.suptitle("Level 2")
+    fig.suptitle(f"Level 2{_subset_suffix(subset)}")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
@@ -215,14 +222,6 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
     ds4 = _clip(_to_dataset(data_l4), subset) if data_l4 is not None else None
     nshear = len(ds3.nshear)
 
-    non_aux_vars = {
-        "psi_k_sh",
-        "psi_f_sh",
-        "senspeed",
-        "section_number",
-        "spike_fraction",
-        "max_despike_iter",
-    }
     aux_keys = set((getattr(data_l3, "_aux_data", {}) or {}).keys())
     aux_vars = [
         var for var in ds3.data_vars if var in aux_keys and "time" in ds3[var].dims
@@ -258,7 +257,7 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
                 ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls="-")
 
         ax.set_xscale("log")
-        ax.set_ylim(np.nanpercentile(eps, 0.1), None)
+        ax.set_ylim(np.nanpercentile(ds3["psi_k_sh"], 0.1), None)
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
@@ -273,7 +272,7 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
 
     axs = [*spectra_axes, *ts_axes]
 
-    fig.suptitle("Level 3")
+    fig.suptitle(f"Level 3{_subset_suffix(subset)}")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
@@ -312,6 +311,6 @@ def plot_level4(*data: Any, subset: SubsetSpec | None = None):
         )
         ax.set_title(f"Shear {i+1} Quality Metrics")
 
-    fig.suptitle("Level 4")
+    fig.suptitle(f"Level 4{_subset_suffix(subset)}")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
