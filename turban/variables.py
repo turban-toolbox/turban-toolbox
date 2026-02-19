@@ -18,7 +18,7 @@ _vars = {
     "eps/latex": r"$\eps$",
     "eps/standard_name": "specific_turbulent_kinetic_energy_dissipation_in_sea_water",
     "eps/unit": "W kg-1",
-    "freq/atomix_name": None,
+    # "freq/atomix_name": None,  # TODO
     "freq/explanation": "Number of cycles per second",
     "freq/unit": "Hz",  # cps
     "kolmlen/explanation": "Kolmogorov length scale",

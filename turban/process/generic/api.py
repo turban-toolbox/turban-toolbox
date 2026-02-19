@@ -1,6 +1,7 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
 from functools import wraps
+from logging import getLogger
 from inspect import isclass
 from logging import warnings
 from typing import get_type_hints, ClassVar, cast
@@ -15,6 +16,8 @@ import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 from turban.variables import VARIABLES
+
+logger = getLogger()
 
 # For Level1/2
 AuxDataTypehintLevel12 = dict[
@@ -39,15 +42,15 @@ AuxDataTypehintLevel34 = dict[
 ]
 
 
-def get_type_hints_recursive(obj) -> dict:
+def get_type_hints_recursive(cls) -> dict:
     """
-    Collect all type definitions on a given objects, also from parent classes.
+    Collect all type definitions on a given class, also from parent classes.
 
     :param obj: Any python object
     """
     hints = {}
     # loop through MRO in reverse order if anything is superseded by inheritance
-    for type_ in type(obj).mro()[::-1]:
+    for type_ in cls.mro()[::-1]:
         hints.update(get_type_hints(type_))
 
     return hints
@@ -57,6 +60,7 @@ def get_type_hints_recursive(obj) -> dict:
 class TimeseriesLevel:
     time: Shaped[ndarray, "time"]
 
+    cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     _coords: ClassVar[list[str]] = ["time"]
     _level: ClassVar[int]
 
@@ -66,7 +70,7 @@ class TimeseriesLevel:
                 [dim.name for dim in t.dims],
                 getattr(self, name),
             )
-            for name, t in get_type_hints_recursive(self).items()
+            for name, t in get_type_hints_recursive(type(self)).items()
             if isclass(t)
             if issubclass(t, AbstractArray)
         }
@@ -79,17 +83,22 @@ class TimeseriesLevel:
         ds = xr.Dataset(data_vars=data_vars, coords=coords)
         for varname in set(list(ds.data_vars) + list(ds.coords)):
             ds[varname].attrs.update(VARIABLES.get(varname, {}))
+
+        # add config as global attributes
+        self.cfg.add_to_xarray(ds)
         return ds
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):
-        raise NotImplementedError
         data = {}
-        hints = get_type_hints_recursive(cls).items()
-        for name in ds:
+        hints = get_type_hints_recursive(cls)
+        for name, arr in dict(**ds.data_vars, **ds.coords).items():
             if name in hints:
-                data[name] = ds[name].values
-        # how to handle aux data?
+                logger.debug(f"Adding `{name}` to data")
+                data[name] = arr.values
+
+        data["cfg"] = hints["cfg"].from_xarray(ds)
+
         return cls(**data)
 
     def get_attr(self, name):
@@ -123,11 +132,27 @@ class AuxiliaryData(TimeseriesLevel):
             )
         return data_vars, coords
 
+    @classmethod
+    def from_xarray(cls, ds: xr.Dataset):
+        new = super().from_xarray(ds)
+        for name in ds:
+            if not hasattr(new, name):
+                if len(ds[name].shape) == 1:
+                    new.add_aux_data(ds[name].values, name=name)
+                else:
+                    logger.warning(
+                        (
+                            f"Skipping potential auxiliary variable `{name}` defined on "
+                            f"dataset as it has {len(ds[name].shape)} dimensions"
+                        )
+                    )
+        return new
+
     def _variable_present(self, name):
         """Returns True if variable called `name` already present somewhere"""
         if name in self._aux_data:
             warnings.warn(f"Variable`{name}` already exists in aux data, skipping")
-        elif name in get_type_hints_recursive(self):
+        elif name in get_type_hints_recursive(type(self)):
             warnings.warn(
                 f"Variable `{name}` already defined on object itself, skipping"
             )
@@ -192,7 +217,7 @@ class AuxiliaryData(TimeseriesLevel):
 
 @dataclass(kw_only=True)
 class HasLevelBelow(TimeseriesLevel):
-    level_below: TimeseriesLevel | None
+    level_below: TimeseriesLevel | None = None
 
     @classmethod
     @abstractmethod
@@ -224,7 +249,6 @@ class HasLevelBelow(TimeseriesLevel):
 @dataclass(kw_only=True)
 class Level1(AuxiliaryData):
     senspeed: Float[ndarray, "time"]
-    cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     section_number: Int[ndarray, "time"]
 
     _level: ClassVar[int] = 1
@@ -402,14 +426,28 @@ class Processing(ABC):
 
     def to_xarray(self):
         """Export"""
-        out_data = []
+        out_data = {}
         for data in [self.level1, self.level2, self.level3, self.level4]:
-            if data is None:
-                out = None
-            else:
+            if data is not None:
                 out = data.to_xarray()
-            out_data.append(out)
-        return out_data
+                out_data[f"level{data._level}"] = xr.DataTree(out)
+
+        data_tree = xr.DataTree(children=out_data)
+        return data_tree
+
+    @classmethod
+    def from_xarray(cls, data_tree: xr.DataTree):
+        """Instantiate pipeline from lowest available level"""
+        for level, class_ in cls._level_mapping.items():
+            level_str = f"level{level:d}"
+            if level_str in data_tree:
+                logger.debug(f"Start processing from level {level}")
+                data = class_.from_xarray(data_tree[level_str].to_dataset())
+                break
+        else:
+            raise ValueError(f"Could not find any data.")
+
+        return cls(data)
 
 
 # def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:

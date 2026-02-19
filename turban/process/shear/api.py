@@ -27,6 +27,7 @@ from turban.process.generic.api import (
 class ShearLevel1(Level1):
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
+    cfg: ShearConfig
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
@@ -45,7 +46,9 @@ class ShearLevel1(Level1):
 @dataclass(kw_only=True)
 class ShearLevel2(Level2):
     shear: Float[ndarray, "nshear time"]
+    section_number: Int[ndarray, "time"]
     num_despike_iter: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
@@ -74,6 +77,7 @@ class ShearLevel2(Level2):
                 time=level1.time,
                 shear=sh_cleaned,
                 senspeed=level1.senspeed,
+                section_number=level1.section_number,
                 num_despike_iter=num_despike_iter,
                 level_below=level1,
             )
@@ -101,6 +105,7 @@ class ShearLevel3(Level3):
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
@@ -108,44 +113,42 @@ class ShearLevel3(Level3):
         data: ShearLevel2,
     ) -> dict:
         kwarg = super()._from_level_below_kwarg(data)
-        level2 = data
-        level1 = data.level_below
         k, psi_k_sh, psi_f_sh, freq, senspeed, section_number = process_level3(
-            shear=level2.shear,
-            senspeed=level2.senspeed,
-            section_number=level1.section_number,
-            segment_length=level2.cfg.segment_length,
-            sampfreq=level2.cfg.sampfreq,
-            spatial_response_wavenum=level2.cfg.spatial_response_wavenum,
-            freq_highpass=level2.cfg.freq_highpass,
-            segment_overlap=level2.cfg.segment_overlap,
-            chunk_length=level2.cfg.chunk_length,
-            chunk_overlap=level2.cfg.chunk_overlap,
+            shear=data.shear,
+            senspeed=data.senspeed,
+            section_number=data.section_number,
+            segment_length=data.cfg.segment_length,
+            sampfreq=data.cfg.sampfreq,
+            spatial_response_wavenum=data.cfg.spatial_response_wavenum,
+            freq_highpass=data.cfg.freq_highpass,
+            segment_overlap=data.cfg.segment_overlap,
+            chunk_length=data.cfg.chunk_length,
+            chunk_overlap=data.cfg.chunk_overlap,
         )
 
         spikes_per_chunk = agg_fast_to_slow(
-            level2.num_despike_iter > 0, # has been despiked
-            chunk_length=level2.cfg.chunk_length,
-            chunk_overlap=level2.cfg.chunk_overlap,
-            section_number_or_data_len=level1.section_number,
-            agg_method="sum", # count number of occurences
+            data.num_despike_iter > 0,  # has been despiked
+            chunk_length=data.cfg.chunk_length,
+            chunk_overlap=data.cfg.chunk_overlap,
+            section_number_or_data_len=data.section_number,
+            agg_method="sum",  # count number of occurences
         )
 
-        spike_fraction = spikes_per_chunk / level2.cfg.chunk_length
+        spike_fraction = spikes_per_chunk / data.cfg.chunk_length
 
         max_despike_iter = agg_fast_to_slow(
-            level2.num_despike_iter,
-            chunk_length=level2.cfg.chunk_length,
-            chunk_overlap=level2.cfg.chunk_overlap,
-            section_number_or_data_len=level1.section_number,
+            data.num_despike_iter,
+            chunk_length=data.cfg.chunk_length,
+            chunk_overlap=data.cfg.chunk_overlap,
+            section_number_or_data_len=data.section_number,
             agg_method="max",
         )
 
         time_slow = agg_fast_to_slow(
-            level2.time,
-            chunk_length=level2.cfg.chunk_length,
-            chunk_overlap=level2.cfg.chunk_overlap,
-            section_number_or_data_len=level1.section_number,
+            data.time,
+            chunk_length=data.cfg.chunk_length,
+            chunk_overlap=data.cfg.chunk_overlap,
+            section_number_or_data_len=data.section_number,
             agg_method="take_mid",
         )
         kwarg.update(
@@ -232,6 +235,7 @@ class ShearLevel4(Level4):
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
     quality_metric: Int[ndarray, "nshear time"]
+    cfg: ShearConfig
 
     @classmethod
     def _from_level_below_kwarg(
