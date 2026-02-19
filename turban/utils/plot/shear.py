@@ -13,6 +13,7 @@ from turban.process.shear.api import (
     ShearLevel4,
 )
 from turban.process.shear.util import model_spectrum
+from turban.utils.util import define_sections
 
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 
@@ -69,7 +70,7 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     return out
 
 
-def plot(*data: Any):
+def plot(*data: Any, subset: list[tuple[str, float, float]] | None = None):
     """Make all possible plots from any number of supplied data."""
     plot_map = {
         1: plot_level1,
@@ -86,7 +87,7 @@ def plot(*data: Any):
     out = []
     for level, plotfunc in plot_map.items():
         if level in level_data_levels:
-            out.append(plotfunc(*level_data_items))
+            out.append(plotfunc(*level_data_items, subset=subset))
 
     return out
 
@@ -104,12 +105,20 @@ def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
         out[i._level] = i
     return out
 
+def _clip(ds: xr.Dataset, subset: list[tuple[str, float, float]] | None = None):
+    if subset is None or len(subset) == 0:
+        return ds
+    data_and_bounds = [(ds[var].values, vmin, vmax) for var, vmin, vmax in subset]
+    ds = ds.sel(time=define_sections(*data_and_bounds) > 0)
+    return ds
 
-def plot_level1(*data: Any):
+
+def plot_level1(*data: Any, subset: list[tuple[str, float, float]] | None = None):
     """Plot Level 1 data with shear and senspeed in two panels."""
     levels = _parse_level_inputs(*data)
 
-    ds = _to_dataset(levels.get(1))
+    ds = _clip(_to_dataset(levels.get(1)), subset)
+
     data_vars = set(ds.data_vars) - {"section_number", "shear", "senspeed"}
     n_panels = len(data_vars)
 
@@ -143,15 +152,16 @@ def plot_level1(*data: Any):
     return fig, axs
 
 
-def plot_level2(*data: Any):
+def plot_level2(*data: Any, subset: list[tuple[str, float, float]] | None = None):
     """Plot Level 2 data. If Level 1 data is given, plots uncleaned shear for comparison."""
     levels = _parse_level_inputs(*data)
 
-    ds = _to_dataset(levels.get(2))
+    ds = _clip(_to_dataset(levels.get(2)), subset)
     valid_section = ds["section_number"] != 0
     data_l1 = levels.get(1, None)
+    ds1 = None
     if data_l1 is not None:
-        ds1 = _to_dataset(data_l1)
+        ds1 = _clip(_to_dataset(data_l1), subset)
         valid_section_l1 = ds1["section_number"] != 0
     nshear = len(ds.nshear)
 
@@ -185,14 +195,17 @@ def plot_level2(*data: Any):
     return fig, axs
 
 
-def plot_level3(*data: Any):
+def plot_level3(*data: Any, subset: list[tuple[str, float, float]] | None = None):
     """Plot shear spectra and time series."""
     levels = _parse_level_inputs(*data)
     data_l3 = levels.get(3)
     data_l4 = levels.get(4, None)
 
-    ds3 = _to_dataset(data_l3)
-    ds4 = _to_dataset(data_l4) if data_l4 is not None else None
+    if data_l3 is None:
+        raise ValueError("plot_level3 requires Level 3 data")
+
+    ds3 = _clip(_to_dataset(data_l3), subset)
+    ds4 = _clip(_to_dataset(data_l4), subset) if data_l4 is not None else None
     nshear = len(ds3.nshear)
 
     non_aux_vars = {
@@ -203,11 +216,11 @@ def plot_level3(*data: Any):
         "spike_fraction",
         "max_despike_iter",
     }
+    aux_keys = set((getattr(data_l3, "_aux_data", {}) or {}).keys())
     aux_vars = [
         var
         for var in ds3.data_vars
-        if var in data_l3._aux_data.keys()
-        and "time" in ds3[var].dims
+        if var in aux_keys and "time" in ds3[var].dims
     ]
     ts_vars = ["senspeed", *aux_vars]
 
@@ -237,7 +250,7 @@ def plot_level3(*data: Any):
                 molvisc = (eps * kolm_length**4) ** (1 / 3)
                 psi = model_spectrum(waveno, eps, molvisc)
 
-                ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls='-')
+                ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls="-")
 
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -259,11 +272,11 @@ def plot_level3(*data: Any):
     return fig, axs
 
 
-def plot_level4(*data: Any):
+def plot_level4(*data: Any, subset: list[tuple[str, float, float]] | None = None):
     """Plot eps time series and quality metrics for each sensor"""
     levels = _parse_level_inputs(*data)
 
-    ds = _to_dataset(levels.get(4))
+    ds = _clip(_to_dataset(levels.get(4)), subset)
     nshear = len(ds.nshear)
 
     # Create figure with panels for eps and quality metrics
