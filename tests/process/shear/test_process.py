@@ -110,7 +110,8 @@ def test_baltic_benchmark(atomix_mss_nc_filename):
     )  # for consistency with turban level 3
     ds4 = xr.load_dataset(atomix_mss_nc_filename, group="L4_dissipation")
 
-    ds1_turban, ds2_turban, ds3_turban, ds4_turban = p.to_xarray()
+    data_tree = p.to_xarray()
+    ds1_turban, ds2_turban, ds3_turban, ds4_turban = data_tree.values()
 
     assert 'time' in ds3_turban.coords
     assert 'waveno' in ds3_turban.coords
