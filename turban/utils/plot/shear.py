@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-from typing import Any, cast
+from typing import Any, cast, TypeAlias
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
@@ -16,6 +16,7 @@ from turban.process.shear.util import model_spectrum
 from turban.utils.util import define_sections
 
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
+SubsetSpec: TypeAlias = list[tuple[str, Any, Any]]
 
 
 def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
@@ -70,7 +71,7 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     return out
 
 
-def plot(*data: Any, subset: list[tuple[str, float, float]] | None = None):
+def plot(*data: Any, subset: SubsetSpec | None = None):
     """Make all possible plots from any number of supplied data."""
     plot_map = {
         1: plot_level1,
@@ -105,7 +106,8 @@ def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
         out[i._level] = i
     return out
 
-def _clip(ds: xr.Dataset, subset: list[tuple[str, float, float]] | None = None):
+
+def _clip(ds: xr.Dataset, subset: SubsetSpec | None = None):
     if subset is None or len(subset) == 0:
         return ds
     data_and_bounds = [(ds[var].values, vmin, vmax) for var, vmin, vmax in subset]
@@ -113,7 +115,7 @@ def _clip(ds: xr.Dataset, subset: list[tuple[str, float, float]] | None = None):
     return ds
 
 
-def plot_level1(*data: Any, subset: list[tuple[str, float, float]] | None = None):
+def plot_level1(*data: Any, subset: SubsetSpec | None = None):
     """Plot Level 1 data with shear and senspeed in two panels."""
     levels = _parse_level_inputs(*data)
 
@@ -152,7 +154,7 @@ def plot_level1(*data: Any, subset: list[tuple[str, float, float]] | None = None
     return fig, axs
 
 
-def plot_level2(*data: Any, subset: list[tuple[str, float, float]] | None = None):
+def plot_level2(*data: Any, subset: SubsetSpec | None = None):
     """Plot Level 2 data. If Level 1 data is given, plots uncleaned shear for comparison."""
     levels = _parse_level_inputs(*data)
 
@@ -195,7 +197,7 @@ def plot_level2(*data: Any, subset: list[tuple[str, float, float]] | None = None
     return fig, axs
 
 
-def plot_level3(*data: Any, subset: list[tuple[str, float, float]] | None = None):
+def plot_level3(*data: Any, subset: SubsetSpec | None = None):
     """Plot shear spectra and time series."""
     levels = _parse_level_inputs(*data)
     data_l3 = levels.get(3)
@@ -218,9 +220,7 @@ def plot_level3(*data: Any, subset: list[tuple[str, float, float]] | None = None
     }
     aux_keys = set((getattr(data_l3, "_aux_data", {}) or {}).keys())
     aux_vars = [
-        var
-        for var in ds3.data_vars
-        if var in aux_keys and "time" in ds3[var].dims
+        var for var in ds3.data_vars if var in aux_keys and "time" in ds3[var].dims
     ]
     ts_vars = ["senspeed", *aux_vars]
 
@@ -253,6 +253,7 @@ def plot_level3(*data: Any, subset: list[tuple[str, float, float]] | None = None
                 ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls="-")
 
         ax.set_xscale("log")
+        ax.set_ylim(np.nanpercentile(eps, 0.1), None)
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
@@ -272,7 +273,7 @@ def plot_level3(*data: Any, subset: list[tuple[str, float, float]] | None = None
     return fig, axs
 
 
-def plot_level4(*data: Any, subset: list[tuple[str, float, float]] | None = None):
+def plot_level4(*data: Any, subset: SubsetSpec | None = None):
     """Plot eps time series and quality metrics for each sensor"""
     levels = _parse_level_inputs(*data)
 
@@ -288,6 +289,7 @@ def plot_level4(*data: Any, subset: list[tuple[str, float, float]] | None = None
     ax = axs[0]
     for i in range(nshear):
         ds.eps.isel(nshear=i).plot(ax=ax, x="time", label=f"Shear {i+1}")
+
     ax.set_yscale("log")
     ax.legend()
     ax.grid(True, alpha=0.3)
