@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from typing import Any, cast, TypeAlias
+import logging
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
@@ -17,6 +18,8 @@ from turban.utils.util import define_sections
 
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 SubsetSpec: TypeAlias = list[tuple[str, Any, Any]]
+
+logger = logging.getLogger(__name__)
 
 
 def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
@@ -66,7 +69,9 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
             "Input must be ShearProcessing, xarray.Dataset, xarray.DataTree, or ShearLevel1-4 instance"
         )
 
-    print(f"Mapped {type(data).__name__} to {tuple(type(o).__name__ for  o in out)}")
+    logger.info(
+        f"Mapped {type(data).__name__} to {tuple(type(o).__name__ for  o in out)}"
+    )
 
     return out
 
