@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import xarray as xr
-from typing import Any
+from typing import Any, cast
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
@@ -15,22 +15,33 @@ from turban.process.shear.api import (
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 
 
-def _to_level_data(data: Any) -> ShearLevelType:
+def _to_level_data_tuple(data: Any) -> tuple[ShearLevelType, ...]:
     if isinstance(data, ShearProcessing):
-        return data.data
+        out = tuple(
+            cast(ShearLevelType, level)
+            for level in (data.level1, data.level2, data.level3, data.level4)
+            if isinstance(level, (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4))
+        )
+        if len(out) == 0:
+            raise ValueError("ShearProcessing does not contain any levels")
+        return out
 
     if isinstance(data, (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4)):
-        return data
+        return (data,)
 
     if isinstance(data, xr.Dataset):
+        out = []
         for class_ in (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4):
             try:
-                return class_.from_xarray(data)
+                out.append(class_.from_xarray(data))
             except Exception:
                 continue
-        raise ValueError("Could not convert dataset to ShearLevel1-4 via from_xarray")
+        if len(out) == 0:
+            raise ValueError("Could not convert dataset to ShearLevel1-4 via from_xarray")
+        return tuple(out)
 
     if isinstance(data, xr.DataTree):
+        out = []
         for level, class_ in (
             (1, ShearLevel1),
             (2, ShearLevel2),
@@ -39,8 +50,10 @@ def _to_level_data(data: Any) -> ShearLevelType:
         ):
             level_name = f"level{level}"
             if level_name in data:
-                return class_.from_xarray(data[level_name].to_dataset())
-        raise ValueError("Could not find level1-4 in DataTree")
+                out.append(class_.from_xarray(data[level_name].to_dataset()))
+        if len(out) == 0:
+            raise ValueError("Could not find level1-4 in DataTree")
+        return tuple(out)
 
     raise TypeError(
         "Input must be ShearProcessing, xarray.Dataset, xarray.DataTree, or ShearLevel1-4 instance"
@@ -58,7 +71,7 @@ def plot(*data: Any):
         4: plot_level4,
     }
 
-    level_data_items = [_to_level_data(item) for item in data]
+    level_data_items = [level for item in data for level in _to_level_data_tuple(item)]
     level1_ref = next((item for item in level_data_items if item._level == 1), None)
 
     out = []
