@@ -435,6 +435,18 @@ class Processing(ABC):
         data_tree = xr.DataTree(children=out_data)
         return data_tree
 
+    @classmethod
+    def from_xarray(cls, data_tree: xr.DataTree):
+        """Instantiate pipeline from lowest available level"""
+        for level, class_ in cls._level_mapping.items():
+            level_str = f"level{level:d}"
+            if level_str in data_tree:
+                logger.debug(f"Start processing from level {level}")
+                data = class_.from_xarray(data_tree[level_str].to_dataset())
+                break
+
+        return cls(data)
+
 
 # def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:
 #     has_key = {k: v for k, v in dct.items() if k in keys}
