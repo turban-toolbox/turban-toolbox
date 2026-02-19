@@ -444,6 +444,7 @@ class Processing(ABC):
                 logger.debug(f"Start processing from level {level}")
                 data = class_.from_xarray(data_tree[level_str].to_dataset())
                 break
+            raise ValueError(f"Could not find any data.")
 
         return cls(data)
 
