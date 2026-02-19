@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import xarray as xr
 from typing import Any, cast
 
@@ -11,6 +12,7 @@ from turban.process.shear.api import (
     ShearLevel3,
     ShearLevel4,
 )
+from turban.process.shear.util import model_spectrum
 
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 
@@ -68,22 +70,23 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
 
 
 def plot(*data: Any):
+    """Make all possible plots from any number of supplied data."""
     plot_map = {
         1: plot_level1,
         2: plot_level2,
         3: plot_level3,
         4: plot_level4,
     }
-
     level_data_items = [level for item in data for level in _to_levels(item)]
-    level1_ref = next((item for item in level_data_items if item._level == 1), None)
+    level_data_levels = [item._level for item in level_data_items]
+
+    if len(set(level_data_levels)) < len(level_data_levels):
+        raise ValueError("Some levels occur more than once; do not know what to do")
 
     out = []
-    for level_data in level_data_items:
-        if level_data._level == 2 and level1_ref is not None:
-            out.append(plot_level2(level_data, level1_ref))
-        else:
-            out.append(plot_map[level_data._level](level_data))
+    for level, plotfunc in plot_map.items():
+        if level in level_data_levels:
+            out.append(plotfunc(*level_data_items))
 
     return out
 
@@ -94,9 +97,19 @@ def _to_dataset(data: ShearLevelType | xr.Dataset) -> xr.Dataset:
     return data.to_xarray()
 
 
-def plot_level1(data: ShearLevel1 | xr.Dataset):
+def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
+    level_items = tuple(level for item in data for level in _to_levels(item))
+    out = {}
+    for i in level_items:
+        out[i._level] = i
+    return out
+
+
+def plot_level1(*data: Any):
     """Plot Level 1 data with shear and senspeed in two panels."""
-    ds = _to_dataset(data)
+    levels = _parse_level_inputs(*data)
+
+    ds = _to_dataset(levels.get(1))
     data_vars = set(ds.data_vars) - {"section_number", "shear", "senspeed"}
     n_panels = len(data_vars)
 
@@ -130,12 +143,13 @@ def plot_level1(data: ShearLevel1 | xr.Dataset):
     return fig, axs
 
 
-def plot_level2(
-    data: ShearLevel2 | xr.Dataset, data_l1: ShearLevel1 | xr.Dataset | None = None
-):
-    """Plot Level 2 data. If data_l1 is given, plots uncleaned shear for comparison."""
-    ds = _to_dataset(data)
+def plot_level2(*data: Any):
+    """Plot Level 2 data. If Level 1 data is given, plots uncleaned shear for comparison."""
+    levels = _parse_level_inputs(*data)
+
+    ds = _to_dataset(levels.get(2))
     valid_section = ds["section_number"] != 0
+    data_l1 = levels.get(1, None)
     if data_l1 is not None:
         ds1 = _to_dataset(data_l1)
         valid_section_l1 = ds1["section_number"] != 0
@@ -146,7 +160,7 @@ def plot_level2(
     for i, (ax1, ax2) in enumerate(zip(axs[::2], axs[1::2])):
         # Panel 1: Shear data
         ax = ax1
-        if data_l1 is not None:
+        if ds1 is not None:
             ds1.isel(nshear=i).shear.where(valid_section_l1).plot(
                 ax=ax, x="time", c="k"
             )
@@ -171,10 +185,15 @@ def plot_level2(
     return fig, axs
 
 
-def plot_level3(data: ShearLevel3 | xr.Dataset):
+def plot_level3(*data: Any):
     """Plot shear spectra for each sensor"""
-    ds = _to_dataset(data)
-    nshear = len(ds.nshear)
+    levels = _parse_level_inputs(*data)
+    data_l3 = levels.get(3)
+    data_l4 = levels.get(4, None)
+
+    ds3 = _to_dataset(data_l3)
+    ds4 = _to_dataset(data_l4) if data_l4 is not None else None
+    nshear = len(ds3.nshear)
 
     fig, axs = plt.subplots(nshear, 1, figsize=(8, 2 + 2 * nshear), sharex=True)
     if nshear == 1:
@@ -182,21 +201,37 @@ def plot_level3(data: ShearLevel3 | xr.Dataset):
 
     for i, ax in enumerate(axs):
         # Plot Pk vs wavenumber with time overlaid
-        ds_sensor = ds.isel(nshear=i)
+        ds_sensor = ds3.isel(nshear=i)
         ds_sensor["psi_k_sh"].plot(ax=ax, x="waveno", hue="time", add_legend=False)
+
+        if ds4 is not None:
+            waveno = 10 ** np.linspace(
+                np.log10(np.nanmin(ds3.waveno.isel(waveno=slice(1, None)))),
+                np.log10(np.nanmax(ds3.waveno)),
+            )
+            eps = ds4["eps"].mean("nshear").values
+            kolm_length = ds4["kolm_length"].mean("nshear").values
+            molvisc = (eps * kolm_length**4) ** (1 / 3)
+            psi = model_spectrum(waveno, eps, molvisc)
+
+            ax.plot(waveno, psi.T, color="k", alpha=0.12, linewidth=0.6)
+
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
+        # ax.legend(loc="best")
 
     fig.suptitle("Level 3")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
 
-def plot_level4(data: ShearLevel4 | xr.Dataset):
+def plot_level4(*data: Any):
     """Plot eps time series and quality metrics for each sensor"""
-    ds = _to_dataset(data)
+    levels = _parse_level_inputs(*data)
+
+    ds = _to_dataset(levels.get(4))
     nshear = len(ds.nshear)
 
     # Create figure with panels for eps and quality metrics
