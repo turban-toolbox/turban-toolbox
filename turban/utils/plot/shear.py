@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import xarray as xr
+from typing import Any
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
@@ -10,10 +12,74 @@ from turban.process.shear.api import (
     ShearLevel4,
 )
 
+ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 
-def plot_level1(data: ShearLevel1):
+
+def _to_level_data(data: Any) -> ShearLevelType:
+    if isinstance(data, ShearProcessing):
+        return data.data
+
+    if isinstance(data, (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4)):
+        return data
+
+    if isinstance(data, xr.Dataset):
+        for class_ in (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4):
+            try:
+                return class_.from_xarray(data)
+            except Exception:
+                continue
+        raise ValueError("Could not convert dataset to ShearLevel1-4 via from_xarray")
+
+    if isinstance(data, xr.DataTree):
+        for level, class_ in (
+            (1, ShearLevel1),
+            (2, ShearLevel2),
+            (3, ShearLevel3),
+            (4, ShearLevel4),
+        ):
+            level_name = f"level{level}"
+            if level_name in data:
+                return class_.from_xarray(data[level_name].to_dataset())
+        raise ValueError("Could not find level1-4 in DataTree")
+
+    raise TypeError(
+        "Input must be ShearProcessing, xarray.Dataset, xarray.DataTree, or ShearLevel1-4 instance"
+    )
+
+
+def plot(*data: Any):
+    if len(data) == 0:
+        raise ValueError("At least one input is required")
+
+    plot_map = {
+        1: plot_level1,
+        2: plot_level2,
+        3: plot_level3,
+        4: plot_level4,
+    }
+
+    level_data_items = [_to_level_data(item) for item in data]
+    level1_ref = next((item for item in level_data_items if item._level == 1), None)
+
+    out = []
+    for level_data in level_data_items:
+        if level_data._level == 2 and level1_ref is not None:
+            out.append(plot_level2(level_data, level1_ref))
+        else:
+            out.append(plot_map[level_data._level](level_data))
+
+    return out[0] if len(out) == 1 else out
+
+
+def _to_dataset(data: ShearLevelType | xr.Dataset) -> xr.Dataset:
+    if isinstance(data, xr.Dataset):
+        return data
+    return data.to_xarray()
+
+
+def plot_level1(data: ShearLevel1 | xr.Dataset):
     """Plot Level 1 data with shear and senspeed in two panels."""
-    ds = data.to_xarray()
+    ds = _to_dataset(data)
     data_vars = set(ds.data_vars) - {"section_number", "shear", "senspeed"}
     n_panels = len(data_vars)
 
@@ -42,15 +108,20 @@ def plot_level1(data: ShearLevel1):
 
     plot_section_numbers(list(axs), ds.time.values, ds.section_number.values)
 
-    plt.tight_layout()
+    fig.suptitle("Level 1")
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
 
-def plot_level2(data: ShearLevel2, data_l1: ShearLevel1 | None = None):
+def plot_level2(
+    data: ShearLevel2 | xr.Dataset, data_l1: ShearLevel1 | xr.Dataset | None = None
+):
     """Plot Level 2 data. If data_l1 is given, plots uncleaned shear for comparison."""
-    ds = data.to_xarray()
+    ds = _to_dataset(data)
+    valid_section = ds["section_number"] != 0
     if data_l1 is not None:
-        ds1 = data_l1.to_xarray()
+        ds1 = _to_dataset(data_l1)
+        valid_section_l1 = ds1["section_number"] != 0
     nshear = len(ds.nshear)
 
     fig, axs = plt.subplots(nshear * 2, 1, figsize=(12, 4 + nshear * 2), sharex=True)
@@ -59,13 +130,13 @@ def plot_level2(data: ShearLevel2, data_l1: ShearLevel1 | None = None):
         # Panel 1: Shear data
         ax = ax1
         if data_l1 is not None:
-            ds1.isel(nshear=i).shear.plot(ax=ax, x="time", c="k")
-        ds.isel(nshear=i).shear.plot(ax=ax, x="time", c="r")
+            ds1.isel(nshear=i).shear.where(valid_section_l1).plot(ax=ax, x="time", c="k")
+        ds.isel(nshear=i).shear.where(valid_section).plot(ax=ax, x="time", c="r")
         ax.set_title(f"Shear {i+1:1d}")
 
         # Panel 2:
         ax = ax2
-        ds["num_despike_iter"].isel(nshear=i).plot(
+        ds["num_despike_iter"].isel(nshear=i).where(valid_section).plot(
             ax=ax, x="time", color="k", linewidth=1
         )
         ax.set_xlabel("Time")
@@ -76,13 +147,14 @@ def plot_level2(data: ShearLevel2, data_l1: ShearLevel1 | None = None):
 
     plot_section_numbers(axs, ds.time.values, ds.section_number.values)
 
-    plt.tight_layout()
+    fig.suptitle("Level 2")
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
 
-def plot_level3(data: ShearLevel3):
+def plot_level3(data: ShearLevel3 | xr.Dataset):
     """Plot shear spectra for each sensor"""
-    ds = data.to_xarray()
+    ds = _to_dataset(data)
     nshear = len(ds.nshear)
 
     fig, axs = plt.subplots(nshear, 1, figsize=(8, 2 + 2 * nshear), sharex=True)
@@ -98,13 +170,14 @@ def plot_level3(data: ShearLevel3):
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
 
-    plt.tight_layout()
+    fig.suptitle("Level 3")
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
 
 
-def plot_level4(data: ShearLevel4):
+def plot_level4(data: ShearLevel4 | xr.Dataset):
     """Plot eps time series and quality metrics for each sensor"""
-    ds = data.to_xarray()
+    ds = _to_dataset(data)
     nshear = len(ds.nshear)
 
     # Create figure with panels for eps and quality metrics
@@ -133,5 +206,6 @@ def plot_level4(data: ShearLevel4):
         )
         ax.set_title(f"Shear {i+1} Quality Metrics")
 
-    plt.tight_layout()
+    fig.suptitle("Level 4")
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
     return fig, axs
