@@ -15,7 +15,7 @@ from turban.process.shear.api import (
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
 
 
-def _to_level_data_tuple(data: Any) -> tuple[ShearLevelType, ...]:
+def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     if isinstance(data, ShearProcessing):
         out = tuple(
             cast(ShearLevelType, level)
@@ -24,12 +24,11 @@ def _to_level_data_tuple(data: Any) -> tuple[ShearLevelType, ...]:
         )
         if len(out) == 0:
             raise ValueError("ShearProcessing does not contain any levels")
-        return out
 
-    if isinstance(data, (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4)):
-        return (data,)
+    elif isinstance(data, (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4)):
+        out = (data,)
 
-    if isinstance(data, xr.Dataset):
+    elif isinstance(data, xr.Dataset):
         out = []
         for class_ in (ShearLevel1, ShearLevel2, ShearLevel3, ShearLevel4):
             try:
@@ -37,10 +36,12 @@ def _to_level_data_tuple(data: Any) -> tuple[ShearLevelType, ...]:
             except Exception:
                 continue
         if len(out) == 0:
-            raise ValueError("Could not convert dataset to ShearLevel1-4 via from_xarray")
-        return tuple(out)
+            raise ValueError(
+                "Could not convert dataset to ShearLevel1-4 via from_xarray"
+            )
+        out = tuple(out)
 
-    if isinstance(data, xr.DataTree):
+    elif isinstance(data, xr.DataTree):
         out = []
         for level, class_ in (
             (1, ShearLevel1),
@@ -50,20 +51,23 @@ def _to_level_data_tuple(data: Any) -> tuple[ShearLevelType, ...]:
         ):
             level_name = f"level{level}"
             if level_name in data:
-                out.append(class_.from_xarray(data[level_name].to_dataset()))
+                ds = data[level_name].to_dataset()
+                out.append(class_.from_xarray(ds))
         if len(out) == 0:
             raise ValueError("Could not find level1-4 in DataTree")
-        return tuple(out)
+        out = tuple(out)
 
-    raise TypeError(
-        "Input must be ShearProcessing, xarray.Dataset, xarray.DataTree, or ShearLevel1-4 instance"
-    )
+    else:
+        raise TypeError(
+            "Input must be ShearProcessing, xarray.Dataset, xarray.DataTree, or ShearLevel1-4 instance"
+        )
+
+    print(f"Mapped {type(data).__name__} to {tuple(type(o).__name__ for  o in out)}")
+
+    return out
 
 
 def plot(*data: Any):
-    if len(data) == 0:
-        raise ValueError("At least one input is required")
-
     plot_map = {
         1: plot_level1,
         2: plot_level2,
@@ -71,7 +75,7 @@ def plot(*data: Any):
         4: plot_level4,
     }
 
-    level_data_items = [level for item in data for level in _to_level_data_tuple(item)]
+    level_data_items = [level for item in data for level in _to_levels(item)]
     level1_ref = next((item for item in level_data_items if item._level == 1), None)
 
     out = []
@@ -81,7 +85,7 @@ def plot(*data: Any):
         else:
             out.append(plot_map[level_data._level](level_data))
 
-    return out[0] if len(out) == 1 else out
+    return out
 
 
 def _to_dataset(data: ShearLevelType | xr.Dataset) -> xr.Dataset:
@@ -143,7 +147,9 @@ def plot_level2(
         # Panel 1: Shear data
         ax = ax1
         if data_l1 is not None:
-            ds1.isel(nshear=i).shear.where(valid_section_l1).plot(ax=ax, x="time", c="k")
+            ds1.isel(nshear=i).shear.where(valid_section_l1).plot(
+                ax=ax, x="time", c="k"
+            )
         ds.isel(nshear=i).shear.where(valid_section).plot(ax=ax, x="time", c="r")
         ax.set_title(f"Shear {i+1:1d}")
 
