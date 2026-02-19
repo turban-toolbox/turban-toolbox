@@ -47,7 +47,7 @@ def plot_level1(data: ShearLevel1):
 
 
 def plot_level2(data: ShearLevel2, data_l1: ShearLevel1 | None = None):
-    """Plot Level 1 data with shear and num_despike_iter in two panels."""
+    """Plot Level 2 data. If data_l1 is given, plots uncleaned shear for comparison."""
     ds = data.to_xarray()
     if data_l1 is not None:
         ds1 = data_l1.to_xarray()
