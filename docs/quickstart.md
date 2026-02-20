@@ -6,16 +6,16 @@ Currently, only shear processing is fully functional. The high-level API can be 
 
 ```python
 from turban.process.shear.api import ShearProcessing
+from turban.utils.plot.shear import plot
 
 # Process a level 1 dataset all the way to level 4
-p = ShearProcessing.from_atomix_netcdf("data/mss/MSS_Baltic.nc", level=1)
+p = ShearProcessing.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc", level=1)
 
 # export level 4 to an xarray.Dataset
 ds = p.level4.to_xarray()
 
 # or plot e.g. like this:
-from turban.util.plot.shear import plot
-plot(p.level4)
+plot(p)
 ```
 
 ### Manual configuration
@@ -26,6 +26,7 @@ If no suitable `ShearProcessing.from_*` method exists, you can configure one man
 import numpy as np
 import xarray as xr
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
+from turban.utils.plot.shear import plot
 
 atomix_nc_filename = "data/process/shear/MSS_Baltic.nc"
 
@@ -35,11 +36,8 @@ cfg = ShearConfig(
     segment_overlap=1024,
     chunk_length=5120,
     chunk_overlap=2560,
-    freq_cutoff_antialias=None,
-    freq_cutoff_corrupt=None,
     freq_highpass=0.15,
     spatial_response_wavenum=50.0,
-    waveno_cutoff_spatial_corr=None,
     spike_threshold=8.0,
     max_tries=10,
     spike_replace_before=512,
@@ -61,6 +59,7 @@ level1 = ShearLevel1(
 )
 
 p = ShearProcessing(level1)
+plot(p)
 ```
 
 In general, `tests/` and in particular `tests/shear/test_process.py` contain more examples of how to use the high-level data structures.
