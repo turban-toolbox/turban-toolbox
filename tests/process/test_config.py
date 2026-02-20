@@ -1,8 +1,9 @@
 from turban.process.generic.config import SegmentConfig
 from turban.process.shear.config import ShearConfig
-from tests.fixtures import atomix_mss_nc_filename
+from tests.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
 
 
-def test_config(atomix_mss_nc_filename):
-    cfg = SegmentConfig.from_atomix_netcdf(atomix_mss_nc_filename)
-    cfg = ShearConfig.from_atomix_netcdf(atomix_mss_nc_filename)
+def test_config():
+    for path in [atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath]:
+        for Config in [SegmentConfig, ShearConfig]:
+            Config.from_atomix_netcdf(path)
