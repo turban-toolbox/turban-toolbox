@@ -1,9 +1,5 @@
 # Turbulence analysis (TURBAN) toolbox: Infrastructure
 
-## Variable names
-
-Variables in TURBAN code (are supposed to) follow, wherever reasonable, the variable names outlined in `turban/variables.py`.
-
 ## Sections, segments, and chunks
 
 ### Nomenclature
