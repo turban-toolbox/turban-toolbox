@@ -7,15 +7,18 @@ import logging
 import pkg_resources
 import re
 
-from turban.instruments.mss import mss_utils
 import gsw
 import xarray as xr
 
+from turban.instruments.mss import mss_utils
+
 try:
-    import dateparser
+    from dateparser import parse as parse_date
 except ImportError:
     warnings.warn("Could not import dateparser")
-    dateparser = None
+
+    def parse_date(*argv, **kwarg):
+        return datetime.datetime(1, 1, 1)
 
 
 # Get the version
@@ -220,7 +223,7 @@ def parse_header(header, logger=None):
     sensor_str = []
 
     logger.debug("PC-Time line:{}".format(hs[2]))
-    config["date_pc"] = dateparser.parse(hs[2]).isoformat()
+    config["date_pc"] = parse_date(hs[2]).isoformat()
     # print('Config date',config['date_pc'])
     # print('HS')
     # print('hs',hs)
