@@ -237,6 +237,7 @@ class ShearLevel4(Level4):
     num_spec_points: Int[ndarray, "nshear time"]
     quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
+    molvisc: Float[ndarray, "time"] | float
 
     @classmethod
     def _from_level_below_kwarg(
@@ -245,6 +246,12 @@ class ShearLevel4(Level4):
     ) -> dict:
         kwarg = super()._from_level_below_kwarg(data)
         level3 = data
+
+        # try getting molvisc from level3, if not, use fallback value
+        # so linters understand we have a dict after __post_init__
+        aux_data = cast(dict, level3._aux_data)
+        molvisc = aux_data.get("molvisc", level3.cfg.molvisc_fallback)
+
         (
             eps,
             eps_source_flag,
@@ -258,6 +265,7 @@ class ShearLevel4(Level4):
             psi=level3.psi_k_sh,
             waveno=level3.waveno,
             senspeed=level3.senspeed,
+            molvisc=molvisc,
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
@@ -288,6 +296,7 @@ class ShearLevel4(Level4):
                 resolved_var_frac=resolved_var_frac,
                 num_spec_points=num_spec_points,
                 quality_metric=quality_metric,
+                molvisc=molvisc,
                 level_below=level3,
             )
         )
