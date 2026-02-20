@@ -2,6 +2,35 @@
 
 This manual assumes that you have read your data into python. For converting common file formats to python data, see the documentation of the individual instruments.
 
+## Shear processing
+
+### Molecular viscosity
+
+Molecular viscosity can be set in two ways: Either using a constant fallback value in the `ShearConfig`, or by explicitly setting a `molvisc` auxiliary variable on the `ShearLevel3` object from which Level 4 is derived. This can for instance be achieved by setting an auxiliary variable on Level 1 with the appropriate aggregation instructions:
+
+```python notest
+# Option 1
+from turban.process.api import ShearConfig
+cfg = ShearConfig(
+    molvisc_fallback=1.6e-6,
+    ...
+)
+```
+
+```python
+# Option 2
+import numpy as np
+from turban.process.shear.api import ShearLevel1
+
+level1 = ShearLevel1.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
+molvisc_arr = np.linspace(1e-6, 2e-6, len(level1.time))
+# specify aggregated name `molvisc` 
+level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
+```
+
+
+
+
 ## Sections, segments, and chunks
 
 ### Nomenclature

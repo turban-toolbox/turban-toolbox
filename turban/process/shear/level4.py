@@ -36,7 +36,10 @@ def process_level4(
     eps_crit = 1e-5
 
     if isinstance(molvisc, float):
+        print(f"Using constant molecular viscosity {molvisc}")
         molvisc = np.array(molvisc)[newaxis]
+    else:
+        print(f"Using variable molecular viscosity with mean {np.mean(molvisc)}")
 
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
@@ -264,8 +267,8 @@ def spectrum_integration(
     )
 
     # 3rd etc. estimates
-    eps_incr_crit = 1.01 # eps increase that indicates convergence
-    eps_increase = eps_incr_crit + 1 # to enter while loop
+    eps_incr_crit = 1.01  # eps increase that indicates convergence
+    eps_increase = eps_incr_crit + 1  # to enter while loop
     # start value of iteration convergence measure
     eps = eps2
     eps_previous = eps2
