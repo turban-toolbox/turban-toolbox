@@ -3,15 +3,15 @@ import netCDF4
 import numpy as np
 
 from turban.process.shear.api import ShearProcessing
+from tests.filepaths import atomix_benchmark_baltic_fpath
 
 def test_spectra_atomix_baltic():
 
-    atomix_nc_filename = "data/mss/MSS_Baltic.nc"
-    print("Opening file: {}".format(atomix_nc_filename))
-    nc = netCDF4.Dataset(atomix_nc_filename)
+    print("Opening file: {}".format(atomix_benchmark_baltic_fpath))
+    nc = netCDF4.Dataset(atomix_benchmark_baltic_fpath)
 
     print("Processing")
-    p = ShearProcessing.from_atomix_netcdf(atomix_nc_filename, level=1)
+    p = ShearProcessing.from_atomix_netcdf(atomix_benchmark_baltic_fpath, level=1)
 
     L1_nc_p = nc.groups["L1_converted"]["PRES"][:]
     L1_nc_sh = nc.groups["L1_converted"]["SHEAR"][:]

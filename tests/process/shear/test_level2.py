@@ -8,29 +8,18 @@ from turban.process.shear.level2 import (
     rollpad1,
     enlarge_bool,
     clean_shear,
-    butterfilt,
 )
 from turban.utils.util import boolarr_to_sections
 from turban.process.shear.api import ShearLevel1, ShearLevel2
-from tests.fixtures import atomix_mss_nc_filename
+from tests.filepaths import atomix_benchmark_baltic_fpath
 
 
-def test_despike_benchmark(atomix_mss_nc_filename):
+def test_despike_benchmark():
 
-    level1 = ShearLevel1.from_atomix_netcdf(atomix_mss_nc_filename)
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_benchmark_baltic_fpath)
     ds1 = level1.to_xarray()
 
-    # level2_bm = ShearLevel2.from_atomix_netcdf(atomix_nc_filename)
-    # ds2_bm = level2_bm.to_xarray()
-
-    # ds2 = ShearLevel2.from_level_below(level1).to_xarray()
-
     ti = slice(50_300, 50_800)
-    # ti = slice(51_000, 51_500)
-    # ti = slice(0, -1)
-    # ti = slice(105_600, 106_000)
-    # ti = slice(122_000, 125_000)
-    # ti = slice(103_000, 107_000)
 
     isel = dict(nshear=0, time=ti)
     # currently, no spike is detected in this segment!
@@ -38,12 +27,12 @@ def test_despike_benchmark(atomix_mss_nc_filename):
     assert np.any(detect_shear_spikes(x, 1024.0, 8.0, 512, 512, 0.5))
 
 
-def test_despike_benchmark_plot(atomix_mss_nc_filename):
+def test_despike_benchmark_plot():
 
-    level1 = ShearLevel1.from_atomix_netcdf(atomix_mss_nc_filename)
+    level1 = ShearLevel1.from_atomix_netcdf(atomix_benchmark_baltic_fpath)
     cfg = level1.cfg
     ds1 = level1.to_xarray()
-    level2_bm = ShearLevel2.from_atomix_netcdf(atomix_mss_nc_filename)
+    level2_bm = ShearLevel2.from_atomix_netcdf(atomix_benchmark_baltic_fpath)
     ds2_bm = level2_bm.to_xarray()
 
     i0 = 48_000  # start of segment
@@ -55,8 +44,6 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
 
     sampfreq = cfg.sampfreq
 
-    segment_length = cfg.segment_length
-
     shear, ctr = clean_shear(
         shear,
         sampfreq=sampfreq,
@@ -67,15 +54,6 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
         spike_include_before=10,
         spike_include_after=20,
         cutoff_freq_lp=0.5,
-    )
-
-    # after removal of spikes, can high-pass filter
-    # Eq. 17
-    sh_clean = butterfilt(
-        signal=shear,
-        cutoff_freq_Hz=0.5 / (segment_length / sampfreq),
-        sampfreq=sampfreq,
-        btype="high",
     )
 
     fig = plt.figure(figsize=(9, 9))
@@ -93,7 +71,7 @@ def test_despike_benchmark_plot(atomix_mss_nc_filename):
     ax.legend(["L1", "L2 benchmark", "L2 turban"])
     ax.grid()
     ax.set_title(f"Samples {tip.start}..{tip.stop}")
-    fig.savefig("out/tests/level2-despike.png")
+    fig.savefig("out/tests/process/shear/level2-despike.png")
 
 
 def test_replace_spike():

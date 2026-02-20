@@ -1,36 +1,16 @@
-import numpy as np
 import xarray as xr
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 import matplotlib.pyplot as plt
 
+from tests.filepaths import atomix_benchmark_faroe_fpath
 
 def test_compare_turban_to_atomix_faroe_example():
-    atomix_nc_filename = "./data/shear/VMP2000_FaroeBankChannel.nc"
 
-    cfg = ShearConfig(
-        sampfreq=512.0,
-        segment_length=2048,
-        segment_overlap=1024,
-        chunk_length=4096,  # 8s*512
-        chunk_overlap=2048,  # 4s*512
-        freq_cutoff_antialias=999.0,
-        freq_cutoff_corrupt=999.0,
-        freq_highpass=0.15,
-        spatial_response_wavenum=50.0,
-        waveno_cutoff_spatial_corr=999.0,
-        spike_threshold=8.0,
-        max_tries=10,
-        spike_replace_before=512,
-        spike_replace_after=512,
-        spike_include_before=10,
-        spike_include_after=20,
-        cutoff_freq_lp=0.5,
-    )
+    cfg = ShearConfig.from_atomix_netcdf(atomix_benchmark_faroe_fpath)
 
-    ds1 = xr.load_dataset(atomix_nc_filename, group="L1_converted")
-    ds2 = xr.load_dataset(atomix_nc_filename, group="L2_cleaned")
-    ds3 = xr.load_dataset(atomix_nc_filename, group="L3_spectra")
-    ds4 = xr.load_dataset(atomix_nc_filename, group="L4_dissipation")
+    ds1 = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L1_converted")
+    ds2 = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L2_cleaned")
+    ds4 = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L4_dissipation")
 
     time = ds1.TIME.values  # .astype("datetime64[ns]").astype(
     #     np.float64
