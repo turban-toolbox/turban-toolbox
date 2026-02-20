@@ -33,7 +33,6 @@ def process_level4(
     Produce epsilon estimates from shear power spectra.
     """
     eps_crit = 1e-5
-    # nu = get_seawater_viscosity(999.)
     molvisc = np.array(1.6e-6)[
         newaxis
     ]  # TODO: get from temperature (aggregate in level3)
@@ -263,11 +262,12 @@ def spectrum_integration(
     )
 
     # 3rd etc. estimates
-    eps_increase = +999.0
+    eps_incr_crit = 1.01 # eps increase that indicates convergence
+    eps_increase = eps_incr_crit + 1 # to enter while loop
     # start value of iteration convergence measure
     eps = eps2
     eps_previous = eps2
-    while np.any(eps_increase > 1.01):
+    while np.any(eps_increase > eps_incr_crit):
         eps_previous = eps
         # raise ValueError (waveno_cutoff.shape)
         eps /= get_spectral_variance_resolved_fraction(

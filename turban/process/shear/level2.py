@@ -38,7 +38,6 @@ def process_level2(
     ctr_agg = np.zeros_like(shear, dtype=int)
 
     for marker, data in segments.items():
-        flag2 = -999 * np.zeros(data.shape[0], dtype=int)
         for k, shear in enumerate(data):
             shear, ctr = clean_shear(
                 shear,
