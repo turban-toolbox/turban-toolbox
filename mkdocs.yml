@@ -1,0 +1,24 @@
+site_name: Turbulence analysis (TURBAN) toolbox
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys
+            - sys.path.append(".") # Allows MkDocs to find the source code
+
+markdown_extensions:
+  - footnotes
+  - attr_list
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
