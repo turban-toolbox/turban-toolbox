@@ -91,8 +91,8 @@ class ShearLevel2(Level2):
             time=ds.TIME.values,
             shear=ds.SHEAR.values,
             senspeed=ds.PSPD_REL.values,
-            # TODO: apparently not exported in benchmark files...?
             section_number=ds["SECTION_NUMBER"].values.astype(int),
+            # TODO: this does not seem to be saved in (all?) ATOMIX files
             num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
         )
@@ -182,6 +182,7 @@ class ShearLevel3(Level3):
             senspeed=ds["PSPD_REL"].values,
             section_number=ds["SECTION_NUMBER"].values.astype(int),
             spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
+            # TODO: this does not seem to be saved in (all?) ATOMIX files
             max_despike_iter=9999
             * np.ones_like(ds["SH_SPEC"].values[:, :, 0], dtype=int),
             level_below=ShearLevel2.from_atomix_netcdf(fname),
@@ -260,6 +261,7 @@ class ShearLevel4(Level4):
             waveno_cutoff_spatial_corr=level3.cfg.waveno_cutoff_spatial_corr,
             freq_cutoff_antialias=level3.cfg.freq_cutoff_antialias,
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
+            waveno_spectral_min=level3.cfg.waveno_spectral_min,
             data_length=level3.data_length,
             log_psi_var=level3.log_psi_var,
         )
