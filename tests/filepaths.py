@@ -37,12 +37,18 @@ class FilePaths:
     >>> atomix_benchmark_baltic_fpath = filepaths.add("data/process/shear/MSS_Baltic.nc")
     >>> # and more paths you want to speficy
     >>> filepaths.download_data_if_necessary()
+
+    Parameters
+    ----------
+    url : str (optional)
+        specifies the download URL. If not supplied the file global variable DATA_DOWNLOAD_LINK is used.
     '''
     
-    def __init__(self) -> None:
+    def __init__(self, url: str="") -> None:
         self.filepaths: list[str] =[]
         self.top_level: str = Path(__file__).resolve().parent.parent
-    
+        self.url = url
+        
     def add(self, path: str | Path) -> str:
         '''Adds given string or Path object to the registry.
 
@@ -75,7 +81,7 @@ class FilePaths:
                 break
         if download_required:
             logger.info("Downloading test data files...")
-            url = DATA_DOWNLOAD_LINK
+            url = self.url or DATA_DOWNLOAD_LINK
             with tempfile.TemporaryDirectory(prefix="turban_", dir=None) as tmpdir:
                 dest_dir = Path(tmpdir)
                 zip_file = self.download_as_zip(url, dest_dir)
