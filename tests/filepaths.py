@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import requests
 import shutil
+import sys
 import tempfile
 from urllib.parse import urlparse
 from zipfile import ZipFile, BadZipFile
@@ -10,6 +11,8 @@ from zipfile import ZipFile, BadZipFile
 logger = logging.getLogger(__name__)
 
 DATA_DOWNLOAD_LINK = "https://share.hereon.de/index.php/s/D89zzgAbdLcCc7m/download"
+ARCHIVE_NAME = "Turban" # Top level directory name of the link
+
 
 def copytree(src, dst, *, overwrite=True):
     src = Path(src)
@@ -38,16 +41,12 @@ class FilePaths:
     >>> # and more paths you want to speficy
     >>> filepaths.download_data_if_necessary()
 
-    Parameters
-    ----------
-    url : str (optional)
-        specifies the download URL. If not supplied the file global variable DATA_DOWNLOAD_LINK is used.
     '''
     
-    def __init__(self, url: str="") -> None:
+    def __init__(self) -> None:
         self.filepaths: list[str] =[]
         self.top_level: str = Path(__file__).resolve().parent.parent
-        self.url = url
+        self.url:str = ""
         
     def add(self, path: str | Path) -> str:
         '''Adds given string or Path object to the registry.
@@ -79,6 +78,7 @@ class FilePaths:
             if not p.exists():
                 download_required = True
                 break
+        logger.debug(f"Dowloading is required: {download_required}")
         if download_required:
             logger.info("Downloading test data files...")
             url = self.url or DATA_DOWNLOAD_LINK
@@ -87,7 +87,7 @@ class FilePaths:
                 zip_file = self.download_as_zip(url, dest_dir)
                 logger.debug(f"Downloaded {zip_file}.")
                 self.safe_extract_zip(zip_file, dest_dir)
-                copytree(dest_dir / "Turban", self.top_level)
+                copytree(dest_dir / ARCHIVE_NAME, self.top_level)
             logger.info("Download completed.")
             
     def download_as_zip(self, url: str, dest_dir: str | Path, timeout:int=30) -> str:
@@ -141,9 +141,6 @@ class FilePaths:
                     raise RuntimeError(f"Unsafe zip entry detected: {member}")
                 z.extractall(path=target_dir)
 
-                
-        
-filepaths = FilePaths()
 
 # NOTE: Add all paths to data files used in the tests using the format below.
 #       Once data are added, you need to make sure that those files are also available
@@ -151,12 +148,12 @@ filepaths = FilePaths()
 #       please make sure they find there way into the public data repository. Contact
 #       lucas dot merckelbach at hereon dot de for that.
 #
+filepaths = FilePaths()
 atomix_benchmark_baltic_fpath = filepaths.add("data/process/shear/MSS_Baltic.nc")
 atomix_benchmark_faroe_fpath = filepaths.add("data/process/shear/VMP2000_FaroeBankChannel.nc")
 atomix_benchmark_baltic_mrd_fpath = filepaths.add("data/instruments/mss/SH2_0330.MRD")
 mss_mrd_fpath = filepaths.add("data/instruments/mss/Nien0020.MRD")
 mss_probeconf_json_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
 mss_utemp_mrd_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
-
-# Ensure that data are downloaded automagically if one or more of the data files are missing.
+                
 filepaths.download_data_if_necessary()
