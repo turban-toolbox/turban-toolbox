@@ -49,6 +49,11 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"
+log_cli = false
+log_cli_level = "DEBUG"
+
+
+
 
 [tool.black]
 line-length = 88
