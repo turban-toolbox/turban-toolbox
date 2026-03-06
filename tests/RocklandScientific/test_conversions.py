@@ -1,5 +1,6 @@
 from itertools import chain
 import os
+import logging
 
 import numpy as np
 import pytest
@@ -7,8 +8,10 @@ from scipy.io import loadmat
 
 from turban.instruments.RocklandScientific import rsIO
 
+logger = logging.getLogger()
 
-data_url = "https://share.hereon.de/index.php/s/AqMdY8Q47FPQHQR"
+logger.debug("TODO need to use filepaths, after it has been merged.")
+
 datadir = "data/RocklandScientific"
 
 
@@ -37,10 +40,6 @@ parameter_table_problem = [('PV', 'PV'),
                            ]
 paramter_table_shear = [('sh1', 'sh1'),
                         ('sh2', 'sh2')]
-
-
-def download_data():
-    pass
 
 
 def load_data(filename, matfilename):

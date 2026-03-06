@@ -432,7 +432,7 @@ class MicroRiderData(object):
         self.header : Header
         self.channel_matrix: ChannelMatrix = ChannelMatrix(config)
         self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
-        self._regex_deconvolve_name = re.compile(r"([TP]\d?)")
+        self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
         self._path = path
 
     def __getattr__(self, name: str) -> Channel:

@@ -257,7 +257,7 @@ class Aem1g_a(Converter):
         v_unit = adc_zero + v * (adc_fs / 2**adc_bits)
         v_unit = a + b * v_unit
         v_unit -= bias
-        if b<1:
+        if b < 1:
             m = '''Provided coefficients (a,b) are not correct.  Each
 instrument provides two sets of calibration results 
 - one for analog output and one for digital output. 
@@ -265,6 +265,29 @@ The analog values should be used for this channel type.'''
             logger.warning(m)
         return v_unit
 
+
+class Aem1g_d(Converter):
+    '''Specific converter method for Aem1g_d type channels'''
+
+    def __init__(self, config: common.ChannelConfigABC):
+        super().__init__(config)
+        self.defaults = common.ChannelConfigU_EM(bias=0.0, units='[ m s^{-1} ]')
+        
+    def convert(self, v: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+        u = v.astype('>u2') # unsigned 16 bit integer
+        a = self.get_parameter('a') / 100 # cm/s -> m/s
+        b = self.get_parameter('b') / 100 # cm/s -> m/s
+        bias = self.get_parameter('bias')
+        v_unit : np.typing.NDArray[np.float64]
+        v_unit = a + b * u
+        v_unit -= bias
+        if b > 1:
+            m = '''Provided coefficients (a,b) are not correct.  Each
+instrument provides two sets of calibration results 
+- one for analog output and one for digital output. 
+The digital values should be used for this channel type.'''
+            logger.warning(m)
+        return v_unit
 
     
 class PassThrough(Converter):
@@ -503,6 +526,8 @@ def get_converter(channel_config: common.ChannelConfigABC) -> type[Converter]:
             converter = InclT
         case "aem1g_a":
             converter = Aem1g_a
+        case "aem1g_d":
+            converter = Aem1g_d
         case "none":
             converter = PassThrough
         case _:

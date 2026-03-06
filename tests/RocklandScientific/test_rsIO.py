@@ -192,8 +192,7 @@ def test_microriderdata_header(microrider_data):
     microrider_config = microrider_data["microrider_config"]
     data = microrider_data["data"]
     expected = microrider_data["expected"]
-    assert np.abs(data.header.t_fast.max() - expected['t_fast_max'])<0.1
+    assert np.abs(data.header.t_fast.max() - expected['t_fast_max'])<0.01 #matlab/octave only stores 2 decimal positions
     assert len(data.header.t_fast) == expected['length_t_fast']
-    assert np.abs(data.header.t_slow.max() - expected['t_slow_max'])<0.1
+    assert np.abs(data.header.t_slow.max() - expected['t_slow_max'])<0.01
     assert len(data.header.t_slow) == expected['length_t_slow']
-
