@@ -311,9 +311,19 @@ class ShearLevel4(Level4):
         # TODO: flag to switch off loading of levels below
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
             return cls(
-                # TODO fix arguments
                 eps=ds["EPSI"].values,
                 level_below=ShearLevel3.from_atomix_netcdf(fname),
+                time=ds["TIME"].values,
+                eps_source_flag=ds["METHOD"].values.astype(int) + 1,
+                section_number=ds["SECTION_NUMBER"].values.astype(int),
+                quality_metric=ds["EPSI_FLAGS"].values.astype(int),
+                molvisc=ds["KVISC"].values,
+                resolved_var_frac=ds["VAR_RESOLVED"].values,
+                num_spec_points=ds["N_S"].values.astype(int),
+                kolm_length=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
+                ** 0.25,
+                log_diss_var=np.nan * np.ones_like(ds["EPSI"].values),
+                log_diss_mad=np.nan * np.ones_like(ds["EPSI"].values),
             )
 
 
