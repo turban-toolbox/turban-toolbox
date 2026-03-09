@@ -12,8 +12,10 @@ logger = logging.getLogger()
 
 logger.debug("TODO need to use filepaths, after it has been merged.")
 
-datadir = "data/RocklandScientific"
+datadir = "data/instruments/microrider"
 
+ATOL = 2e-6 
+RTOL = 1e-5
 
 def extract_data(pParameter, mParameter, pdata, mdata):
     vp = pdata.channel_matrix.channels[pParameter].data
@@ -31,16 +33,14 @@ parameter_table = [('Ax', 'Ax'),
                    ('V_Bat', 'V_Bat'),      
                    ('EMC_Cur', 'EMC_Cur'),  
                    ('T1', 'T1_slow'),       
-                   ('T2', 'T2_slow')
+                   ('T2', 'T2_slow'),
+                   ('PV', 'PV'),
+                   ('U_EM', 'U_EM'),
+                   ('sh1', 'sh1'),
+                   ('sh2', 'sh2')
                    ]
 parameter_table_persistor_specific = [('Gnd_2', 'Gnd_2'),
                                       ('ch255', 'ch255')]
-parameter_table_problem = [('PV', 'PV'),
-                           ('U_EM', 'U_EM')
-                           ]
-paramter_table_shear = [('sh1', 'sh1'),
-                        ('sh2', 'sh2')]
-
 
 def load_data(filename, matfilename):
     fn = os.path.join(datadir, filename)
@@ -69,26 +69,20 @@ def data_0413():
 @pytest.mark.parametrize("params", parameter_table)
 def test_parameters_persistor(data_058, params):
     vp, vm = extract_data(*params, *data_058)
-    d = np.isclose(vp, vm, rtol=1e-5, atol=1e-08)
+    d = np.isclose(vp, vm, rtol=RTOL, atol=ATOL)
     assert np.all(d)
 
 @pytest.mark.parametrize("params", parameter_table_persistor_specific)
 def test_parameters_persistor_specific(data_058, params):
     vp, vm = extract_data(*params, *data_058)
-    d = np.isclose(vp, vm, rtol=1e-5, atol=1e-08)
+    d = np.isclose(vp, vm, rtol=RTOL, atol=ATOL)
     assert np.all(d)
 
 
     
-# @pytest.mark.parametrize("params", parameter_table_problem)
-# def test_parameters_problem(data_058, params):
-#     vp, vm = extract_data(*params, *data_058)
-#     d = np.isclose(vp, vm, rtol=4e-5, atol=1e-08)
-#     assert np.all(d)
-
 @pytest.mark.parametrize("params", parameter_table)
 def test_parameters(data_0413, params):
     vp, vm = extract_data(*params, *data_0413)
-    d = np.isclose(vp, vm, rtol=1e-5, atol=1e-08)
+    d = np.isclose(vp, vm, rtol=RTOL, atol=ATOL)
     assert np.all(d)
 

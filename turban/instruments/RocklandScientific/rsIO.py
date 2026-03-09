@@ -580,7 +580,8 @@ class MicroRiderData(object):
             elif not regex: # skipping T1 T2 and P, because they are interpolated from the deconvolved versions
                 logger.info(f"Converting {n}")
                 ch.convert_to_units()
-
+            else:
+                logger.debug(f"Skipping {n} for now, because, they are interpolated from the deconvolved versions???")
 
     def deconvolve_and_convert_channel(self, ch: Channel) -> None:
         ''' Treats channels that need deconvolving separately

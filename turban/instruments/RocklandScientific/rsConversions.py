@@ -245,7 +245,7 @@ class Aem1g_a(Converter):
         super().__init__(config)
         self.defaults = common.ChannelConfigU_EM(bias=0.0, units='[ m s^{-1} ]')
         
-    def convert(self, v: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+    def convert(self, v: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
         bias = self.get_parameter('bias')
         adc_fs  = self.get_parameter('adc_fs')
         adc_bits  = self.get_parameter('adc_bits')
@@ -254,7 +254,7 @@ class Aem1g_a(Converter):
         b = self.get_parameter('b') / 100 # cm/s -> m/s
         v_unit : np.typing.NDArray[np.float64]
         if adc_zero is None: adc_zero = adc_fs / 2
-        v_unit = adc_zero + v * (adc_fs / 2**adc_bits)
+        v_unit = adc_zero + v * adc_fs / 2**adc_bits
         v_unit = a + b * v_unit
         v_unit -= bias
         if b < 1:
