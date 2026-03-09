@@ -38,6 +38,50 @@ def temperature_gradient_spectra(
     Float[ndarray, "ntemp waveno"],  # psi_noise
     Int[ndarray, "time_slow n_chunks n_segments"],  # ii
 ]:
+    """Compute temperature gradient power spectra and convert to wavenumber domain.
+
+    Parameters
+    ----------
+    dtempdt : ndarray, shape (ntemp, time_fast)
+        Time derivative of temperature for each sensor.
+    senspeed : ndarray, shape (time_fast,)
+        Platform speed through water in m/s.
+    segment_length : int
+        Number of samples per FFT segment.
+    segment_overlap : int
+        Overlap between successive FFT segments in samples.
+    chunk_length : int
+        Number of samples per dissipation chunk.
+    chunk_overlap : int
+        Overlap between successive dissipation chunks in samples.
+    sampfreq : float
+        Sampling frequency in Hz.
+    waveno_limit_upper : float
+        Upper wavenumber integration limit in cpm.
+    diff_gain : float
+        Time constant of the NTC high-pass pre-emphasis differentiator in seconds.
+    section_number : ndarray of int, shape (time_fast,)
+        Section marker array; zero marks invalid data.
+
+    Returns
+    -------
+    waveno : ndarray, shape (time_slow, k)
+        Wavenumber array in cpm for each chunk.
+    psi_k : ndarray, shape (ntemp, time_slow, waveno)
+        Temperature gradient spectra in wavenumber domain.
+    psi_f : ndarray, shape (ntemp, time_slow, waveno)
+        Temperature gradient spectra in frequency domain.
+    freq : ndarray, shape (waveno,)
+        Frequency array in Hz.
+    senspeeda : ndarray, shape (time_slow,)
+        Chunk-averaged platform speed.
+    section_number_slow : ndarray of int, shape (time_slow,)
+        Section markers aggregated to slow time.
+    psi_noise : ndarray, shape (ntemp, waveno)
+        Estimated noise spectrum from the least intense 5% of chunks.
+    ii : ndarray of int, shape (time_slow, n_chunks, n_segments)
+        Chunking index used to aggregate fast-to-slow quantities.
+    """
     ii = get_chunking_index(
         section_number,
         (chunk_length, chunk_overlap),

@@ -19,21 +19,22 @@ class hhl:
         self.nbad = 0
 
     def add_to_buffer(self, data):
-        """
-        Adds data to the internal buffer that is used to process the data
-        Args:
-            data:
+        """Append data to the internal buffer.
 
-        Returns:
-
+        Parameters
+        ----------
+        data : bytes
+            Data to append to the buffer.
         """
         self.buffer += data
 
     def align_buffer(self):
-        """
-        Aligns buffer to channel 0
-        Returns: None if alignment could not be done, otherwise True
+        """Align buffer to channel 0.
 
+        Returns
+        -------
+        None or bool
+            None if alignment failed, True if buffer is valid and ready to process.
         """
 
         funcname = __name__ + ".align_buffer():"
@@ -83,11 +84,14 @@ class hhl:
                         [channel, data] = self.decode_HHL(self.buffer)
 
     def process_buffer(self):
-        """
-        Processes the data found in the buffer
+        """Process data in the buffer.
 
-        Returns:
-
+        Returns
+        -------
+        list of (ndarray, ndarray) or None
+            [channel_cat, data_cat] where channel_cat is an ndarray of channel
+            numbers and data_cat is an ndarray of shape (n_packets, 16) with
+            decoded data values. Returns None if buffer cannot be aligned.
         """
         funcname = __name__ + ".process_buffer():"
         self.FLAG_VALID_HHL = True  # legacy
@@ -153,11 +157,14 @@ class hhl:
                 return data_return
 
     def process_buffer_legacy(self):
-        """
-        Processes the data found in the buffer
+        """Process data in the buffer (legacy version).
 
-        Returns:
-
+        Returns
+        -------
+        list of (ndarray, ndarray) or None
+            [channel_cat, data_cat] where channel_cat is an ndarray of channel
+            numbers and data_cat is an ndarray of shape (n_packets, 16) with
+            decoded data values. Returns None if buffer cannot be aligned.
         """
         funcname = __name__ + ".process_buffer():"
         self.FLAG_VALID_HHL = False
@@ -241,13 +248,18 @@ class hhl:
                 return data_return
 
     def decode_HHL(self, hhldata):
-        """
-        Decodes a three bytes hhldata bytes array into channel, data
-        Args:
-            hhldata:
+        """Decode three bytes of HHL data into channel and value.
 
-        Returns:
+        Parameters
+        ----------
+        hhldata : bytes
+            HHL packet data, length >= 3.
 
+        Returns
+        -------
+        list of (int, int) or None
+            [channel, data] where channel is the channel number and data is
+            the decoded 16-bit value. Returns None if the packet is invalid.
         """
         # Check if its a valid packet
         if len(hhldata) >= 2:
@@ -273,13 +285,17 @@ class hhl:
         return [channel, data]
 
     def valid_packet(self, data):
-        """
-        Checks if the datapacket is valid by testing of the first three bytes have the HHL pattern
-        Args:
-            data:
+        """Check if the data packet has a valid HHL pattern.
 
-        Returns: bool
+        Parameters
+        ----------
+        data : bytes
+            Data to validate.
 
+        Returns
+        -------
+        bool
+            True if the first three bytes have the HHL pattern, False otherwise.
         """
         if len(data) >= 2:
             # print('data',data,data[0:1])

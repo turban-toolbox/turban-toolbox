@@ -15,6 +15,17 @@ def plot_section_numbers(
     time: Shaped[np.ndarray, "n"],
     section_num: Int[np.ndarray, "n"],
 ):
+    """Plot contiguous non-zero sections as vertical spans on multiple axes.
+
+    Parameters
+    ----------
+    axs : Iterable[mpl.axes.Axes]
+        Collection of matplotlib axes to draw on.
+    time : ndarray, shape (n,)
+        Time coordinates for the x-axis.
+    section_num : ndarray of int, shape (n,)
+        Section markers; non-zero values indicate sections to highlight.
+    """
     # Plot section_number as solid bars where non-zero
     non_zero_mask = section_num != 0
 
@@ -40,6 +51,22 @@ def plot_quality_metric(
     q_codes: dict | None = None,
     **kwarg,
 ):
+    """Plot integer quality flags as a pseudocolor mesh with a flag axis.
+
+    Parameters
+    ----------
+    ax : mpl.axes.Axes
+        Matplotlib axes to plot on.
+    time : ndarray, shape (*any, time)
+        Time coordinates for the x-axis.
+    q : ndarray of int, shape (*any, time)
+        Quality flags as integers; each bit represents a flag condition.
+    q_codes : dict, optional
+        Mapping from bit-flag values (powers of 2) to human-readable names.
+        If None, flags are labeled by their numeric value.
+    **kwarg
+        Additional keyword arguments passed to ``unwrap_base2``.
+    """
     green_red_cmap = LinearSegmentedColormap.from_list("GreenRedCmap", ["green", "red"])
 
     flag_dict = unwrap_base2(q, **kwarg)

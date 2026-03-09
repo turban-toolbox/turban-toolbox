@@ -23,6 +23,26 @@ logger = logging.getLogger(__name__)
 
 
 def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
+    """Convert a data object to a tuple of ShearLevel instances.
+
+    Parameters
+    ----------
+    data : Any
+        Input data: ``ShearProcessing``, ``ShearLevel1``–``ShearLevel4``,
+        ``xr.Dataset``, or ``xr.DataTree``.
+
+    Returns
+    -------
+    tuple of ShearLevelType
+        One or more shear level instances extracted from ``data``.
+
+    Raises
+    ------
+    TypeError
+        If ``data`` is not a recognised type.
+    ValueError
+        If no valid levels can be extracted from ``data``.
+    """
     if isinstance(data, ShearProcessing):
         out = tuple(
             cast(ShearLevelType, level)
@@ -99,12 +119,37 @@ def plot(*data: Any, subset: SubsetSpec | None = None):
 
 
 def _to_dataset(data: ShearLevelType | xr.Dataset) -> xr.Dataset:
+    """Convert a ShearLevel instance or Dataset to an xarray Dataset.
+
+    Parameters
+    ----------
+    data : ShearLevelType or xr.Dataset
+        Data to convert.
+
+    Returns
+    -------
+    xr.Dataset
+        The dataset representation of ``data``.
+    """
     if isinstance(data, xr.Dataset):
         return data
     return data.to_xarray()
 
 
 def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
+    """Parse mixed data inputs into a dict keyed by level number.
+
+    Parameters
+    ----------
+    *data : Any
+        Any combination of ``ShearProcessing``, ``ShearLevel1``–``ShearLevel4``,
+        ``xr.Dataset``, or ``xr.DataTree`` objects.
+
+    Returns
+    -------
+    dict[int, ShearLevelType]
+        Mapping from level number (1–4) to corresponding ShearLevel instance.
+    """
     level_items = tuple(level for item in data for level in _to_levels(item))
     out = {}
     for i in level_items:
@@ -113,6 +158,22 @@ def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
 
 
 def _clip(ds: xr.Dataset, subset: SubsetSpec | None = None):
+    """Subset a dataset to time steps that satisfy all subset bounds.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset to subset.
+    subset : list of tuple, optional
+        List of ``(variable, vmin, vmax)`` triples. Only time steps where every
+        variable falls within its ``[vmin, vmax]`` range are retained.
+        If None or empty, ``ds`` is returned unchanged.
+
+    Returns
+    -------
+    xr.Dataset
+        Subsetted dataset.
+    """
     if subset is None or len(subset) == 0:
         return ds
     data_and_bounds = [(ds[var].values, vmin, vmax) for var, vmin, vmax in subset]
@@ -121,6 +182,19 @@ def _clip(ds: xr.Dataset, subset: SubsetSpec | None = None):
 
 
 def _subset_suffix(subset: SubsetSpec | None) -> str:
+    """Build a human-readable suffix string describing the active subset.
+
+    Parameters
+    ----------
+    subset : list of tuple or None
+        List of ``(variable, vmin, vmax)`` triples, or None.
+
+    Returns
+    -------
+    str
+        Empty string if no subset is active, otherwise a newline-prefixed
+        description of all subset bounds.
+    """
     if subset is None or len(subset) == 0:
         return ""
     subset_str = "; ".join(f"{var}∈[{vmin}, {vmax}]" for var, vmin, vmax in subset)
@@ -128,7 +202,22 @@ def _subset_suffix(subset: SubsetSpec | None) -> str:
 
 
 def plot_level1(*data: Any, subset: SubsetSpec | None = None):
-    """Plot Level 1 data with shear and senspeed in two panels."""
+    """Plot Level 1 data with shear and senspeed panels.
+
+    Parameters
+    ----------
+    *data : Any
+        ShearLevel1, ShearProcessing, xr.Dataset, or xr.DataTree objects.
+    subset : list of tuple, optional
+        List of ``(variable, vmin, vmax)`` bounds for subsetting. If None, no
+        subsetting is applied.
+
+    Returns
+    -------
+    tuple of (matplotlib.figure.Figure, ndarray of Axes)
+        Figure with panels for shear (one line per sensor), senspeed, and any
+        remaining data variables.
+    """
     levels = _parse_level_inputs(*data)
 
     ds = _clip(_to_dataset(levels.get(1)), subset)
@@ -167,7 +256,23 @@ def plot_level1(*data: Any, subset: SubsetSpec | None = None):
 
 
 def plot_level2(*data: Any, subset: SubsetSpec | None = None):
-    """Plot Level 2 data. If Level 1 data is given, plots uncleaned shear for comparison."""
+    """Plot Level 2 data with cleaned shear and despike iteration counts.
+
+    Parameters
+    ----------
+    *data : Any
+        ShearLevel2 required; ShearLevel1 optional (for overlay comparison).
+        Also accepts ShearProcessing, xr.Dataset, or xr.DataTree objects.
+    subset : list of tuple, optional
+        List of ``(variable, vmin, vmax)`` bounds for subsetting. If None, no
+        subsetting is applied.
+
+    Returns
+    -------
+    tuple of (matplotlib.figure.Figure, ndarray of Axes)
+        Figure with 2×nshear panels: cleaned vs raw shear overlay per sensor,
+        and despike iteration count per sensor.
+    """
     levels = _parse_level_inputs(*data)
 
     ds = _clip(_to_dataset(levels.get(2)), subset)
@@ -210,7 +315,24 @@ def plot_level2(*data: Any, subset: SubsetSpec | None = None):
 
 
 def plot_level3(*data: Any, subset: SubsetSpec | None = None):
-    """Plot shear spectra and time series."""
+    """Plot shear spectra and time series with optional model spectrum overlay.
+
+    Parameters
+    ----------
+    *data : Any
+        ShearLevel3 required; ShearLevel4 optional (for model spectrum overlay).
+        Also accepts ShearProcessing, xr.Dataset, or xr.DataTree objects.
+    subset : list of tuple, optional
+        List of ``(variable, vmin, vmax)`` bounds for subsetting. If None, no
+        subsetting is applied.
+
+    Returns
+    -------
+    tuple of (matplotlib.figure.Figure, list of Axes)
+        Figure with shear spectra panels (one per sensor) and time series panels
+        for senspeed and auxiliary variables. Model Nasmyth spectra are overlaid
+        if Level 4 data is provided.
+    """
     levels = _parse_level_inputs(*data)
     data_l3 = levels.get(3)
     data_l4 = levels.get(4, None)
@@ -278,7 +400,23 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
 
 
 def plot_level4(*data: Any, subset: SubsetSpec | None = None):
-    """Plot eps time series and quality metrics for each sensor"""
+    """Plot turbulent dissipation rate time series and quality metrics.
+
+    Parameters
+    ----------
+    *data : Any
+        ShearLevel4 required. Also accepts ShearProcessing, xr.Dataset, or
+        xr.DataTree objects.
+    subset : list of tuple, optional
+        List of ``(variable, vmin, vmax)`` bounds for subsetting. If None, no
+        subsetting is applied.
+
+    Returns
+    -------
+    tuple of (matplotlib.figure.Figure, list of Axes)
+        Figure with eps time series panel and quality metric panels for each
+        sensor.
+    """
     levels = _parse_level_inputs(*data)
 
     ds = _clip(_to_dataset(levels.get(4)), subset)

@@ -33,6 +33,40 @@ def process_level2(
     Float[ndarray, "nshear time"],  # despiked shear
     Int[ndarray, "nshear time"],  # number of despike iterations
 ]:
+    """Despike and high-pass filter shear time series section-by-section.
+
+    Parameters
+    ----------
+    shear : ndarray, shape (nshear, time)
+        Raw shear time series for each sensor.
+    section_numbers : ndarray of int, shape (time,)
+        Section marker array; zero marks invalid data.
+    sampfreq : float
+        Sampling frequency in Hz.
+    segment_length : int
+        Length of FFT segments (used to set the high-pass cutoff frequency).
+    cutoff_freq_lp : float
+        Low-pass cutoff frequency in Hz for spike detection envelope.
+    spike_threshold : float
+        Ratio threshold above which a sample is flagged as a spike.
+    max_tries : int
+        Maximum number of despike iterations per section.
+    spike_replace_before : int
+        Number of samples before a spike replaced during interpolation.
+    spike_replace_after : int
+        Number of samples after a spike replaced during interpolation.
+    spike_include_before : int
+        Number of samples before a detected spike also flagged as spike.
+    spike_include_after : int
+        Number of samples after a detected spike also flagged as spike.
+
+    Returns
+    -------
+    sh_clean_agg : ndarray, shape (nshear, time)
+        Despiked and high-pass filtered shear.
+    ctr_agg : ndarray of int, shape (nshear, time)
+        Number of despike iterations applied to each sample.
+    """
     segments = split_data(shear, section_numbers)
     sh_clean_agg = np.nan * np.zeros_like(shear)
     ctr_agg = np.zeros_like(shear, dtype=int)
@@ -69,12 +103,25 @@ def select_sections(
     data_and_bounds: data_and_bounds_type,
     segment_min_len: int = None,
 ) -> list[list[int]]:
-    """
-    Select sections from a list of time series. Arguments are alternatingly
-    data and tuples of (min, max) values
+    """Select contiguous sections where data falls within specified bounds.
 
-    Returns:
-        List of indices for each section (list of lists of integers)
+    Filters data points that simultaneously satisfy all (min, max) constraints,
+    then returns indices of contiguous True regions.
+
+    Parameters
+    ----------
+    data_and_bounds : list of tuple
+        List of ((min, max), data_array) pairs. Each pair specifies a lower
+        and upper bound (either may be None) and corresponding time series.
+        All constraints are AND'd together.
+    segment_min_len : int, optional
+        Minimum length required to include a section. If None, all sections
+        are returned.
+
+    Returns
+    -------
+    list of list of int
+        Indices for each selected section.
     """
     data_sample = data_and_bounds[0][1]
     inds = np.ones(data_sample.shape, dtype=bool)
@@ -96,8 +143,21 @@ def sections_to_marker(
     sections: list[list[int]],
     n: int,  # length of time series
 ) -> Int[ndarray, "time"]:
-    """Convert a list of sections to a marker array.
-    0 means no section, 1 means first section, etc."""
+    """Convert section indices to a marker array.
+
+    Parameters
+    ----------
+    sections : list of list of int
+        Indices for each section.
+    n : int
+        Length of output marker array (length of time series).
+
+    Returns
+    -------
+    ndarray of int, shape (n,)
+        Marker array where 0 indicates no section, 1 indicates first section,
+        2 indicates second section, etc.
+    """
     marker = np.zeros(n, dtype=int)
     for i, sec in enumerate(sections):
         marker[sec] = i + 1  # 0 is reserved for no section
@@ -108,7 +168,22 @@ from functools import reduce
 
 
 def rollpad1(x, n, pad):
-    """Roll but don't wrap around"""
+    """Roll array and pad boundaries instead of wrapping.
+
+    Parameters
+    ----------
+    x : array_like, shape (time,)
+        Input array.
+    n : int
+        Number of positions to roll. Positive rolls right, negative rolls left.
+    pad : scalar
+        Fill value for the boundary region created by rolling.
+
+    Returns
+    -------
+    ndarray, shape (time,)
+        Rolled array with boundaries filled by `pad` instead of wrapped values.
+    """
     xr = np.roll(x, n)
     if n < 0:
         xr[n:] = pad
@@ -118,7 +193,22 @@ def rollpad1(x, n, pad):
 
 
 def enlarge_bool(x, before, after):
-    """Extend True values to their front and back"""
+    """Extend True values in a boolean array left and right.
+
+    Parameters
+    ----------
+    x : ndarray of bool
+        Input boolean array.
+    before : int
+        Number of samples to extend leftward from each True value.
+    after : int
+        Number of samples to extend rightward from each True value.
+
+    Returns
+    -------
+    ndarray of bool
+        Boolean array with True regions expanded.
+    """
     return reduce(
         lambda x, y: x | y, [rollpad1(x, i, False) for i in range(-before, after + 1)]
     )
@@ -164,7 +254,35 @@ def clean_shear(
     Float[ndarray, "time"],  # despiked shear
     Int[ndarray, "time"],  # number of despike iterations on each sample
 ]:
-    """Section 3.2.2"""
+    """Iteratively detect and replace spikes in shear data (ATOMIX Section 3.2.2).
+
+    Parameters
+    ----------
+    shear : ndarray, shape (time,)
+        Shear time series (modified in-place).
+    sampfreq : float
+        Sampling frequency in Hz.
+    spike_threshold : float
+        Ratio threshold above which a sample is flagged as a spike.
+    max_tries : int
+        Maximum number of despike iterations.
+    spike_replace_before : int
+        Number of samples before a spike to use for interpolation context.
+    spike_replace_after : int
+        Number of samples after a spike to use for interpolation context.
+    spike_include_before : int
+        Number of samples before a detected spike also marked as spike.
+    spike_include_after : int
+        Number of samples after a detected spike also marked as spike.
+    cutoff_freq_lp : float
+        Low-pass cutoff frequency in Hz for spike detection envelope.
+
+    Returns
+    -------
+    tuple of (ndarray, ndarray)
+        Despiked shear, shape (time,).
+        Iteration count per sample, shape (time,).
+    """
     N = len(shear)
     ctr = 0
     spikes = detect_shear_spikes(
@@ -204,7 +322,22 @@ from numpy import isnan, nan
 
 @jit(float64(float64[:]))
 def nanmean_empty(x):
-    """Circumvent https://github.com/numba/numba/issues/5502"""
+    """Compute nanmean while handling empty arrays (numba workaround).
+
+    Workaround for https://github.com/numba/numba/issues/5502: numba's
+    nanmean raises an exception on empty arrays, so this function returns
+    nan instead.
+
+    Parameters
+    ----------
+    x : ndarray, shape (n,)
+        Input array of float64.
+
+    Returns
+    -------
+    float64
+        Nanmean of x, or nan if x is empty.
+    """
     if len(x) == 0:
         return np.nan
     else:
@@ -245,7 +378,29 @@ def replace_spike(
 
 @jit
 def replace_spikes(shear, spike_markers, spike_replace_before, spike_replace_after):
-    """In-place replacement of shear spikes according to atomix procedure"""
+    """Replace spikes in shear via linear interpolation (ATOMIX procedure).
+
+    Modifies shear in-place. Each spike region is replaced with the mean of
+    values before and after, computed from non-nan samples in the specified
+    context windows.
+
+    Parameters
+    ----------
+    shear : ndarray, shape (time,)
+        Shear time series (modified in-place).
+    spike_markers : ndarray of int, shape (time,)
+        Marker array where each unique nonzero value indicates one spike
+        region to replace. 0 indicates no spike.
+    spike_replace_before : int
+        Number of samples before the spike region to use for context mean.
+    spike_replace_after : int
+        Number of samples after the spike region to use for context mean.
+
+    Returns
+    -------
+    None
+        Modifies shear in-place.
+    """
     for marker in np.unique(spike_markers):
         if marker == 0:
             continue

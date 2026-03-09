@@ -65,6 +65,15 @@ class TimeseriesLevel:
     _level: ClassVar[int]
 
     def arrays_as_xr_dicts(self):
+        """Separate array-typed fields into data-variable and coordinate dicts.
+
+        Returns
+        -------
+        data_vars : dict
+            Fields not listed in ``_coords``, in xarray ``(dims, data)`` format.
+        coords : dict
+            Fields listed in ``_coords``, in xarray ``(dims, data)`` format.
+        """
         dct = {
             name: (
                 [dim.name for dim in t.dims],
@@ -79,6 +88,14 @@ class TimeseriesLevel:
         return data_vars, coords
 
     def to_xarray(self):
+        """Export this level to an xarray Dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            Dataset containing all array fields as data variables and coordinates,
+            with TURBAN standard attributes and config stored as global attributes.
+        """
         data_vars, coords = self.arrays_as_xr_dicts()
         ds = xr.Dataset(data_vars=data_vars, coords=coords)
         for varname in set(list(ds.data_vars) + list(ds.coords)):
@@ -90,6 +107,18 @@ class TimeseriesLevel:
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):
+        """Instantiate this level from an xarray Dataset.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Dataset containing array fields and config global attributes.
+
+        Returns
+        -------
+        TimeseriesLevel
+            New instance populated from the dataset.
+        """
         data = {}
         hints = get_type_hints_recursive(cls)
         for name, arr in dict(**ds.data_vars, **ds.coords).items():
@@ -102,6 +131,18 @@ class TimeseriesLevel:
         return cls(**data)
 
     def get_attr(self, name):
+        """Retrieve an attribute by name.
+
+        Parameters
+        ----------
+        name : str
+            Name of the attribute to retrieve.
+
+        Returns
+        -------
+        object
+            Value of the attribute.
+        """
         attr = getattr(self, name)
         if isinstance(attr, SegmentConfig):
             return getattr()
@@ -115,10 +156,20 @@ class AuxiliaryData(TimeseriesLevel):
     _aux_data: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None
 
     def __post_init__(self):
+        """Initialise ``_aux_data`` to an empty dict if it was not provided."""
         if self._aux_data is None:
             self._aux_data = {}
 
     def arrays_as_xr_dicts(self):
+        """Separate array fields including auxiliary data into data-variable and coordinate dicts.
+
+        Returns
+        -------
+        data_vars : dict
+            Fields (including auxiliary data) not listed in ``_coords``.
+        coords : dict
+            Fields listed in ``_coords``.
+        """
         data_vars, coords = super().arrays_as_xr_dicts()
         if self._level <= 2:
             data = cast(AuxDataTypehintLevel12, self._aux_data)
@@ -134,6 +185,18 @@ class AuxiliaryData(TimeseriesLevel):
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):
+        """Instantiate from an xarray Dataset, loading auxiliary variables.
+
+        Parameters
+        ----------
+        ds : xr.Dataset
+            Dataset; variables not recognised as core fields are added as auxiliary data.
+
+        Returns
+        -------
+        AuxiliaryData
+            New instance with core and auxiliary data populated.
+        """
         new = super().from_xarray(ds)
         for name in ds:
             if not hasattr(new, name):
@@ -227,6 +290,18 @@ class HasLevelBelow(TimeseriesLevel):
 
     @classmethod
     def from_level_below(cls, data: TimeseriesLevel | None):
+        """Construct this level from the level-below data object.
+
+        Parameters
+        ----------
+        data : TimeseriesLevel or None
+            Data from the level below.
+
+        Returns
+        -------
+        HasLevelBelow
+            New instance initialised from ``data``.
+        """
         return cls(**cls._from_level_below_kwarg(data))
 
     @property
@@ -266,6 +341,18 @@ class Level2(HasLevelBelow, AuxiliaryData):
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
+        """Build constructor kwargs for Level2 from Level1 data.
+
+        Parameters
+        ----------
+        data : Level1
+            Level 1 data object.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the Level2 constructor.
+        """
         return dict(
             time=data.time,
             senspeed=data.senspeed,
@@ -287,6 +374,18 @@ class Level3(HasLevelBelow, AuxiliaryData):
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level2) -> dict:
+        """Build constructor kwargs for Level3 from Level2 data, aggregating aux data.
+
+        Parameters
+        ----------
+        data : Level2
+            Level 2 data object.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the Level3 constructor.
+        """
         return dict(
             time=data.time,
             _aux_data=cls.agg(
@@ -337,6 +436,18 @@ class Level4(HasLevelBelow, AuxiliaryData):
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level3) -> dict:
+        """Build constructor kwargs for Level4 from Level3 data.
+
+        Parameters
+        ----------
+        data : Level3
+            Level 3 data object.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the Level4 constructor.
+        """
         return dict(
             time=data.time,
             section_number=data.section_number,
@@ -376,6 +487,13 @@ class Processing(ABC):
     @property
     @abstractmethod
     def _level_mapping(self) -> dict:
+        """Mapping from level number to the corresponding level class.
+
+        Returns
+        -------
+        dict
+            Dict of ``{int: TimeseriesLevel subclass}`` for levels 1–4.
+        """
         # Slightly clumsy way of requiring a class attribute called _level_mapping
         return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
 
@@ -383,12 +501,20 @@ class Processing(ABC):
         self,
         data: TimeseriesLevel,
     ):
+        """Propagate ``data`` up to level 4 using the level mapping.
+
+        Parameters
+        ----------
+        data : TimeseriesLevel
+            Starting data object at any level.
+        """
         for l in range(data._level + 1, 5):
             data = self._level_mapping[l].from_level_below(data)
         self.data = data
 
     @property
     def level1(self):
+        """Level 1 data, or None if not available."""
         if self.level2 is None:
             return None
         else:
@@ -396,6 +522,7 @@ class Processing(ABC):
 
     @property
     def level2(self):
+        """Level 2 data, or None if not available."""
         if self.level3 is None:
             return None
         else:
@@ -403,6 +530,7 @@ class Processing(ABC):
 
     @property
     def level3(self):
+        """Level 3 data, or None if not available."""
         if self.level4 is None:
             return None
         else:
@@ -410,10 +538,12 @@ class Processing(ABC):
 
     @property
     def level4(self):
+        """Level 4 data (the topmost processed level)."""
         return self.data
 
     @property
     def cfg(self):
+        """Segment configuration from the top-level data object."""
         return self.level4.cfg
 
     @property

@@ -31,6 +31,18 @@ class ShearLevel1(Level1):
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
+        """Load ShearLevel1 from an ATOMIX netCDF file.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the ATOMIX netCDF file.
+
+        Returns
+        -------
+        ShearLevel1
+            Level 1 instance populated from the file.
+        """
         ds = xr.load_dataset(fname, group="L1_converted")
         # TODO: handle section_number through level 2
         ds2 = xr.load_dataset(fname, group="L2_cleaned")
@@ -55,6 +67,18 @@ class ShearLevel2(Level2):
         cls,
         data: ShearLevel1,
     ):
+        """Build constructor kwargs for ShearLevel2 by despiking ShearLevel1 shear.
+
+        Parameters
+        ----------
+        data : ShearLevel1
+            Level 1 data containing raw shear and configuration.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the ShearLevel2 constructor.
+        """
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
         cfg = cast(ShearConfig, level1.cfg)  # just for type checkers to understand type
@@ -86,6 +110,18 @@ class ShearLevel2(Level2):
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
+        """Load ShearLevel2 from an ATOMIX netCDF file.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the ATOMIX netCDF file.
+
+        Returns
+        -------
+        ShearLevel2
+            Level 2 instance populated from the file (with Level1 attached below).
+        """
         ds = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
             time=ds.TIME.values,
