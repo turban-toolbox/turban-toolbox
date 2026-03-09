@@ -71,8 +71,8 @@ class Channel(object):
     def __init__(self, channel_config: ChannelConfigABC, deconvolved: bool = False):
         self.name: str = channel_config.name
         self.config: ChannelConfigABC = channel_config
-        self.data: np.typing.NDArray[np.float64] = np.array([])
-        self._data: np.typing.NDArray[np.float64] = np.array([])
+        self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = np.array([])
+        self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]= np.array([])
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
         self.converted_into_units: bool = False
         self.deconvolved: bool = deconvolved
@@ -97,9 +97,7 @@ class Channel(object):
         config = self.config.copy()
         return Channel(config, deconvolved=deconvolved)
 
-    def correct_sign(
-        self, data: np_typing.NDArray[np.int16]
-    ) -> np_typing.NDArray[np.int16]:
+    def correct_sign(self) -> None:
         """Corrects sign of data (if configuration dictates)
 
         Some channels record in unsigned integers. If required they need to be
@@ -109,20 +107,19 @@ class Channel(object):
         types_to_skip = "sbt sbc jac_c jac_t o2_43f".split()
         cfg = self.config
         if cfg.id == 255:
-            return data  # nothing to do for ch255
+            return  # nothing to do for ch255
         if cfg.type in types_to_skip:
-            return data
+            return
         if cfg.sign == "unsigned":
             logger.info("Correcting sign")
-            data = data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
+            self.data = data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
         else:
             idx = np.where(self.data >= 2**31)[0]
             if len(idx):
-                data[idx] -= 2**32
+                self.data[idx] -= 2**32
                 logger.info("Correcting sign of 32 bit channel.")
                 logger.debug("Does this ever happen?")
                 raise ValueError("FIX ME")
-        return data
 
     def convert_to_units(self) -> None:
         """Converts channel into unit bearing data
@@ -555,8 +552,8 @@ class MicroRiderData(object):
                     "sample_rate", 0
                 )  # we don't need to know this for this channel anyway.
             # correct the sign of the data if necessary
-            data_correct_sign = channel.correct_sign(data_snr[:, idx].flatten())
-            channel.data = data_correct_sign.astype(np.float64)
+            channel.data = data_snr[:, idx].flatten()
+            channel.correct_sign()
 
     def combine_split_channels(self) -> None:
         """Combines even and odd channels into one
