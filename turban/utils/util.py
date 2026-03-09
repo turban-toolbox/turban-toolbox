@@ -3,18 +3,52 @@ from functools import wraps
 from typing import cast, Literal
 import warnings
 import numpy as np
-from jaxtyping import Bool
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt
 from scipy.fftpack import fft, ifft, fftfreq
-from jaxtyping import Float, Int, Num
+from jaxtyping import Float, Int, Num, Bool, Shaped
 from netCDF4 import Dataset
 import xarray as xr
 
 
+def kolmogorov_length(
+    eps: Float[ndarray, "*any"],
+    molvisc: Float[ndarray, "*any"],
+) -> Float[ndarray, "*any"]:
+    """Compute the Kolmogorov length scale.
+
+    Parameters
+    ----------
+    eps : Float[ndarray, "*any"]
+        TKE dissipation rate in W/kg.
+    molvisc : Float[ndarray, "*any"]
+        Kinematic viscosity in m^2/s.
+
+    Returns
+    -------
+    Float[ndarray, "*any"]
+        Kolmogorov length scale in m.
+    """
+    return (molvisc**3 / eps) ** 0.25
+
+
 def ensure_reshape_index(func):
-    """Make sure that `func` has `reshape_index` available by alternatively supplying
-    segment_length etc."""
+    """Decorate `func` to accept alternative chunking parameters.
+
+    Enables `func` to accept `section_number_or_data_len`, `segment_length`,
+    `segment_overlap`, `chunk_length`, and `chunk_overlap` as alternatives to
+    `reshape_index`.
+
+    Parameters
+    ----------
+    func : callable
+        Function to decorate.
+
+    Returns
+    -------
+    callable
+        Decorated function with reshape_index parameter resolution.
+    """
 
     @wraps(func)
     def decorated(
@@ -99,6 +133,22 @@ def convert_atomix_benchmark_to_turban_netcdf(fname: str):
 
 
 def get_vsink(pressure_raw, sampfreq=1024.0):
+    """Estimate sinking velocity from raw pressure by low-pass filtering and differentiation.
+
+    Parameters
+    ----------
+    pressure_raw : array_like
+        Raw pressure time series.
+    sampfreq : float, optional
+        Sampling frequency in Hz. Default is 1024.0.
+
+    Returns
+    -------
+    vsink : ndarray
+        Estimated sinking velocity (dP/dt of low-pass filtered pressure).
+    pressure_lp : ndarray
+        Low-pass filtered pressure time series.
+    """
     # lowpass filter pressure
     pressure_lp = butterfilt(
         signal=pressure_raw,
@@ -111,69 +161,51 @@ def get_vsink(pressure_raw, sampfreq=1024.0):
     return vsink, pressure_lp
 
 
-def fast_to_slow_grad_by_segment(
-    x: Float[ndarray, "... time_fast"],
-    y: Float[ndarray, "... time_fast"],
-    sampfreq: float,
-    segment_length: int = None,
-    segment_overlap: int = None,
-    chunk_length: int = None,
-    chunk_overlap: int = None,
-    section_number: Int[ndarray, "time_fast"] = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] = None,
-) -> Float[ndarray, "... time_slow"]:
-    """
-    Calculate the gradient of `y` with respect to `x`, averaged over each segment.
-    If reshape_index is not supplied, calculates it.
-    """
-    if reshape_index is None:
-        reshape_index = get_chunking_index(
-            section_number,
-            (chunk_length, chunk_overlap),
-            (segment_length, segment_overlap),
-        )
-    else:
-        segment_length = reshape_index.shape[-1]
-
-    x = x[..., reshape_index]
-    y = y[..., reshape_index]
-
-    # dummy time vector in seconds
-    time = np.linspace(1, segment_length / sampfreq, segment_length)
-    dxdt = np.polyfit(x=time, y=x.transpose(), deg=1)[0, :]
-    dydt = np.polyfit(x=time, y=y.transpose(), deg=1)[0, :]
-    dydx = dydt / dxdt
-    return dydx.mean(axis=-1)  # average gradient over each `chunk_length` segment
-
-
-@ensure_reshape_index
 def agg_fast_to_slow(
-    x: Num[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "time_slow fft_chunk segment_length"],
-    agg_method: Literal["takefirst"] | str = "mean",
-) -> Num[ndarray, "*any time_slow"]:
+    x: Shaped[ndarray, "*any time_fast"],
+    section_number_or_data_len: Int[ndarray, "num_data"] | int | None = None,
+    chunk_length: int | None = None,
+    chunk_overlap: int | None = None,
+    agg_method: Literal["take_first", "take_mid", "take_last"] | str = "mean",
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
+) -> Shaped[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)
     to slow sampling rate (e.g, spectra).
+    If reshape_index is supplied, `section_number_or_data_len`, `chunk_length` and
+    `chunk_overlap` are disregarded
 
     Parameters
     ----------
-    method: 
-        "takefirst": use first value of every chunk
-        any other: use numpy function (e.g., "mean", "max", ... ) 
+    method:
+        "take_first": use first value of every chunk
+        "take_mid": use midpoint value of every chunk
+        "take_last": use last value of every chunk
+        any other: use numpy function (e.g., "mean", "max", ... )
 
     `agg_method` can be anything that is an attribute of a numpy array, e.g. `mean`,
     `max`, etc.
     """
-    if agg_method == "takefirst":
-        return x[..., reshape_index[:, 0, 0]]
-    
-    if agg_method == "grad":
-        raise NotImplementedError("Cannot calculate gradients yet")
+    if reshape_index is None:
+        ii = get_chunking_index(
+            section_number_or_data_len,
+            (chunk_length, chunk_overlap),
+        )
+    else:
+        ii = reshape_index
+
+    match agg_method:
+        case "take_first":
+            return x[..., ii[:, 0]]
+        case "take_mid":
+            return x[..., ii[:, ii.shape[1] // 2]]
+        case "take_last":
+            return x[..., ii[:, -1]]
+        case "grad":
+            raise NotImplementedError("Cannot calculate gradients yet")
 
     # no other method fit the bill, so look in numpy:
-    ii = diss_chunk_wise_reshape_index(reshape_index)
-    xi: Num[ndarray, "*any time_slow chunk_length"] = x[..., ii]
+    xi: Shaped[ndarray, "*any time_slow chunk_length"] = x[..., ii]
     return getattr(np, agg_method)(xi, axis=-1)
 
 
@@ -188,19 +220,24 @@ def agg_fast_to_slow_batch(
     return data_slow
 
 
-def fast_to_slow_avg_by_segment():
-    pass
-
-
 def get_chunking_index(
     section_number_or_data_len: Int[ndarray, "time_fast"] | int,
     *length_and_overlap: tuple[int, int],
 ) -> Int[ndarray, "*any"]:
-    """
-    Create index that rechunks a dimension into overlapping segments.
+    """Create index array for rechunking a dimension into overlapping segments.
 
-    First argument: Either int (length of data) or a 1d array of int section markers.
-    Successive arguments: Tuples of the form (length, overlap). These will be successively nested.
+    Parameters
+    ----------
+    section_number_or_data_len : Int[ndarray, "time_fast"] or int
+        Section markers (array of int) or data length (int).
+    *length_and_overlap : tuple[int, int]
+        Variable number of (length, overlap) tuples specifying chunk parameters
+        to be applied successively.
+
+    Returns
+    -------
+    Int[ndarray, "*any"]
+        Index array for chunking.
     """
 
     if isinstance(section_number_or_data_len, int):
@@ -237,8 +274,21 @@ def split_data(
     data: Num[ndarray, "... time"],
     section_numbers: Int[ndarray, "... time"],
 ) -> dict[np.int_ | int, Num[ndarray, "... time"]]:  # sections
-    """Split array of data into segments based on section markers.
-    section marker "0" is neglected and not included in the output."""
+    """Split array into segments based on section markers.
+
+    Parameters
+    ----------
+    data : Num[ndarray, "... time"]
+        Data array to split.
+    section_numbers : Int[ndarray, "... time"]
+        Marker array specifying section membership. Zero markers are excluded.
+
+    Returns
+    -------
+    dict[np.int_ | int, Num[ndarray, "... time"]]
+        Dictionary mapping section marker to corresponding data segment.
+        Marker 0 is not included.
+    """
 
     markers = set(section_numbers)
     # sections = select_sections(data_and_bounds)
@@ -254,7 +304,20 @@ def fft_grad(
     signal: Float[ndarray, "... time"],
     dt: float,
 ) -> Float[ndarray, "... freq"]:
-    """compute gradient using FFT."""
+    """Compute gradient via FFT along last axis.
+
+    Parameters
+    ----------
+    signal : Float[ndarray, "... time"]
+        Input signal.
+    dt : float
+        Time step in seconds.
+
+    Returns
+    -------
+    Float[ndarray, "... freq"]
+        Gradient computed via FFT.
+    """
     N = signal.shape[-1]
     x = np.concatenate(
         (signal, signal[::-1]), axis=-1
@@ -266,13 +329,44 @@ def fft_grad(
 
 
 def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: tuple[int, ...]):
+    """Prepend size-1 axes until ``arr`` has the same number of dimensions as ``targetshape``.
+
+    Parameters
+    ----------
+    arr : ndarray, shape (..., dim0)
+        Input array to expand.
+    targetshape : tuple of int
+        Target shape whose number of dimensions is the goal.
+
+    Returns
+    -------
+    ndarray
+        Array with leading size-1 axes added as needed.
+    """
     for _ in range(len(targetshape) - len(arr.shape)):
         arr = arr[np.newaxis, ...]
     return arr
 
 
 def butterfilt(signal, cutoff_freq_Hz, sampfreq, **kwarg):
-    """Apply first oder Butterworth filter. kwarg are passed into `butter`"""
+    """Apply first-order Butterworth filter.
+
+    Parameters
+    ----------
+    signal : array_like
+        Input signal.
+    cutoff_freq_Hz : float
+        Cutoff frequency in Hz.
+    sampfreq : float
+        Sampling frequency in Hz.
+    **kwarg
+        Additional keyword arguments passed to `scipy.signal.butter`.
+
+    Returns
+    -------
+    ndarray
+        Filtered signal.
+    """
     # nondimensionalize using Nyquist freq
     cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, **kwarg)
@@ -292,13 +386,21 @@ def channel_mapping(json_fname, *channel_names):
 
 
 def reshape_overlap_index(w: int, overlap: int, N: int) -> Int[ndarray, "segment w"]:
-    """
-    Expand dimension into two dimensions of overlapping intervals.
-    Returns the index that expands a dimension of length N.
+    """Create index array for overlapping window segmentation.
 
-    N: length of dimension to be expanded (positive integer)
-    w: window length (positive integer)
-    overlap: overlap length (positive integer)
+    Parameters
+    ----------
+    w : int
+        Window length (positive integer).
+    overlap : int
+        Overlap length (positive integer), must be less than `w`.
+    N : int
+        Dimension length to expand (positive integer).
+
+    Returns
+    -------
+    Int[ndarray, "segment w"]
+        Index array of shape (segment, w) for overlapping windows.
     """
     assert w > overlap
     # assert N >= w
@@ -316,8 +418,21 @@ def reshape_any_first(
     chunklen: int,
     chunkoverlap: int,
 ) -> Float[ndarray, "segment inside ..."]:
-    """
-    Re-arrange first dimension of P
+    """Reshape first dimension into overlapping segments.
+
+    Parameters
+    ----------
+    P : Float[ndarray, "samples ..."]
+        Input array.
+    chunklen : int
+        Chunk length.
+    chunkoverlap : int
+        Chunk overlap length.
+
+    Returns
+    -------
+    Float[ndarray, "segment inside ..."]
+        Reshaped array, or zero array if dimension is smaller than `chunklen`.
     """
     n = P.shape[0]
     if n >= chunklen:
@@ -332,8 +447,21 @@ def reshape_any_nextlast(
     chunklen: int,
     chunkoverlap: int,
 ) -> Float[ndarray, "... segment inside _"]:
-    """
-    Re-arrange next-to-last dimension of P
+    """Reshape next-to-last dimension into overlapping segments.
+
+    Parameters
+    ----------
+    P : Float[ndarray, "... samples _"]
+        Input array.
+    chunklen : int
+        Chunk length.
+    chunkoverlap : int
+        Chunk overlap length.
+
+    Returns
+    -------
+    Float[ndarray, "... segment inside _"]
+        Reshaped array, or zero array if dimension is smaller than `chunklen`.
     """
     n = P.shape[-2]
     if n >= chunklen:
@@ -348,8 +476,21 @@ def reshape_any_last(
     chunklen: int,
     chunkoverlap: int,
 ) -> Float[ndarray, "... segment inside"]:
-    """
-    Re-arrange last dimension of P
+    """Reshape last dimension into overlapping segments.
+
+    Parameters
+    ----------
+    P : Float[ndarray, "... samples"]
+        Input array.
+    chunklen : int
+        Chunk length.
+    chunkoverlap : int
+        Chunk overlap length.
+
+    Returns
+    -------
+    Float[ndarray, "... segment inside"]
+        Reshaped array, or zero array if dimension is smaller than `chunklen`.
     """
     n = P.shape[-1]
     if n >= chunklen:
@@ -362,9 +503,19 @@ def reshape_any_last(
 def reshape_halfoverlap_first(
     y: Float[ndarray, "samples ..."], w: int
 ) -> Float[ndarray, "segment inside ... "]:
-    """
-    Expand the first dimension into two dimensions of half-overlapping intervals
-    w: window length (even integer)
+    """Reshape first dimension into half-overlapping windows.
+
+    Parameters
+    ----------
+    y : Float[ndarray, "samples ..."]
+        Input array.
+    w : int
+        Window length (even integer).
+
+    Returns
+    -------
+    Float[ndarray, "segment inside ... "]
+        Reshaped array with half-overlapping windows.
     """
     assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
     return y[reshape_overlap_index(w, w // 2, y.shape[0]), ...]
@@ -373,9 +524,19 @@ def reshape_halfoverlap_first(
 def reshape_halfoverlap_last(
     y: Float[ndarray, "... samples"], w: int
 ) -> Float[ndarray, "... segment w"]:
-    """
-    Expand the last dimension into two dimensions of half-overlapping intervals
-    w: window length (even integer)
+    """Reshape last dimension into half-overlapping windows.
+
+    Parameters
+    ----------
+    y : Float[ndarray, "... samples"]
+        Input array.
+    w : int
+        Window length (even integer).
+
+    Returns
+    -------
+    Float[ndarray, "... segment w"]
+        Reshaped array with half-overlapping windows.
     """
     assert w % 2 == 0  # function would work for uneven w but results may be unintuitive
     return y[..., reshape_overlap_index(w, w // 2, y.shape[-1])]
@@ -397,33 +558,43 @@ def integrate(
     x_from: Float[ndarray, "... time"],
     x_to: Float[ndarray, "... time"],
 ) -> Float[ndarray, "... time"]:
-    """
-    Integrate along last axis
+    """Integrate `y` over `x` along last axis using trapezoidal rule.
+
+    Parameters
+    ----------
+    y : Float[ndarray, "... time frequency"]
+        Integrand values.
+    x : Float[ndarray, "... time frequency"]
+        Corresponding x-axis values.
+    x_from : Float[ndarray, "... time"]
+        Lower integration limits.
+    x_to : Float[ndarray, "... time"]
+        Upper integration limits.
+
+    Returns
+    -------
+    Float[ndarray, "... time"]
+        Integral along last axis.
     """
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
     return np.trapz(y_zero, x=x, axis=-1)
 
 
-@ensure_reshape_index
-def get_cleaned_fraction(
-    x: Float[ndarray, "*any time_fast"],
-    x_clean: Float[ndarray, "*any time_fast"],
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
-) -> Float[ndarray, "*any time_slow"]:
-    is_cleaned = x != x_clean
-    ii = diss_chunk_wise_reshape_index(reshape_index)
-
-    num_cleaned_samples = is_cleaned[..., ii].sum(axis=-1)
-    num_total_samples = ii.shape[-1]
-    return num_cleaned_samples / num_total_samples
-
-
 def diss_chunk_wise_reshape_index(
     reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"],
 ) -> Int[ndarray, "diss_chunk chunk_length"]:
-    """Flatten the last two dimensions into one, making sure only unique indices appear
-    for each `diss_chunk`.
+    """Flatten last two dimensions while ensuring unique indices per diss_chunk.
+
+    Parameters
+    ----------
+    reshape_index : Int[ndarray, "diss_chunk fft_chunk segment_length"]
+        3D index array to flatten.
+
+    Returns
+    -------
+    Int[ndarray, "diss_chunk chunk_length"]
+        2D index array with unique indices for each diss_chunk.
     """
     ii = reshape_index
     ii_flat = ii.reshape((ii.shape[0], ii.shape[1] * ii.shape[2]))
@@ -432,7 +603,18 @@ def diss_chunk_wise_reshape_index(
 
 
 def boolarr_to_sections(bools: Bool[ndarray, "time"]) -> list[list[int]]:
-    """Separate a list of bools into contiguous chunks"""
+    """Partition boolean array into contiguous True-valued index ranges.
+
+    Parameters
+    ----------
+    bools : Bool[ndarray, "time"]
+        Boolean array.
+
+    Returns
+    -------
+    list[list[int]]
+        List of contiguous index ranges where `bools` is True.
+    """
     bools_as_ints = list(map(int, bools))
     sections = []
     # make sure first and last sections are picked up
@@ -460,15 +642,23 @@ def define_sections(
     segment_min_len: int = 0,
     trim: int = 0,
 ) -> Int[ndarray, "*any"]:
-    """
-    Select sections from a list of time series by requiring values to fall within
-    (min, max) bounds.
-    Arguments are tuples of (data_array, min, max) values.
-    segment_min_len (int) only retains sections with this minimum length.
-    trim (int) shortens (positive) or widens (negative) the sections.
+    """Identify contiguous sections where all data fall within specified bounds.
 
-    Returns:
-        List of indices for each section (list of lists of integers)
+    Parameters
+    ----------
+    *data_and_bounds : tuple[Float[ndarray, "*any"], float, float]
+        Variable number of (data_array, lo, up) tuples specifying data arrays
+        and their lower and upper bounds. Sections must satisfy all bounds.
+    segment_min_len : int, optional
+        Minimum segment length to retain. Default is 0.
+    trim : int, optional
+        Positive values shrink sections by this amount; negative values widen them.
+        Default is 0.
+
+    Returns
+    -------
+    Int[ndarray, "*any"]
+        Section numbers (0 for invalid regions, positive integers for valid sections).
     """
     data_shp = data_and_bounds[0][0].shape  # select first data entry as sample
     inds = np.ones(data_shp, dtype=bool)
@@ -503,3 +693,33 @@ def define_sections(
         section_number[sec] = k + 1
 
     return section_number
+
+
+def unwrap_base2(
+    q: Int[ndarray, "*any"],
+    maxq: int | None = None,
+) -> dict[int, Bool[ndarray, "*any"]]:
+    """Decompose integers into base-2 bit flags.
+
+    Parameters
+    ----------
+    q : Int[ndarray, "*any"]
+        Integer array to decompose.
+    maxq : int, optional
+        Maximum value to determine bit depth. If None, uses `nanmax(q)`.
+
+    Returns
+    -------
+    dict[int, Bool[ndarray, "*any"]]
+        Dictionary mapping power-of-2 integers to boolean arrays indicating
+        which bits are set in corresponding `q` elements.
+    """
+    if maxq is None:
+        maxq = np.nanmax(q)
+
+    flag_arr: Bool[ndarray, "*any"] = np.unpackbits(
+        q.astype(np.uint8)[np.newaxis], axis=0, bitorder="little"
+    ).astype(bool)
+    base = [2**i for i in range(int(np.log2(maxq) + 1))]
+    flag_dict = {name: val for name, val in zip(base, flag_arr)}
+    return flag_dict

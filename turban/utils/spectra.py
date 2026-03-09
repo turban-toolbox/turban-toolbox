@@ -24,13 +24,37 @@ def spectrum(
     Num[ndarray, "... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:
-    """
-    Produce spectra from time series.
-    If reshape_index is not supplied, calculates it.
+    """Compute power spectral density or cross spectral density from time series.
 
-    If onlyx is provided, will compute power spectral density.
+    Parameters
+    ----------
+    x : ndarray, shape (... time_fast)
+        Input time series.
+    sampfreq : float
+        Sampling frequency in Hz.
+    segment_length : int, optional
+        FFT segment length in samples.
+    segment_overlap : int, optional
+        FFT segment overlap in samples.
+    chunk_length : int, optional
+        Dissipation chunk length.
+    chunk_overlap : int, optional
+        Dissipation chunk overlap.
+    section_number : ndarray of int, shape (time_fast,), optional
+        Section markers.
+    reshape_index : ndarray of int, shape (diss_chunk, fft_chunk, segment_length), optional
+        Precomputed reshaping index. If not provided, is calculated from other parameters.
+    y : ndarray, shape (... time_fast), optional
+        If provided, compute cross spectral density instead of PSD.
+    **estimator_kwarg
+        Additional keyword arguments passed to welch or csd.
 
-    If y is provided (same shape as x), will compute cross spectral density.
+    Returns
+    -------
+    psi : ndarray, shape (... chunk freq)
+        Power spectral density (PSD) or cross spectral density (CSD).
+    freq : ndarray, shape (freq,)
+        Frequency array.
     """
     if reshape_index is None:
         section_number = cast(Int[ndarray, "time_fast"], section_number)
@@ -70,10 +94,26 @@ def spectrum(
 def apply_var_conserve(
     psi: Float[ndarray, "*any freq"],
     dfreq: float,
-    signal_reshape: Float[ndarray, "n_shear chunks freq"],
+    signal_reshape: Float[ndarray, "nshear chunks freq"],
 ) -> Float[ndarray, "*any"]:
-    """
-    Scale `psi` such that its integral along last axis (`freq`) equals variance of input signal.
+    """Apply variance conservation correction to power spectral density.
+
+    Scales `psi` in-place such that its integral along the frequency axis equals
+    the variance of the input signal.
+
+    Parameters
+    ----------
+    psi : ndarray, shape (*any, freq)
+        Power spectral density. Modified in-place.
+    dfreq : float
+        Frequency resolution.
+    signal_reshape : ndarray, shape (nshear, chunks, freq)
+        Reshaped signal used for variance calculation.
+
+    Returns
+    -------
+    ndarray, shape (*any,)
+        Correction factors applied to psi.
     """
     intpsi = psi[..., 1:].sum(axis=-1) * dfreq  # disregard first frequency
     signal_reshape = np.ascontiguousarray(

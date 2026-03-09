@@ -14,13 +14,12 @@ from turban.process.utemp.api import UTempConfig, UTempProcessing
 from turban.utils.util import define_sections
 from turban.instruments.mss.mss_utils import deconvolve_mss_ntchp
 
-top_level = Path(__file__).resolve().parent.parent.parent.parent
-
+from tests.filepaths import mss_probeconf_json_fpath, mss_utemp_mrd_fpath
 
 
 def test_mss():
 
-    with open(top_level / "data" / "mss" / "probeconf_mss053_2024.json") as f:
+    with open(mss_probeconf_json_fpath) as f:
         mss_cfg_053 = MssDeviceConfig.model_validate(json.load(f))
 
     cfg = UTempConfig(
@@ -32,8 +31,6 @@ def test_mss():
         waveno_limit_upper=500.0,
         diff_gain=1.5,
     )
-    fname = top_level / "data" / "mss" / "AO2024_0035.MRD"
-    # sl1 = mrd_to_level1(fname, 'shear', cfg, mss_cfg_053)
-    ut1 = mrd_to_level1(fname, "utemp", cfg, mss_cfg_053)
-    p = UTempProcessing(ut1, level=1)
+    ut1 = mrd_to_level1(mss_utemp_mrd_fpath, "utemp", cfg, mss_cfg_053)
+    p = UTempProcessing(ut1)
     ds4 = p.level4.to_xarray()

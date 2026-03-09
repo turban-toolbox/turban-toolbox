@@ -7,15 +7,26 @@ from scipy.signal import butter, lfilter, lfiltic
 
 
 def calc_shear(shear, vsink, density, fs):
-    """
-    Calculates the physical shear by
-    * 1 Hz high pass sensor data
-    * calculate its time gradient
-    * shear = A / (density x Vsink ^ 2)
+    """Calculate physical shear from sensor data.
+
+    High-pass filters at 1 Hz, computes time gradient, then applies
+    the relationship: shear = dshear/dt / (density * vsink^2).
+
+    Parameters
+    ----------
+    shear : array_like
+        Raw shear probe signal.
+    vsink : array_like
+        Sinking velocity in m/s.
+    density : array_like
+        Water density in kg/m³.
+    fs : float
+        Sampling frequency in Hz.
 
     Returns
     -------
-
+    ndarray
+        Physical shear.
     """
     dt = 1 / fs
     degree = 4
@@ -38,6 +49,22 @@ def calc_shear(shear, vsink, density, fs):
 
 
 def calc_vsink(press, fs, f_low=0.2):
+    """Calculate sinking velocity by low-pass filtering and differentiating pressure.
+
+    Parameters
+    ----------
+    press : array_like
+        Pressure time series.
+    fs : float
+        Sampling frequency in Hz.
+    f_low : float, optional
+        Low-pass cutoff frequency in Hz. Default is 0.2.
+
+    Returns
+    -------
+    vsink : ndarray
+        Sinking velocity estimated as the time derivative of low-pass filtered pressure.
+    """
     dt = 1 / fs
     # Low pass the pressure signal
     degree = 4
@@ -51,12 +78,21 @@ def calc_vsink(press, fs, f_low=0.2):
 
 
 def calc_vsink_legacy(press, fs):
-    """
-    Calculates the sinking velocity by differentiating the pressure record
+    """Calculate sinking velocity by differentiating pressure record.
+
+    Uses the legacy gradient function with low-pass filtering at 0.2 Hz.
+
+    Parameters
+    ----------
+    press : array_like
+        Pressure time series.
+    fs : float
+        Sampling frequency in Hz.
 
     Returns
     -------
-
+    ndarray
+        Sinking velocity.
     """
 
     vsink = gradient(press, 1 / fs)
@@ -71,20 +107,28 @@ def calc_vsink_legacy(press, fs):
 
 
 def despike_std(x, win=1024, fac_std=3, max_spike_len=5):
-    """
-    Despikes x by linearly detrending x, calculating the standard deviation and removing everything that is
-    thresh * standard deviation and shorter than max_spike_len.
+    """Remove spikes from a time series using standard deviation thresholding.
+
+    Detrends the input in windows, identifies points exceeding fac_std times the
+    standard deviation within each window, and removes spikes shorter than
+    max_spike_len by interpolation.
 
     Parameters
     ----------
-    x
-    win
-    thresh
-    max_spike_len
+    x : array_like
+        Time series to despike.
+    win : int, optional
+        Window size in samples. Default is 1024.
+    fac_std : float, optional
+        Standard deviation factor threshold. Default is 3.
+    max_spike_len : int, optional
+        Maximum spike length in samples. Spikes longer than this are retained.
+        Default is 5.
 
     Returns
     -------
-
+    ndarray
+        Despiked time series with spikes removed by linear interpolation.
     """
     # Get the index of the spikes
     indspike = identify_spikes_std(x, win, fac_std, max_spike_len)
@@ -95,19 +139,28 @@ def despike_std(x, win=1024, fac_std=3, max_spike_len=5):
 
 
 def identify_spikes_std(x, win=1024, fac_std=3, max_spike_len=5):
-    """
-    Identifies spikes by splitting x in windows of size win, detrendig and calculating the standard deviation of the
-    detrended data in each window. If the differences between each datapoint and the mean exceeds fac_stc * std().
+    """Identify spikes in a time series using windowed standard deviation.
+
+    Splits the time series into windows, detrends each window, and flags points
+    that deviate from the window mean by more than fac_std times the window
+    standard deviation. Only spikes shorter than max_spike_len samples are marked.
 
     Parameters
     ----------
-    x
-    win
-    thresh
+    x : array_like
+        Time series to analyze.
+    win : int, optional
+        Window size in samples. Default is 1024.
+    fac_std : float, optional
+        Standard deviation factor threshold. Default is 3.
+    max_spike_len : int, optional
+        Maximum spike length in samples. Spikes longer than this are not flagged.
+        Default is 5.
 
     Returns
     -------
-
+    ndarray of bool
+        Boolean mask where True indicates a spike.
     """
     ind_spike_all = np.zeros(np.shape(x), dtype=bool)
     for i in range(0, len(x), win):
@@ -184,6 +237,25 @@ def deconvolve_mss_ntchp(
     sampfreq: float,
     gain: float = 1.5,
 ):
+    """Deconvolve the MSS NTC high-pass pre-emphasis filter.
+
+    Parameters
+    ----------
+    x : ndarray, shape (time,)
+        Original (unemphasised) signal, used to set initial filter conditions.
+    x_emph : Num[ndarray, "time"]
+        Pre-emphasised signal to be deconvolved.
+    sampfreq : float
+        Sampling frequency in Hz.
+    gain : float, optional
+        Time constant of the high-pass pre-emphasis filter in seconds.
+        Default is 1.5.
+
+    Returns
+    -------
+    ndarray, shape (time,)
+        Deconvolved signal with the emphasis removed.
+    """
     cutoff_freq_Hz = 1 / (2 * np.pi * gain)
     # cutoff_freq_Hz = 0.5
     cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)

@@ -1,6 +1,7 @@
 target
 MSS_BalticSea
 matlab-routines
+turban_toolbox.egg-info
 
 .vscode
 *.nc
@@ -22,5 +23,6 @@ __pycache__
 
 qc/
 data/
+scraps/
 
 .coverage

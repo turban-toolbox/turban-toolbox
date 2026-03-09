@@ -1,8 +1,49 @@
 # Turbulence analysis (TURBAN) toolbox: Infrastructure
 
-## Variable names
+This manual assumes that you have read your data into python. For converting common file formats to python data, see the documentation of the individual instruments and platforms (such as [MSS](mss.md) or [MicroRider](urider.md)).
 
-Variables in TURBAN code (are supposed to) follow, wherever reasonable, the variable names outlined in `turban/variables.py`.
+## Exporting and importing data
+
+TURBAN can export to and import from xarray datasets using its `.to_xarray()` and `.from_xarray()` methods available on `Processing` as well as `Level1/2/3/4` objects. 
+TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases.
+
+The following would do a roundtrip in TURBAN:
+```python
+from turban import ShearLevel3
+l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")  # import from benchmark file 
+ds = l3.to_xarray()  # TURBAN-compliant xarray dataset
+l3_reimport = ShearLevel3.from_xarray(ds)  # equal to l3
+```
+## Shear processing
+
+### Molecular viscosity
+
+Molecular viscosity can be set in two ways: Either by using a constant fallback value in the `ShearConfig`:
+
+```python notest
+# Option 1
+from turban import ShearConfig
+cfg = ShearConfig(
+    molvisc_fallback=1.6e-6,
+    ...
+)
+```
+
+or by explicitly setting a `molvisc` auxiliary variable on the `ShearLevel3` object from which Level 4 is derived. This can for instance be achieved by setting an auxiliary variable on Level 1 with the appropriate aggregation instructions:
+
+```python
+# Option 2
+import numpy as np
+from turban import ShearLevel1
+
+level1 = ShearLevel1.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
+molvisc_arr = np.linspace(1e-6, 2e-6, len(level1.time))
+# specify aggregated name `molvisc` 
+level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
+# level 3 will now contain a chunk-averaged variable called `molvisv`,
+# which level 4 will then use
+```
+
 
 ## Sections, segments, and chunks
 
@@ -27,11 +68,12 @@ While sections in practice are mutually exclusive, both segments and chunks ofte
 As example, let us consider a timeseries `x` of 13 samples. (We choose few samples in order to be able to write out arrays.) Of these, the first sample and the last two samples are to be discarded. This is achieved by
 ```python
 import numpy as np
+x = np.random.rand(13)
 section_number = np.zeros_like(x, dtype=int)
 section_number[1:12] = 1
 ```
 leaving us with 10 samples. We would like to compute dissipation using half-overlapping FFT _segments_ of 2 samples, taking 3 such FFT _segments_ for each dissipation estimate (_chunk_), and an overlap of half a FFT _segment_ between _chunks_. Then:
-```python
+```python continuation
 segment_length = 2
 segment_overlap = 1
 chunk_length = 4 # We can fit 3 half-overlapping segments in here
@@ -48,10 +90,16 @@ When called with exactly the two tuples (`chunk_length`, `chunk_overlap`) and(`s
 3. Inside each segment, counting the samples attributed to each segment.
 
 For instance, given a an array `x` whose last axis has length `samples_len`, we can calculate the FFT over all segments without any loop:
-```python
+```python continuation
+from turban.utils.util import get_chunking_index
+idx = get_chunking_index(
+    len(x),
+    (chunk_length, chunk_overlap),
+    (segment_length, segment_overlap),
+)
 xr = x[..., idx] # reshape time axis. Now the last dimension contains the FFT segments
-xr -= xr.mean(axis=-1)[..., newaxis]  # subtract mean
-xr *= np.hanning(segment_length)[newaxis, newaxis, :]  # hanning window
+xr -= xr.mean(axis=-1)[..., np.newaxis]  # subtract mean
+xr *= np.hanning(segment_length)[np.newaxis, np.newaxis, :]  # hanning window
 Fx = np.fft.rfft(xr) # FFT(x). Now the last dimension contains the frequency axis
 ```
 
@@ -74,6 +122,8 @@ When a user needs to change an alorithm beyond a simple parameter, there are two
 2. Python allows "monkey patching" individual functions (i.e. replacing them with our own implementations), as in:
 ```python
 from turban.process.shear import level3 
+from numpy import ndarray, newaxis
+from jaxtyping import Float
 
 def my_apply_compensation_highpass(
     x: Float[ndarray, "n_shear time_slow f"],
@@ -84,15 +134,7 @@ def my_apply_compensation_highpass(
     x *= correction_factor[newaxis, :]
     return correction_factor
 
-level3.apply_compensation_highpass = my_apply_compensation_highpass # TURBAN will now use the user-defined function instead
+# with the following, TURBAN would now use the user-defined function instead
+# level3.apply_compensation_highpass = my_apply_compensation_highpass
 ```
 In fact, this method can be used as long as the function signatures of the old and the new functions are the same.
-
-## Code base overview
-
-TURBAN handles a variety of instruments and a variety of methods of analysing them.
-- `turban/instruments/`: Instruments provide a way of getting raw data from an instrument up to level 1 (converted to physical units).
-- `turban/process/`: Analysis methods provide a way of getting data from level 1 to level 4
-- `turban/.../generic/`: Each of `instruments/` and `process/` has one folder `generic` for base and helper classes, in addition to one folder per instrument or process type.
-- `turban/.../.../api.py`: Define high-level objects that handle data loading, writing, and processing between levels. These are the objects the end user preferably works with.
-- `turban/.../.../config.py`: Define configuration objects that store parameters about processing pipelines or instruments such as sampling rate, high-pass filter cutoff frequencies, and the like.

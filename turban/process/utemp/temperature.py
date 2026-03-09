@@ -21,7 +21,6 @@ def _flatten01(x: ndarray):
     return x.reshape((x.shape[0] * x.shape[1], x.shape[2]))
 
 
-
 def _try_sigma_derivative(df):
     """
     Cheap try to get sigma0 derivative from high precision cond/temp"""

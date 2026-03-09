@@ -7,7 +7,7 @@ from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr
 
-from turban.utils.util import agg_fast_to_slow, get_cleaned_fraction
+from turban.utils.util import agg_fast_to_slow
 from turban.process.utemp.config import UTempConfig
 
 # from turban.process.utemp.level2 import process_level2
@@ -41,6 +41,18 @@ class UTempLevel2(Level2):
         cls,
         data: UTempLevel1,
     ):
+        """Build constructor kwargs for UTempLevel2 from UTempLevel1 data.
+
+        Parameters
+        ----------
+        data : UTempLevel1
+            Level 1 microtemperature data.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the UTempLevel2 constructor.
+        """
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
         cfg = cast(UTempConfig, level1.cfg)  # just for type checkers to understand type
@@ -75,6 +87,18 @@ class UTempLevel3(Level3):
         cls,
         data: UTempLevel2,
     ) -> dict:
+        """Build constructor kwargs for UTempLevel3 by computing temperature gradient spectra.
+
+        Parameters
+        ----------
+        data : UTempLevel2
+            Level 2 microtemperature data.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the UTempLevel3 constructor.
+        """
         level2 = data
         cfg = cast(UTempConfig, level2.cfg)
         kwarg = super()._from_level_below_kwarg(level2)
@@ -104,7 +128,11 @@ class UTempLevel3(Level3):
         kwarg.update(
             dict(
                 time=agg_fast_to_slow(
-                    level2.time, reshape_index=reshape_index, agg_method="takefirst"
+                    level2.time,
+                    section_number_or_data_len=level2.section_number,
+                    chunk_length=level2.cfg.chunk_length,
+                    chunk_overlap=level2.cfg.chunk_overlap,
+                    agg_method="take_mid",
                 ),
                 psi_k=psi_k,
                 psi_noise=psi_noise,

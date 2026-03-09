@@ -3,11 +3,12 @@ from turban.process.generic.config import SegmentConfig
 
 
 class ShearConfig(SegmentConfig):
-    freq_cutoff_antialias: float = 999.0  # TODO
-    freq_cutoff_corrupt: float = 999.0  # TODO
+    freq_cutoff_antialias: float | None = None
+    freq_cutoff_corrupt: float | None = None  #
     freq_highpass: float = 0.15  # [Hz]
     spatial_response_wavenum: float = 50.0  # [1/m]
-    waveno_cutoff_spatial_corr: float = 999.0  # [1/m] # TODO
+    waveno_cutoff_spatial_corr: float | None = None  # [1/m] #
+    waveno_spectral_min: float | None = None
     spike_threshold: float = 8.0  # despiking in level 2
     max_tries: int = 10  # despiking in level 2
     spike_replace_before: int = 512  # despiking in level 2
@@ -15,6 +16,7 @@ class ShearConfig(SegmentConfig):
     spike_include_before: int = 10  # despiking in level 2
     spike_include_after: int = 20  # despiking in level 2
     cutoff_freq_lp: float = 0.5  # despiking in level 2
+    molvisc_fallback: float = 1.6e-6  # used for level4 when not available from level3
 
     @staticmethod
     def _attrs_from_atomix_netcdf(fname):

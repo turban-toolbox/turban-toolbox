@@ -2,17 +2,22 @@ import warnings
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Bool
+import xarray as xr
 
 from turban.utils.util import integrate
+from turban.process.shear.util import model_spectrum
+from turban.utils.util import kolmogorov_length
 
 
 def process_level4(
     psi: Float[ndarray, "nshear time waveno"],
     waveno: Float[ndarray, "time waveno"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    molvisc: Float[ndarray, "time"] | float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
     data_length: Float[ndarray, "time"],
     log_psi_var: float,
 ) -> tuple[
@@ -29,10 +34,13 @@ def process_level4(
     Produce epsilon estimates from shear power spectra.
     """
     eps_crit = 1e-5
-    # nu = get_seawater_viscosity(999.)
-    molvisc = np.array(1.6e-6)[
-        newaxis
-    ]  # TODO: get from temperature (aggregate in level3)
+
+    if isinstance(molvisc, float):
+        print(f"Using constant molecular viscosity {molvisc}")
+        molvisc = np.array(molvisc)[newaxis]
+    else:
+        print(f"Using variable molecular viscosity with mean {np.mean(molvisc)}")
+
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
 
@@ -49,6 +57,7 @@ def process_level4(
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
+        waveno_spectral_min,
     )
 
     k_kolmogorov = (eps1 / molvisc**3) ** 0.25
@@ -102,6 +111,15 @@ def process_level4(
     )
 
 
+QUALITY_METRIC_CODES = {
+    1: "FOM",
+    2: "Spike fraction",
+    4: "Eps disagree",
+    8: "Despike iterations",
+    16: "Variance resolved",
+}
+
+
 def get_quality_metric(
     eps: Float[ndarray, "nshear time"],
     eps_source_flag: Int[ndarray, "nshear time"],
@@ -119,7 +137,7 @@ def get_quality_metric(
     disregarded. We choose not to, and leave it at the discretion of the user."""
 
     if eps.shape[0] == 2:
-        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :] 
+        eps_dev = np.abs(np.log(eps[0, :]) - np.log(eps[1, :]))[newaxis, :]
         # the mean between the std of the two shear probes is explicitly mentioned in
         # the ATOMIX paper
         shear_disagree = eps_dev >= 2.77 * np.mean(np.sqrt(log_diss_var), axis=0)
@@ -147,15 +165,6 @@ def get_quality_metric(
     quality_metric += np.where(resolved_var_frac < 0.6, 16, 0)
 
     return quality_metric
-
-
-def unwrap_quality_metric(q: Int[ndarray, "*any"]) -> dict[int, Bool[ndarray, "*any"]]:
-    flag_arr: Bool[ndarray, "*any"] = np.unpackbits(
-        q.astype(np.uint8)[np.newaxis], axis=0, bitorder="little"
-    ).astype(bool)
-    base = [2**i for i in range(8)]
-    flag_dict = {name: val for name, val in zip(base, flag_arr)}
-    return flag_dict
 
 
 def get_log_diss_var(
@@ -235,9 +244,10 @@ def spectrum_integration(
     eps1: Float[ndarray, "nshear time"],
     molvisc: Float[ndarray, "time"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
 ) -> tuple[
     Float[ndarray, "nshear time"],
     Float[ndarray, "nshear time"],
@@ -253,14 +263,16 @@ def spectrum_integration(
         waveno_cutoff_spatial_corr,
         freq_cutoff_antialias,
         freq_cutoff_corrupt,
+        waveno_spectral_min,
     )
 
     # 3rd etc. estimates
-    eps_increase = +999.0
+    eps_incr_crit = 1.01  # eps increase that indicates convergence
+    eps_increase = eps_incr_crit + 1  # to enter while loop
     # start value of iteration convergence measure
     eps = eps2
     eps_previous = eps2
-    while np.any(eps_increase > 1.01):
+    while np.any(eps_increase > eps_incr_crit):
         eps_previous = eps
         # raise ValueError (waveno_cutoff.shape)
         eps /= get_spectral_variance_resolved_fraction(
@@ -298,28 +310,38 @@ def get_eps_second_estimate(
     eps: Float[ndarray, "nshear time"],  # from first estimate
     molvisc: Float[ndarray, "time"],
     senspeed: Float[ndarray, "time"],
-    waveno_cutoff_spatial_corr: float,
-    freq_cutoff_antialias: float,
-    freq_cutoff_corrupt: float,
+    waveno_cutoff_spatial_corr: float | None,
+    freq_cutoff_antialias: float | None,
+    freq_cutoff_corrupt: float | None,
+    waveno_spectral_min: float | None,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Float[ndarray, "nshear time"],  # cutoff waveno
 ]:
     k95: Float[ndarray, "nshear time"] = 0.12 * (eps / molvisc**3) ** 0.25
-    waveno_spectral_min = 9999.0  # TODO
-    waveno_cutoff_antialias: Float[ndarray, "time"] = (
-        0.9 * freq_cutoff_antialias / senspeed
-    )
-    waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / senspeed
+    # make a vector that collects all wavenumber cutoffs
+    waveno_cutoffs = [k95]
+
+    # populate vector with other conditions, as available
+    if freq_cutoff_antialias is not None:
+        waveno_cutoff_antialias: Float[ndarray, "time"] = (
+            0.9 * freq_cutoff_antialias / senspeed
+        )
+        waveno_cutoffs.append(np.array(waveno_cutoff_antialias)[newaxis, :])
+
+    if freq_cutoff_corrupt is not None:
+        waveno_cutoff_corrupt: Float[ndarray, "time"] = freq_cutoff_corrupt / senspeed
+        waveno_cutoffs.append(np.array(waveno_cutoff_corrupt)[newaxis, :])
+
+    if waveno_cutoff_spatial_corr is not None:
+        waveno_cutoffs.append(np.array(waveno_cutoff_spatial_corr)[newaxis, newaxis])
+
+    if waveno_spectral_min is not None:
+        waveno_cutoffs.append(np.array(waveno_spectral_min)[newaxis, newaxis])
+
     ku: Float[ndarray, "nshear time"] = np.min(
         np.stack(
-            np.broadcast_arrays(
-                k95,
-                np.array(waveno_spectral_min)[newaxis, newaxis],
-                np.array(waveno_cutoff_spatial_corr)[newaxis, newaxis],
-                np.array(waveno_cutoff_antialias)[newaxis, :],
-                np.array(waveno_cutoff_corrupt)[newaxis, :],
-            ),
+            np.broadcast_arrays(*waveno_cutoffs),
             axis=-1,
         ),
         axis=-1,
@@ -337,42 +359,3 @@ def get_spectral_variance_resolved_fraction(
     # Eq. 11; I_L (3rd model)
     k43 = (waveno * kolmlen) ** (4.0 / 3.0)
     return np.tanh(65.5 * k43) - 9.0 * k43 * np.exp((-54.5 * k43))
-
-
-def kolmogorov_length(
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any"]:
-    """The Kolmogorov length scale"""
-    return (molvisc**3 / eps) ** 0.25
-
-
-def psi_nondim_factor(
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any"]:
-    """To pass from non-dimensional to dimensional shear spectra, see Eq. 6"""
-    return (eps**3 / molvisc) ** 0.25
-
-
-def model_spectrum(
-    waveno: Float[ndarray, "*any waveno"],
-    eps: Float[ndarray, "*any"],
-    molvisc: Float[ndarray, "*any"],
-) -> Float[ndarray, "*any waveno"]:
-    """Uses the Lueck spectrum (Eq. 9) - consistent with
-    `get_spectral_variance_resolved_fraction`"""
-    k_nondim = waveno * kolmogorov_length(eps, molvisc)[..., newaxis]
-    psi_nondim = model_spectrum_lueck(k_nondim)
-    return psi_nondim * psi_nondim_factor(eps, molvisc)[..., newaxis]
-
-
-def model_spectrum_lueck(
-    waveno_nondim: Float[ndarray, "*any waveno"],  # nondimensional waveno
-) -> Float[ndarray, "*any waveno"]:
-    """Non-dimensional form, Eq. 9"""
-    y = (waveno_nondim / 0.015) ** 2
-    fac1 = 8.048 * waveno_nondim ** (1 / 3) / (1 + (21.7 * waveno_nondim) ** 3)
-    fac2 = 1 / (1 + (6.6 * waveno_nondim) ** 2.5)
-    fac3 = 1 + 0.36 * y / ((y - 1) ** 2 + 2 * y)
-    return fac1 * fac2 * fac3

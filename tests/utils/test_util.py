@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 from turban.utils.util import (
+    unwrap_base2,
     fft_grad,
     reshape_overlap_index,
     reshape_any_first,
@@ -9,27 +10,20 @@ from turban.utils.util import (
     reshape_halfoverlap_first,
     reshape_halfoverlap_last,
     agg_fast_to_slow,
-    get_cleaned_fraction,
     diss_chunk_wise_reshape_index,
     get_chunking_index,
     boolarr_to_sections,
 )
 
 
-def test_get_cleaned_fraction():
-    x = np.arange(20)
-    xc = x.copy()
-    xc[2:4] = 0  # clean two samples in the first diss_chunk of 10 samples
-    cl_frac = get_cleaned_fraction(
-        x,
-        xc,
-        section_number_or_data_len=len(x),
-        segment_length=4,
-        segment_overlap=2,
-        chunk_length=10,
-        chunk_overlap=0,
-    )
-    assert np.all(cl_frac == np.array([2 / 10, 0]))
+def test_unwrap_unwrap_base2():
+    q = np.array([0, 1, 2, 3, 9])
+    qd = unwrap_base2(q, maxq=16)
+    assert np.all(qd[1] == np.array([False, True, False, True, True]))
+    assert np.all(qd[2] == np.array([False, False, True, True, False]))
+    assert np.all(qd[4] == np.array([False, False, False, False, False]))
+    assert np.all(qd[8] == np.array([False, False, False, False, True]))
+    assert np.all(qd[16] == np.array([False, False, False, False, False]))
 
 
 def test_diss_chunk_wise_reshape_index():
@@ -155,8 +149,6 @@ def test_average_fast_to_slow():
     y = agg_fast_to_slow(
         x,
         section_number_or_data_len=x.shape[-1],
-        segment_length=4,
-        segment_overlap=2,
         chunk_length=6,
         chunk_overlap=2,
     )
@@ -169,8 +161,6 @@ def test_agg_fast_to_slow():
     xm = agg_fast_to_slow(
         x,
         section_number_or_data_len=len(x),
-        segment_length=4,
-        segment_overlap=2,
         chunk_length=10,
         chunk_overlap=0,
         agg_method="max",

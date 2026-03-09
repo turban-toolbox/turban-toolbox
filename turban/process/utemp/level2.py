@@ -12,4 +12,3 @@ viscosity_kinematic = 0.0000016
 diffusivity_temp = 0.00000014
 # constant for batchelor spectrum
 q_b = 3.7
-

@@ -1,23 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from tests.fixtures import atomix_mss_mrd_filename
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.instruments.mss.mss_mrd import read_mrd, raw_to_level0, level0_to_level1
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
+from tests.filepaths import atomix_benchmark_baltic_mrd_fpath
 
 
-def test_mss(atomix_mss_mrd_filename):
+def test_mss():
 
     mss_conf = MssDeviceConfig.from_mrd(
-        filename=atomix_mss_mrd_filename,
-        shear_sensitivities={'SHE1': 3.90e-4, 'SHE2': 4.05e-4},  # sensors 32 and 33 (MSS038)
+        filename=atomix_benchmark_baltic_mrd_fpath,
+        shear_sensitivities={
+            "SHE1": 3.90e-4,
+            "SHE2": 4.05e-4,
+        },  # sensors 32 and 33 (MSS038)
         offset=0,
     )
     # # Change the pressure sensor manually, because P250 had a cap on and did not measure properly
     # mss_conf.sensornames_ctd["press"] = "P1000"
 
-    with open(atomix_mss_mrd_filename, "rb") as f:
+    with open(atomix_benchmark_baltic_mrd_fpath, "rb") as f:
         data_raw = read_mrd(f)
     data_level0 = raw_to_level0(mss_conf, data_raw)
 
@@ -31,11 +34,8 @@ def test_mss(atomix_mss_mrd_filename):
         segment_overlap=1024,
         chunk_length=4 * 2048,
         chunk_overlap=1024,
-        freq_cutoff_antialias=999.0,
-        freq_cutoff_corrupt=999.0,
         freq_highpass=0.15,
         spatial_response_wavenum=50.0,
-        waveno_cutoff_spatial_corr=999.0,
         spike_threshold=8.0,
         max_tries=10,
         spike_replace_before=512,
@@ -70,4 +70,4 @@ def test_mss(atomix_mss_mrd_filename):
     ax.set_ylabel("Pressure [dbar]")
     ax.set_xlabel("Epsilon [W kg-1]")
     ax.legend(["Shear 1", "Shear 2"])
-    fig.savefig("out/tests/mss/SH2_0330.png")
+    fig.savefig("out/tests/instruments/mss/SH2_0330.png")

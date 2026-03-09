@@ -1,6 +1,6 @@
 [project]
 name = "turban-toolbox"
-dynamic = ["version"]
+version = "0.0.2"
 description = "Turbulence Analysis Toolbox"
 authors = [
   { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
@@ -18,11 +18,12 @@ dependencies = [
   'numpy',
   'pandas',
   'pydantic',
-  "requests>=2.32.5",
+  'requests',
   'scipy',
   'setuptools',
   'xarray',
-] # for end user only - for developers, see environment-dev.yml
+]
+
 requires-python = ">=3.9"
 readme = "README.md"
 classifiers = [
@@ -33,6 +34,10 @@ classifiers = [
   'Operating System :: OS Independent',
   'Programming Language :: Python :: 3 :: Only',
 ]
+
+[project.optional-dependencies]
+dev = ["black", "pytest", "pytest-cov"]
+mss = ["pytz", "dateparser"]
 
 [project.scripts]
 
@@ -46,12 +51,11 @@ include-package-data = false
 
 [tool.setuptools.packages.find]
 
-[tool.setuptools.package-data]
-"*" = ["VERSION"]
-
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"
 #addopts = "--pdb"
+log_cli = false
+log_cli_level = "DEBUG"
 
 [tool.black]
 line-length = 88

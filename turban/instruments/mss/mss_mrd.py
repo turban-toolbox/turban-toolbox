@@ -1,28 +1,19 @@
 import datetime
-import warnings
 from pytz import timezone
 import math
-import numpy
 import logging
-import pkg_resources
 import re
+from importlib.metadata import version as pkg_version
 
-from turban.instruments.mss import mss_utils
+import numpy
 import gsw
 import xarray as xr
+from dateparser import parse as parse_date
 
-try:
-    import dateparser
-except ImportError:
-    warnings.warn("Could not import dateparser")
-    dateparser = None
+from turban.instruments.mss import mss_utils
 
 
-# Get the version
-version_file = pkg_resources.resource_filename("turban", "VERSION")
-
-with open(version_file) as version_f:
-    version = version_f.read().strip()
+version = pkg_version("turban-toolbox")
 
 # Setup logging module
 # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
@@ -198,7 +189,25 @@ def read_mrd(
 
 
 def parse_header(header, logger=None):
-    """Parsing the header of a MRD file and saving the results in a config dictionary"""
+    """Parse an ASCII MRD file header into a configuration dictionary.
+
+    Extracts metadata from the ASCII header of a Microstructure Raw Data (MRD)
+    file, including ship, cruise, date, and channel calibration coefficients.
+
+    Parameters
+    ----------
+    header : str
+        ASCII header text from the MRD file.
+    logger : logging.Logger, optional
+        Logger instance. If None, creates a logger named
+        "turban.instruments.mss_mrd" with DEBUG level.
+
+    Returns
+    -------
+    dict
+        Configuration dictionary with keys 'ship', 'cruise', 'date_pc', and
+        'mss' (which contains a nested dict with channel information).
+    """
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
@@ -220,7 +229,7 @@ def parse_header(header, logger=None):
     sensor_str = []
 
     logger.debug("PC-Time line:{}".format(hs[2]))
-    config["date_pc"] = dateparser.parse(hs[2]).isoformat()
+    config["date_pc"] = parse_date(hs[2]).isoformat()
     # print('Config date',config['date_pc'])
     # print('HS')
     # print('hs',hs)
@@ -230,7 +239,7 @@ def parse_header(header, logger=None):
     # for i in range(17,len(hs)-1):
     for i in range(len(hs)):
         # logger.debug('Testing line {:s}'.format(hs[i]))
-        hstmp = re.sub("\s+", " ", hs[i])  # replace multiple blanks with one
+        hstmp = re.sub(r"\s+", " ", hs[i])  # replace multiple blanks with one
         hsp = hstmp.split(" ")
         # check if we have a sensor line
         # each sensor should have 12 entries
