@@ -21,7 +21,8 @@ dependencies = [
   'scipy',
   'setuptools',
   'xarray',
-] # for end user only - for developers, see environment-dev.yml
+]
+
 requires-python = ">=3.9"
 readme = "README.md"
 classifiers = [
@@ -32,6 +33,10 @@ classifiers = [
   'Operating System :: OS Independent',
   'Programming Language :: Python :: 3 :: Only',
 ]
+
+[project.optional-dependencies]
+dev = ["black", "pytest", "pytest-cov"]
+mss = ["pytz", "dateparser"]
 
 [project.scripts]
 
@@ -52,8 +57,6 @@ include-package-data = false
 filterwarnings = "always::UserWarning"
 log_cli = false
 log_cli_level = "DEBUG"
-
-
 
 
 [tool.black]
