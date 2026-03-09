@@ -86,12 +86,8 @@ def process_level4(
         log_psi_var,
     )
 
-    psi_model = model_spectrum(waveno, eps, molvisc)
-    use_waveno = waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
     fom, log_diss_mad, num_spec_points_fom = figure_of_merit(
-        np.where(use_waveno, psi, np.nan)[..., 1:],
-        np.where(use_waveno, psi_model, np.nan)[..., 1:],
-        log_psi_var,
+        waveno, waveno_cutoff, eps, molvisc, psi, log_psi_var
     )
     num_spec_points_agree = np.equal(num_spec_points, num_spec_points_fom)
     if not np.all(num_spec_points_agree):
@@ -193,15 +189,23 @@ def get_log_diss_var(
 
 
 def figure_of_merit(
+    waveno: Float[ndarray, "nshear waveno"],
+    waveno_cutoff: Float[ndarray, "nshear time"],
+    eps: Float[ndarray, "nshear waveno"],
+    molvisc: Float[ndarray, "time"],
     psi: Float[ndarray, "nshear time waveno"],
-    psi_model: Float[ndarray, "nshear time waveno"],
     log_psi_var: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],
     Float[ndarray, "nshear time"],
     Int[ndarray, "nshear time"],
 ]:
-    summand = np.abs(np.log(psi) - np.log(psi_model))
+    psi_model = model_spectrum(waveno, eps, molvisc)
+    use_waveno = waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
+    use_psi = np.where(use_waveno, psi, np.nan)[..., 1:]
+    use_psi_model = np.where(use_waveno, psi_model, np.nan)[..., 1:]
+
+    summand = np.abs(np.log(use_psi) - np.log(use_psi_model))
     num_spec_points = (~np.isnan(summand)).sum(axis=-1)
     log_diss_mad = np.nanmean(summand, axis=-1)
     tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  # T_M in ATOMIX paper
