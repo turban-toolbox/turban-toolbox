@@ -22,5 +22,6 @@ __pycache__
 
 qc/
 data/
+scraps/
 
 .coverage
