@@ -11,7 +11,7 @@ from zipfile import ZipFile, BadZipFile
 logger = logging.getLogger(__name__)
 
 DATA_DOWNLOAD_LINK = "https://share.hereon.de/index.php/s/D89zzgAbdLcCc7m/download"
-ARCHIVE_NAME = "Turban" # Top level directory name of the link
+ARCHIVE_NAME = "Turban"  # Top level directory name of the link
 
 
 def copytree(src, dst, *, overwrite=True):
@@ -29,8 +29,9 @@ def copytree(src, dst, *, overwrite=True):
                 continue
             shutil.copy2(src_file, dst_file)  # preserves metadata
 
+
 class FilePaths:
-    ''' FilePaths
+    """FilePaths
 
     A class for managing downloading data files for test purposes from a remote server.
 
@@ -41,15 +42,15 @@ class FilePaths:
     >>> # and more paths you want to speficy
     >>> filepaths.download_data_if_necessary()
 
-    '''
-    
+    """
+
     def __init__(self) -> None:
-        self.filepaths: list[str] =[]
+        self.filepaths: list[str] = []
         self.top_level: str = Path(__file__).resolve().parent.parent
-        self.url:str = ""
-        
+        self.url: str = ""
+
     def add(self, path: str | Path) -> str:
-        '''Adds given string or Path object to the registry.
+        """Adds given string or Path object to the registry.
 
         Parameters
         ----------
@@ -58,13 +59,13 @@ class FilePaths:
 
         Returns: str
             Path name as a string
-        '''
+        """
         file_path = self.top_level / path
         self.filepaths.append(file_path)
         return str(file_path)
-    
+
     def download_data_if_necessary(self) -> None:
-        ''' Download if one or more data files are missing
+        """Download if one or more data files are missing
 
         This method checks if all required files are existing on the current system,
         and in case one or more are failing, the data files are retrieved from a central
@@ -72,7 +73,7 @@ class FilePaths:
 
         Data download, and extraction are done in a temporary directoy, before being moved
         to the expected location.
-        '''
+        """
         download_required = False
         for p in self.filepaths:
             if not p.exists():
@@ -89,9 +90,9 @@ class FilePaths:
                 self.safe_extract_zip(zip_file, dest_dir)
                 copytree(dest_dir / ARCHIVE_NAME, self.top_level)
             logger.info("Download completed.")
-            
-    def download_as_zip(self, url: str, dest_dir: str | Path, timeout:int=30) -> str:
-        ''' Download URL and write as a zip file
+
+    def download_as_zip(self, url: str, dest_dir: str | Path, timeout: int = 30) -> str:
+        """Download URL and write as a zip file
 
         Parameters
         ----------
@@ -104,8 +105,8 @@ class FilePaths:
         -------
         str:
             name of zip file
-        '''
-        headers={"User-Agent":"curl/7.88.1"}
+        """
+        headers = {"User-Agent": "curl/7.88.1"}
         os.makedirs(dest_dir, exist_ok=True)
         local_name = str(Path(dest_dir) / "data.zip")
         with requests.get(url, headers=headers, stream=True, timeout=timeout) as r:
@@ -137,7 +138,9 @@ class FilePaths:
             for member in z.namelist():
                 member_path = target_dir / member
                 # Prevent path traversal: ensure the resolved path is inside target_dir
-                if not str(member_path.resolve()).startswith(str(target_dir.resolve()) + os.sep):
+                if not str(member_path.resolve()).startswith(
+                    str(target_dir.resolve()) + os.sep
+                ):
                     raise RuntimeError(f"Unsafe zip entry detected: {member}")
                 z.extractall(path=target_dir)
 
@@ -150,10 +153,14 @@ class FilePaths:
 #
 filepaths = FilePaths()
 atomix_benchmark_baltic_fpath = filepaths.add("data/process/shear/MSS_Baltic.nc")
-atomix_benchmark_faroe_fpath = filepaths.add("data/process/shear/VMP2000_FaroeBankChannel.nc")
+atomix_benchmark_faroe_fpath = filepaths.add(
+    "data/process/shear/VMP2000_FaroeBankChannel.nc"
+)
 atomix_benchmark_baltic_mrd_fpath = filepaths.add("data/instruments/mss/SH2_0330.MRD")
 mss_mrd_fpath = filepaths.add("data/instruments/mss/Nien0020.MRD")
-mss_probeconf_json_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
+mss_probeconf_json_fpath = filepaths.add(
+    "data/instruments/mss/probeconf_mss053_2024.json"
+)
 mss_utemp_mrd_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
-                
+
 filepaths.download_data_if_necessary()

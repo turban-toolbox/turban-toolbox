@@ -1,7 +1,8 @@
 import os
 import pytest
 
-from  tests import filepaths
+from tests import filepaths
+
 
 @pytest.fixture
 def download_test(monkeypatch):
@@ -16,7 +17,7 @@ def test_download_data_if_necessary(download_test):
     fp = filepaths.filepaths
     fp.filepaths.clear()
     fp.add("test.txt")
-    fp.url="https://share.hereon.de/index.php/s/Y2tYW2w28zKLpk3/download"
+    fp.url = "https://share.hereon.de/index.php/s/Y2tYW2w28zKLpk3/download"
     fp.download_data_if_necessary()
     result = os.path.exists("test.txt")
     try:
