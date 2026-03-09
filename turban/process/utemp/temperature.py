@@ -5,6 +5,9 @@ from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 
 from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_last
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
@@ -76,14 +79,14 @@ def _k_batchelor_mle_round_2():
     assert np.max(cfunc_values_1[0]) == _mid[0]
     # curvature of cost function values at batchelor waveno
     delta_k = (2 * range_) / np.sqrt(2 * _mid - _left - _right)
-    print(delta_k)
+    logger.debug("delta_k: %s", delta_k)
     finalrange = np.maximum(delta_k, range_)
     # print(finalrange)
     kmin_2: Float[ndarray, "time_slow"] = np.maximum(
         0, k_batchelor_estimates_1 - finalrange
     )
     kmax_2: Float[ndarray, "time_slow"] = k_batchelor_estimates_1 + finalrange
-    print(kmin_2, kmax_2)
+    logger.debug("kmin_2: %s, kmax_2: %s", kmin_2, kmax_2)
 
     k_batchelor_estimates_2 = np.nan * np.zeros_like(chi)
     cfunc_values_2: Float[ndarray, "time_slow k_test"] = np.zeros(
@@ -91,7 +94,7 @@ def _k_batchelor_mle_round_2():
     )
     for i, (mi, ma) in enumerate(zip(kmin_2, kmax_2)):
         k_test_2 = np.linspace(mi, ma, 30)  # k_batchelor values to test
-        print(k_test_2)
+        logger.debug("k_test_2: %s", k_test_2)
         cfunc_values_2[i, :] = get_k_batchelor_costfunc(
             k_test_2,
             chi[i],

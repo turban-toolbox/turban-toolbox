@@ -1,4 +1,3 @@
-import logging
 from typing import cast, Literal
 from pathlib import Path
 import numpy as np
@@ -11,12 +10,9 @@ from turban.instruments.mss import mss_mrd
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.process.shear.config import ShearConfig
 from turban.process.shear.api import ShearLevel1
+from turban.utils.logging import get_logger
 
-# Setup logging module
-# TODO should handle this more gracefully, having debug level logging everywhere is annoying
-# logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-logger = logging.getLogger("turban.instruments.mss")
-# logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 
 def mrd_to_level1(

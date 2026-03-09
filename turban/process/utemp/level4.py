@@ -5,7 +5,9 @@ from scipy.signal import butter, freqz, lfilter, lfiltic
 from scipy.special import erf, gamma
 
 from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_last
-from turban.utils.logging import logger
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016

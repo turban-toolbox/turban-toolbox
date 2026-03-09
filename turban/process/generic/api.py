@@ -1,9 +1,7 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
 from functools import wraps
-from logging import getLogger
 from inspect import isclass
-from logging import warnings
 from typing import get_type_hints, ClassVar, cast
 from abc import abstractmethod, ABC
 from typing import Literal
@@ -16,8 +14,9 @@ import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 from turban.variables import VARIABLES
+from turban.utils.logging import get_logger
 
-logger = getLogger()
+logger = get_logger(__name__)
 
 # For Level1/2
 AuxDataTypehintLevel12 = dict[

@@ -8,6 +8,9 @@ from turban.utils.util import integrate
 from turban.process.shear.util import model_spectrum
 from turban.utils.util import kolmogorov_length
 
+from turban.utils.logging import get_logger
+logger = get_logger(__name__)
+
 
 def process_level4(
     psi: Float[ndarray, "nshear time waveno"],
@@ -36,10 +39,10 @@ def process_level4(
     eps_crit = 1e-5
 
     if isinstance(molvisc, float):
-        print(f"Using constant molecular viscosity {molvisc}")
+        logger.info("Using constant molecular viscosity %s", molvisc)
         molvisc = np.array(molvisc)[newaxis]
     else:
-        print(f"Using variable molecular viscosity with mean {np.mean(molvisc)}")
+        logger.info("Using variable molecular viscosity with mean %s", np.mean(molvisc))
 
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
