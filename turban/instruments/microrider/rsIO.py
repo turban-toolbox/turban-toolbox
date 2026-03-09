@@ -71,8 +71,12 @@ class Channel(object):
     def __init__(self, channel_config: ChannelConfigABC, deconvolved: bool = False):
         self.name: str = channel_config.name
         self.config: ChannelConfigABC = channel_config
-        self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = np.array([])
-        self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]= np.array([])
+        self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
+            np.array([])
+        )
+        self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
+            np.array([])
+        )
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
         self.converted_into_units: bool = False
         self.deconvolved: bool = deconvolved
@@ -112,7 +116,7 @@ class Channel(object):
             return
         if cfg.sign == "unsigned":
             logger.info("Correcting sign")
-            self.data = data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
+            self.data = self.data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
         else:
             idx = np.where(self.data >= 2**31)[0]
             if len(idx):

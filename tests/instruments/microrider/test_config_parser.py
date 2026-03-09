@@ -7,6 +7,7 @@ from tests.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
 
+
 @pytest.fixture
 def setupstring_data(request):
     variable = request.param
