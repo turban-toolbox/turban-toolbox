@@ -1,6 +1,6 @@
 [project]
 name = "turban-toolbox"
-dynamic = ["version"]
+version = "0.0.2"
 description = "Turbulence Analysis Toolbox"
 authors = [
   { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
@@ -38,9 +38,6 @@ classifiers = [
 dev = ["black", "pytest", "pytest-cov"]
 mss = ["pytz", "dateparser"]
 
-[tool.setuptools.dynamic]
-version = { file = "turban/VERSION" }
-
 [project.scripts]
 
 
@@ -52,9 +49,6 @@ build-backend = "setuptools.build_meta"
 include-package-data = false
 
 [tool.setuptools.packages.find]
-
-[tool.setuptools.package-data]
-"*" = ["VERSION"]
 
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"
