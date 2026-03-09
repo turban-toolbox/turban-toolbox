@@ -2,6 +2,18 @@
 
 This manual assumes that you have read your data into python. For converting common file formats to python data, see the documentation of the individual instruments and platforms (such as [MSS](mss.md) or [MicroRider](urider.md)).
 
+## Exporting and importing data
+
+TURBAN can export to and import from xarray datasets using its `.to_xarray()` and `.from_xarray()` methods available on `Processing` as well as `Level1/2/3/4` objects. 
+TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases.
+
+The following would do a roundtrip in TURBAN:
+```python
+from turban import ShearLevel3
+l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")  # import from benchmark file 
+ds = l3.to_xarray()  # TURBAN-compliant xarray dataset
+l3_reimport = ShearLevel3.from_xarray(ds)  # equal to l3
+```
 ## Shear processing
 
 ### Molecular viscosity
