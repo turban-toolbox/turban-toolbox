@@ -55,6 +55,7 @@ filterwarnings = "always::UserWarning"
 
 [tool.black]
 line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
 include = '\.pyi?$'
 exclude = '''
 
@@ -70,6 +71,7 @@ exclude = '''
 
 [dependency-groups]
 dev = [
+    "black>=25.11.0",
     "ipython>=8.18.1",
     "mypy>=1.19.1",
     "pytest>=8.4.2",

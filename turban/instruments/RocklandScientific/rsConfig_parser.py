@@ -1,6 +1,7 @@
 import re
 from typing import Any
 
+
 class MicroRiderConfig:
     """Class to handle MicroRider configuration from the raw setupstr
     read from the header information.
@@ -33,7 +34,7 @@ class MicroRiderConfig:
         self._config: dict[str, dict[str, Any]] = {}
         self._current_section: str = "root"
         self._number_of_channels: int = 0
-        
+
     def parse(self, config_text: str) -> None:
         """
         Parse the configuration text into a nested dictionary.
@@ -69,7 +70,7 @@ class MicroRiderConfig:
                 if section_name == "channel":
                     self._current_section = f"channel{channel_index:02d}"
                     channel_index += 1
-                    self._number_of_channels=channel_index
+                    self._number_of_channels = channel_index
                 else:
                     self._current_section = section_name
                 self._config[self._current_section] = {}
@@ -98,7 +99,7 @@ class MicroRiderConfig:
     @property
     def number_of_channels(self) -> int:
         return self._number_of_channels
-                
+
     def _parse_single_value(self, value: str) -> Any:
         """
         Parse a single value to the most appropriate type.
@@ -137,9 +138,7 @@ class MicroRiderConfig:
         """
         return self._config
 
-    def get_section(
-        self, section: str = "root"
-    ) -> dict[str, Any]:
+    def get_section(self, section: str = "root") -> dict[str, Any]:
         """
         Retrieve a specific section of the configuration.
 
@@ -172,9 +171,7 @@ class MicroRiderConfig:
         channel_map = dict([(str(self.get_section(c)["name"]), c) for c in channels])
         return channel_map
 
-    def get_channel_config(
-        self, name: str
-    ) -> dict[str, Any] | None:
+    def get_channel_config(self, name: str) -> dict[str, Any] | None:
         """
         Get the configuration of a channel
 

@@ -2,9 +2,10 @@ import hashlib
 import os
 import pytest
 import json
-from  turban.instruments.RocklandScientific import rsConfig_parser
+from turban.instruments.RocklandScientific import rsConfig_parser
 
 datadir = "data/RocklandScientific"
+
 
 @pytest.fixture
 def setupstring_data(request):
@@ -20,7 +21,12 @@ def setupstring_data(request):
             number_of_channels = 18
     with open(fn, "r") as fp:
         setupstring = "\n".join(fp.readlines())
-    return dict(setupstring=setupstring, hash_value=hash_value, number_of_channels=number_of_channels)
+    return dict(
+        setupstring=setupstring,
+        hash_value=hash_value,
+        number_of_channels=number_of_channels,
+    )
+
 
 @pytest.mark.parametrize("setupstring_data", ["058", "0413"], indirect=True)
 def test_rsConfig_parser(setupstring_data):
@@ -30,14 +36,15 @@ def test_rsConfig_parser(setupstring_data):
     hash_value = hashlib.md5(s).hexdigest()
     assert hash_value == setupstring_data["hash_value"]
 
+
 @pytest.mark.parametrize("setupstring_data", ["058", "0413"], indirect=True)
 def test_get_channel_config(setupstring_data):
     cp = rsConfig_parser.MicroRiderConfig()
     cp.parse(setupstring_data["setupstring"])
-    cfg = cp.get_channel_config('sh1')
-    assert cfg['name'] == 'sh1' and len(cfg.keys())>=8
-    
-    
+    cfg = cp.get_channel_config("sh1")
+    assert cfg["name"] == "sh1" and len(cfg.keys()) >= 8
+
+
 @pytest.mark.parametrize("setupstring_data", ["058", "0413"], indirect=True)
 def test_number_of_channels(setupstring_data):
     cp = rsConfig_parser.MicroRiderConfig()
