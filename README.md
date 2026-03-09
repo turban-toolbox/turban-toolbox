@@ -6,3 +6,16 @@ Welcome to TURBAN. You can find documentation on [readthedocs](https://turban-to
 
 Currently, only shear processing is fully functional. It has nascent support for temperature microstructure, and more is on the way (e.g. high-frequency ADCP).
 
+### Installation
+
+To install dependencies with pip for the end user, including packages only needed for the MSS:
+```bash
+python -m pip install -e ".[mss]"
+```
+
+or, for developers, replace with:
+```bash
+python -m pip install -e ".[dev,mss]"
+```
+
+This can be done in any python environment.
