@@ -17,6 +17,7 @@ dependencies:
   - pydantic
   - pytest
   - pytest-cov
+  - requests
   - scipy
   - setuptools
   - xarray
