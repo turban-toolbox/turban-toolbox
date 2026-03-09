@@ -10,18 +10,12 @@ def download_test(monkeypatch):
 
 
 def test_download_data_if_necessary(download_test):
-    try:
-        os.unlink("test.txt")
-    except OSError:
-        pass
+    os.remove("test.txt") if os.path.exists("test.txt") else None
     fp = filepaths.filepaths
     fp.filepaths.clear()
     fp.add("test.txt")
     fp.url = "https://share.hereon.de/index.php/s/Y2tYW2w28zKLpk3/download"
     fp.download_data_if_necessary()
     result = os.path.exists("test.txt")
-    try:
-        os.unlink("test.txt")
-    except OSError:
-        pass
+    os.remove("test.txt")
     assert result
