@@ -5,8 +5,7 @@ Currently, only shear processing is fully functional. The high-level API can be 
 ### Using the high-level ShearProcessing pipeline
 
 ```python
-from turban.process.shear.api import ShearProcessing
-from turban.utils.plot.shear import plot
+from turban import ShearProcessing, plot
 
 # Process a level 1 dataset all the way to level 4
 p = ShearProcessing.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc", level=1)
@@ -25,8 +24,7 @@ If no suitable `ShearProcessing.from_*` method exists, you can configure one man
 ```python
 import numpy as np
 import xarray as xr
-from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
-from turban.utils.plot.shear import plot
+from turban import ShearProcessing, ShearLevel1, ShearConfig, plot
 
 atomix_nc_filename = "data/process/shear/MSS_Baltic.nc"
 
