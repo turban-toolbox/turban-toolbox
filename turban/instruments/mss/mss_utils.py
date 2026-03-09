@@ -4,6 +4,9 @@ import numpy as np
 from jaxtyping import Num
 from numpy import ndarray, newaxis
 from scipy.signal import butter, lfilter, lfiltic
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def calc_shear(shear, vsink, density, fs):
@@ -216,13 +219,13 @@ def gradient_legacy(x, dt):
     """
 
     dxdt = np.zeros((len(x)))
-    print(np.asarray(x))
-    print(np.shape(x))
-    print(np.shape(dxdt))
-    print(np.shape(x[2:]), np.shape(x[1:-1]), np.shape(x[0:-2]))
-    print(np.shape(dxdt[2:]))
-    print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)))
-    print(np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2])))
+    logger.debug("x array: %s", np.asarray(x))
+    logger.debug("x shape: %s", np.shape(x))
+    logger.debug("dxdt shape: %s", np.shape(dxdt))
+    logger.debug("Slice shapes: %s, %s, %s", np.shape(x[2:]), np.shape(x[1:-1]), np.shape(x[0:-2]))
+    logger.debug("dxdt[2:] shape: %s", np.shape(dxdt[2:]))
+    logger.debug("Result shape: %s", np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)))
+    logger.debug("Array shape: %s", np.shape((-x[2:] + 4 * x[1:-1] - 3 * x[0:-2])))
     # dxdt(i:len)=(-x(i:len)+ 4.*x(i-1:len-1) - 3.*x(i-2:len-2))./(2*dt)
     dxdt[2:] = (-x[2:] + 4 * x[1:-1] - 3 * x[0:-2]) / (2 * dt)
     dxdt[0] = (x[1] - x[0]) / dt

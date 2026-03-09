@@ -1,18 +1,14 @@
-import logging
 import sys
 import numpy as np
+from turban.utils.logging import get_logger
 
-
-# Setup logging module
-# logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+logger = get_logger(__name__)
 
 
 class hhl:
     """A processor for the HHL binary datastream from Sea & Sun Technology."""
 
-    def __init__(self, verbosity=logging.DEBUG, config={}):
-        self.logger = logging.getLogger("turban.instruments.mss_hhl")
-        self.logger.setLevel(verbosity)
+    def __init__(self, config={}):
         self.config = config
         self.buffer = b""  # a binary buffer for the rawdata
         self.ngood = 0
@@ -37,21 +33,20 @@ class hhl:
             None if alignment failed, True if buffer is valid and ready to process.
         """
 
-        funcname = __name__ + ".align_buffer():"
         self.FLAG_VALID_HHL = False
         self.FLAG_VALID_BUFFER = False
 
         # check for a valid HHL packet first, if found loop over packets and seek for channel 0, if found check if buffer is still enough to create one datapacket
         # Seek for a start, find two "H" and one "L" pattern
         n = len(self.buffer)
-        print(funcname + "Processing length", n)
+        logger.debug("Processing length %d", n)
         if n >= 48:  # We need at least 3*16 bytes for one complete datapacket
             # for i in range(3):
             for i in range(16):  # Check 16 bytes
                 data_tmp = self.decode_HHL(self.buffer)
                 # Check if the datastream is valid, if not delete the first byte and try again
                 if data_tmp is not None:
-                    print("Found valid HHL packet after", i)
+                    logger.debug("Found valid HHL packet after %d", i)
                     self.FLAG_VALID_HHL = True
                     channel = data_tmp[0]
                     data = data_tmp[1]
@@ -60,21 +55,21 @@ class hhl:
                     # print('Did not found valid HHL packet')
                     self.buffer = self.buffer[1:]
 
-            print("Valid", self.FLAG_VALID_HHL)
+            logger.info("Valid %s", self.FLAG_VALID_HHL)
             # Found valid HHL, now search for channel 0
             if self.FLAG_VALID_HHL == False:
-                print("No valid hhl")
+                logger.debug("No valid hhl")
                 return None
             else:
                 # for i in range(0,16):
                 for i in range(0, 20):
                     if channel == 0:  # Channel 0, great!
-                        print("Found channel 0")
+                        logger.debug("Found channel 0")
                         n = len(self.buffer)
                         if (
                             n >= 48
                         ):  # We need at least 3*16 bytes for one complete datapacket
-                            print("Enough data to decode")
+                            logger.debug("Enough data to decode")
                             self.FLAG_VALID_BUFFER = True
                             return True
                         # print('Found channel 0')
@@ -93,39 +88,38 @@ class hhl:
             numbers and data_cat is an ndarray of shape (n_packets, 16) with
             decoded data values. Returns None if buffer cannot be aligned.
         """
-        funcname = __name__ + ".process_buffer():"
         self.FLAG_VALID_HHL = True  # legacy
         self.FLAG_VALID_BUFFER = True  # legacy
         nbad = 0
 
         align = self.align_buffer()
         if align is None:
-            self.logger.debug("Could not align buffer")
+            logger.debug("Could not align buffer")
             return None
         else:
             # If we have a valid buffer, starts with channel 0 and has at least 48 bytes
             # if self.FLAG_VALID_BUFFER:
             if True:
-                print(funcname + " Processing rawdata")
+                logger.debug("Processing rawdata")
                 data_cat = []
                 channel_cat = []
                 while True:
                     if len(self.buffer) < 48:  # We need at least 3 bytes to process
-                        print(funcname + " Not enough data left")
+                        logger.debug("Not enough data left")
                         break
                     else:  # Process data
                         data_tmp = []
                         for i in range(0, 16):
-                            # print(funcname,i,len(self.buffer))
+                            # print(i,len(self.buffer))
                             data_proc = self.decode_HHL(self.buffer[0:3])
                             if data_proc is not None:
                                 channel = data_proc[0]
                                 data = data_proc[1]
                             else:
-                                print("Problem decoding, realigning", data_proc)
+                                logger.debug("Problem decoding, realigning %s", data_proc)
                                 align = self.align_buffer()
                                 if align is None:
-                                    self.logger.debug("Could not realign align buffer")
+                                    logger.debug("Could not realign align buffer")
                                     return None
 
                             self.buffer = self.buffer[3:]
@@ -133,10 +127,10 @@ class hhl:
                             if channel == i:
                                 data_tmp.append(data)
                             else:
-                                print("Bad channel", channel, i)
+                                logger.debug("Bad channel %d %d", channel, i)
                                 align = self.align_buffer()
                                 if align is None:
-                                    self.logger.debug("Could not realign align buffer")
+                                    logger.debug("Could not realign align buffer")
                                     return None
                                 # return None
 
@@ -153,7 +147,7 @@ class hhl:
                 channel_cat = np.asarray(channel_cat)
                 data_cat = np.asarray(data_cat)
                 data_return = [channel_cat, data_cat]
-                print("N Good, N Bad hhl", self.ngood, self.nbad)
+                logger.info("N Good, N Bad hhl %d %d", self.ngood, self.nbad)
                 return data_return
 
     def process_buffer_legacy(self):
@@ -166,42 +160,41 @@ class hhl:
             numbers and data_cat is an ndarray of shape (n_packets, 16) with
             decoded data values. Returns None if buffer cannot be aligned.
         """
-        funcname = __name__ + ".process_buffer():"
         self.FLAG_VALID_HHL = False
         self.FLAG_VALID_BUFFER = False
 
         # check for a valid HHL packet first, if found loop over packets and seek for channel 0, if found check if buffer is still enough to create one datapacket
         # Seek for a start, find two "H" and one "L" pattern
         n = len(self.buffer)
-        print(funcname + "Processing length", n)
+        logger.debug("Processing length %d", n)
         if n >= 48:  # We need at least 3*16 bytes for one complete datapacket
             for i in range(3):
                 data_tmp = self.decode_HHL(self.buffer)
                 # Check if the datastream is valid, if not delete the first byte and try again
                 if data_tmp is not None:
-                    # print('Found valid HHL packet')
+                    logger.debug('Found valid HHL packet')
                     self.FLAG_VALID_HHL = True
                     channel = data_tmp[0]
                     data = data_tmp[1]
                     break
                 else:
-                    # print('Did not found valid HHL packet')
+                    logger.debug('Did not find valid HHL packet')
                     self.buffer = self.buffer[1:]
 
-            print("Valid", self.FLAG_VALID_HHL)
+            logger.debug("Valid %s", self.FLAG_VALID_HHL)
             # Found valid HHL, now search for channel 0
             if self.FLAG_VALID_HHL == False:
-                print("No valid hhl")
+                logger.debug("No valid hhl")
             else:
                 # for i in range(0,16):
                 for i in range(0, 20):
                     if channel == 0:  # Channel 0, great!
-                        # print('Found channel 0')
+                        # logger.debug('Found channel 0')
                         n = len(self.buffer)
                         if (
                             n >= 48
                         ):  # We need at least 3*16 bytes for one complete datapacket
-                            print("Enough data to decode")
+                            logger.debug("Enough data to decode")
                             self.FLAG_VALID_BUFFER = True
                         # print('Found channel 0')
                         break
@@ -211,34 +204,34 @@ class hhl:
 
             # If we have a valid buffer, starts with channel 0 and has at least 48 bytes
             if self.FLAG_VALID_BUFFER:
-                print(funcname + " Processing rawdata")
+                logger.debug("Processing rawdata")
                 data_cat = []
                 channel_cat = []
                 while True:
                     if len(self.buffer) < 48:  # We need at least 3 bytes to process
-                        print(funcname + " Not enough data left")
+                        logger.debug("Not enough data left")
                         break
                     else:  # Process data
                         data_tmp = []
                         for i in range(0, 16):
-                            print(funcname, i, len(self.buffer))
+                            logger.debug("%d %d", i, len(self.buffer))
                             data_proc = self.decode_HHL(self.buffer[0:3])
                             if data_proc is not None:
                                 channel = data_proc[0]
                                 data = data_proc[1]
                             else:
-                                print("Problem decoding", data_proc)
+                                logger.debug("Problem decoding %s", data_proc)
                                 return None
                             self.buffer = self.buffer[3:]
                             channel_cat.append(channel)
                             if channel == i:
                                 data_tmp.append(data)
                             else:
-                                print("Bad channel", channel, i)
+                                logger.debug("Bad channel %d %d", channel, i)
                                 return None
 
-                            # print('Channel',channel)
-                            # print('data {:04x}'.format(data))
+                            # logger.debug('Channel %d', channel)
+                            # logger.debug('data {:04x}'.format(data))
 
                         data_cat.append(data_tmp)
                 channel_cat = np.asarray(channel_cat)
