@@ -17,6 +17,7 @@ dependencies = [
   'numpy',
   'pandas',
   'pydantic',
+  'requests',
   'scipy',
   'setuptools',
   'xarray',
