@@ -10,7 +10,7 @@ Molecular viscosity can be set in two ways: Either using a constant fallback val
 
 ```python notest
 # Option 1
-from turban.process.api import ShearConfig
+from turban import ShearConfig
 cfg = ShearConfig(
     molvisc_fallback=1.6e-6,
     ...
@@ -20,7 +20,7 @@ cfg = ShearConfig(
 ```python
 # Option 2
 import numpy as np
-from turban.process.shear.api import ShearLevel1
+from turban import ShearLevel1
 
 level1 = ShearLevel1.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
 molvisc_arr = np.linspace(1e-6, 2e-6, len(level1.time))
