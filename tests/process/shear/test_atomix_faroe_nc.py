@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from tests.filepaths import atomix_benchmark_faroe_fpath
 
+
 def test_compare_turban_to_atomix_faroe_example():
 
     cfg = ShearConfig.from_atomix_netcdf(atomix_benchmark_faroe_fpath)

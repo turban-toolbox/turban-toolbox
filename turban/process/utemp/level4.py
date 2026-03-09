@@ -35,7 +35,7 @@ def temperature_dissipation(
     """
     Calculate chi (temperature variance dissipation)
     """
-    logger.critical('Missing some parts of algorithm. Use with care!')
+    logger.critical("Missing some parts of algorithm. Use with care!")
 
     chi = integrate_chi(waveno, psi_k, psi_noise, waveno_limit_upper)
 

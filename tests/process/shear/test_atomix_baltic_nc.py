@@ -5,6 +5,7 @@ import numpy as np
 from turban.process.shear.api import ShearProcessing
 from tests.filepaths import atomix_benchmark_baltic_fpath
 
+
 def test_spectra_atomix_baltic():
 
     print("Opening file: {}".format(atomix_benchmark_baltic_fpath))

@@ -25,7 +25,9 @@ from turban.process.shear.api import ShearProcessing
 
 
 @pytest.mark.parametrize("level", [1, 2, 3, 4])
-@pytest.mark.parametrize("fpath", [atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath])
+@pytest.mark.parametrize(
+    "fpath", [atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath]
+)
 def test_load_atomix_netcdf(fpath, level):
     p = ShearProcessing.from_atomix_netcdf(fpath, level=level)
     assert isinstance(p.level4.eps, np.ndarray)
@@ -35,7 +37,12 @@ def test_agg_aux():
     """Test equivalence of simplified and advanced API for aggregating aux variables"""
 
     aux_vars = ["temp"]
-    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_benchmark_baltic_fpath, aux_vars)))
+    arr = dict(
+        zip(
+            aux_vars,
+            NetcdfReader("atomix").read(atomix_benchmark_baltic_fpath, aux_vars),
+        )
+    )
     data_aux = {
         "temp": (
             ["time"],
@@ -60,7 +67,12 @@ def test_agg_aux():
 def test_baltic_benchmark():
 
     aux_vars = ["time", "press", "temp", "cond"]
-    arr = dict(zip(aux_vars, NetcdfReader("atomix").read(atomix_benchmark_baltic_fpath, aux_vars)))
+    arr = dict(
+        zip(
+            aux_vars,
+            NetcdfReader("atomix").read(atomix_benchmark_baltic_fpath, aux_vars),
+        )
+    )
     data_aux = {
         "time": (
             ["time"],
@@ -115,9 +127,9 @@ def test_baltic_benchmark():
     data_tree = p.to_xarray()
     ds1_turban, ds2_turban, ds3_turban, ds4_turban = data_tree.values()
 
-    assert 'time' in ds3_turban.coords
-    assert 'waveno' in ds3_turban.coords
-    assert 'freq' in ds3_turban.coords
+    assert "time" in ds3_turban.coords
+    assert "waveno" in ds3_turban.coords
+    assert "freq" in ds3_turban.coords
 
     _plot_level4(ds4, ds4_turban)  # TODO
 
