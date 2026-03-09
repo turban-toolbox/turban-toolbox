@@ -66,7 +66,23 @@ _vars = {
 }
 
 
-def to_dict(vars):
+def _to_dict(vars):
+    """Transform a flat dictionary into a nested variable-attribute structure.
+    
+    This function may vanish at any time - its only purpose is converting _vars
+    to VARIABLES.
+
+    Parameters
+    ----------
+    vars : dict
+        Flat dictionary with keys formatted as ``"varname/attribute"``.
+
+    Returns
+    -------
+    dict
+        Nested dictionary mapping variable names to attribute dictionaries.
+        Default factory returns an empty dict for missing keys.
+    """
     dct = defaultdict(lambda: {})
     for k, v in vars.items():
         varname, attr = k.split("/")
@@ -74,4 +90,4 @@ def to_dict(vars):
     return dct
 
 
-VARIABLES = to_dict(_vars)
+VARIABLES = _to_dict(_vars)

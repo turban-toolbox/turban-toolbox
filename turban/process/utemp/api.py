@@ -41,6 +41,18 @@ class UTempLevel2(Level2):
         cls,
         data: UTempLevel1,
     ):
+        """Build constructor kwargs for UTempLevel2 from UTempLevel1 data.
+
+        Parameters
+        ----------
+        data : UTempLevel1
+            Level 1 microtemperature data.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the UTempLevel2 constructor.
+        """
         kwarg = super()._from_level_below_kwarg(data)
         level1 = data
         cfg = cast(UTempConfig, level1.cfg)  # just for type checkers to understand type
@@ -75,6 +87,18 @@ class UTempLevel3(Level3):
         cls,
         data: UTempLevel2,
     ) -> dict:
+        """Build constructor kwargs for UTempLevel3 by computing temperature gradient spectra.
+
+        Parameters
+        ----------
+        data : UTempLevel2
+            Level 2 microtemperature data.
+
+        Returns
+        -------
+        dict
+            Keyword arguments to pass to the UTempLevel3 constructor.
+        """
         level2 = data
         cfg = cast(UTempConfig, level2.cfg)
         kwarg = super()._from_level_below_kwarg(level2)

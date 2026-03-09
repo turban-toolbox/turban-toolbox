@@ -32,8 +32,29 @@ def temperature_dissipation(
     Float[ndarray, "n_temp time_slow"],
     Float[ndarray, "n_temp time_slow"],
 ]:
-    """
-    Calculate chi (temperature variance dissipation)
+    """Calculate temperature variance dissipation (chi) and TKE dissipation estimate.
+
+    Parameters
+    ----------
+    psi_k : ndarray, shape (n_temp, time_slow, waveno)
+        Temperature gradient power spectra.
+    waveno : ndarray, shape (time_slow, waveno)
+        Wavenumber array in cpm.
+    psi_noise : ndarray, shape (n_temp, waveno)
+        Noise power spectrum.
+    waveno_limit_upper : float
+        Upper wavenumber integration limit.
+
+    Returns
+    -------
+    chi : ndarray, shape (n_temp, time_slow)
+        Temperature variance dissipation.
+    eps_est2 : ndarray, shape (n_temp, time_slow)
+        TKE dissipation estimate.
+
+    Notes
+    -----
+    Missing some parts of algorithm. Use with care.
     """
     logger.critical("Missing some parts of algorithm. Use with care!")
 
@@ -250,9 +271,20 @@ def theoretical_spectrum(
     )
 
 
-def chisquared(x: Float[ndarray, "..."], dof: int):
-    """
-    pdf of chi^2 distribution
+def chisquared(x: Float[ndarray, "..."], dof: int) -> Float[ndarray, "..."]:
+    """Probability density function of chi-squared distribution.
+
+    Parameters
+    ----------
+    x : ndarray
+        Input values.
+    dof : int
+        Degrees of freedom.
+
+    Returns
+    -------
+    ndarray
+        Probability density of chi-squared distribution.
     """
     return x ** (dof / 2) * np.exp(-x / 2) / (2 ** (dof / 2) * gamma(dof / 2))
 

@@ -189,7 +189,25 @@ def read_mrd(
 
 
 def parse_header(header, logger=None):
-    """Parsing the header of a MRD file and saving the results in a config dictionary"""
+    """Parse an ASCII MRD file header into a configuration dictionary.
+
+    Extracts metadata from the ASCII header of a Microstructure Raw Data (MRD)
+    file, including ship, cruise, date, and channel calibration coefficients.
+
+    Parameters
+    ----------
+    header : str
+        ASCII header text from the MRD file.
+    logger : logging.Logger, optional
+        Logger instance. If None, creates a logger named
+        "turban.instruments.mss_mrd" with DEBUG level.
+
+    Returns
+    -------
+    dict
+        Configuration dictionary with keys 'ship', 'cruise', 'date_pc', and
+        'mss' (which contains a nested dict with channel information).
+    """
     if logger is None:
         logger = logging.getLogger("turban.instruments.mss_mrd")
         logger.setLevel(logging.DEBUG)
