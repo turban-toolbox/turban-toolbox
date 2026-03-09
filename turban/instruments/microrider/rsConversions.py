@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
 from collections import defaultdict
+import typing
 
 import numpy as np
 
@@ -497,7 +498,7 @@ class Deconvolve(object):
 
     def interpolate(
         self, X_dX: np.typing.NDArray[np.float64], X: np.typing.NDArray[np.float64]
-    ) -> np.typing.Any:
+    ) -> typing.Any:
         # only interpolate if X and X_dX are not of equal length
         if X is None or (X.shape == X_dX.shape):
             return X  # nothing to do

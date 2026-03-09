@@ -163,4 +163,14 @@ mss_probeconf_json_fpath = filepaths.add(
 )
 mss_utemp_mrd_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
 
+microrider_data_directory = filepaths.add("data/instruments/microrider")
+# make sure that individual files are present:
+filepaths.add("data/instruments/microrider/DAT_058.mat")
+filepaths.add("data/instruments/microrider/DAT_058.P")
+filepaths.add("data/instruments/microrider/data_0413.mat")
+filepaths.add("data/instruments/microrider/data_0413.p")
+filepaths.add("data/instruments/microrider/setupstring_0413.txt")
+filepaths.add("data/instruments/microrider/setupstring_058.txt")
+
+
 filepaths.download_data_if_necessary()
