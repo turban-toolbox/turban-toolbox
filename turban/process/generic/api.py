@@ -213,9 +213,9 @@ class AuxiliaryData(TimeseriesLevel):
     def _variable_present(self, name):
         """Returns True if variable called `name` already present somewhere"""
         if name in self._aux_data:
-            warnings.warn(f"Variable`{name}` already exists in aux data, skipping")
+            logger.warning(f"Variable`{name}` already exists in aux data, skipping")
         elif name in get_type_hints_recursive(type(self)):
-            warnings.warn(
+            logger.warning(
                 f"Variable `{name}` already defined on object itself, skipping"
             )
         else:

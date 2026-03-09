@@ -1,4 +1,3 @@
-import warnings
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Bool
@@ -98,7 +97,7 @@ def process_level4(
     )
     num_spec_points_agree = np.equal(num_spec_points, num_spec_points_fom)
     if not np.all(num_spec_points_agree):
-        warnings.warn(
+        logger.warning(
             f"Disagreement about number of available spectral points at {np.where(~num_spec_points_agree)}"
         )
 
@@ -151,7 +150,7 @@ def get_quality_metric(
         #     eps_dev >= 4.2 * log_psi_var / np.sqrt(num_spec_points),
         # )
     else:
-        warnings.warn(
+        logger.warning(
             """Can currently not handle disagreement between more or less than
                       two shear probes"""
         )

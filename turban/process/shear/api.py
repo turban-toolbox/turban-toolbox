@@ -1,4 +1,3 @@
-import warnings
 from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
@@ -234,7 +233,7 @@ class ShearLevel3(Level3):
     @property
     def number_signals_vibration_removal(self):
         """N_V in the ATOMIX paper"""
-        warnings.warn("Not implemented")
+        logger.warning("Not implemented")
         return 0
 
     @property

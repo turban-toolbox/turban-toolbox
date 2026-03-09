@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 from jaxtyping import Float, Int
 from numpy import ndarray, newaxis
@@ -158,11 +157,6 @@ def correction_frequency_response_vachon_lueck(
     ) ** 2  # inverse of the frequency response
     # - correction (Hinv is nondimensional so can apply directly to Pk_gradT)
     return Hinv
-
-
-def correction_frequency_response():
-    raise warnings.warn("To be implemented")
-    return 1
 
 
 def get_noise(

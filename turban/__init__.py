@@ -17,3 +17,8 @@ from turban.process.shear.api import (
     ShearLevel4,
 )
 from turban.utils.plot.shear import plot
+
+from turban.utils.logging import set_turban_loglevel
+
+# set all turban loggers to WARNING
+set_turban_loglevel("WARNING")
