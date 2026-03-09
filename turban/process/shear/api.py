@@ -169,8 +169,12 @@ class ShearLevel3(Level3):
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
-        ds = xr.load_dataset(fname, group="L3_spectra").transpose(
-            ..., "N_SHEAR_SENSORS", "TIME_SPECTRA", "WAVENUMBER"
+        ds = xr.load_dataset(fname, group="L3_spectra")
+        ds = ds.transpose(
+            ...,
+            "N_SHEAR_SENSORS",
+            "TIME_SPECTRA",
+            "WAVENUMBER" if "WAVENUMBER" in ds.dims else "N_WAVENUMBER",
         )
 
         return cls(
