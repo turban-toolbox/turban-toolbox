@@ -1,31 +1,19 @@
 import datetime
-import warnings
 from pytz import timezone
 import math
-import numpy
 import logging
-import pkg_resources
 import re
+from importlib.metadata import version as pkg_version
 
+import numpy
 import gsw
 import xarray as xr
+from dateparser import parse as parse_date
 
 from turban.instruments.mss import mss_utils
 
-try:
-    from dateparser import parse as parse_date
-except ImportError:
-    warnings.warn("Could not import dateparser")
 
-    def parse_date(*argv, **kwarg):
-        return datetime.datetime(1, 1, 1)
-
-
-# Get the version
-version_file = pkg_resources.resource_filename("turban", "VERSION")
-
-with open(version_file) as version_f:
-    version = version_f.read().strip()
+version = pkg_version("turban-toolbox")
 
 # Setup logging module
 # logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)

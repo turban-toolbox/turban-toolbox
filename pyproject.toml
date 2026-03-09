@@ -38,6 +38,9 @@ classifiers = [
 dev = ["black", "pytest", "pytest-cov"]
 mss = ["pytz", "dateparser"]
 
+[tool.setuptools.dynamic]
+version = { file = "turban/VERSION" }
+
 [project.scripts]
 
 
