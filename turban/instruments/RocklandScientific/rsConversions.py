@@ -275,7 +275,9 @@ class Aem1g_a(Converter):
         super().__init__(config)
         self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
-    def convert(self, v: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
+    ) -> np.typing.NDArray[np.float64]:
         bias = self.get_parameter("bias")
         adc_fs = self.get_parameter("adc_fs")
         adc_bits = self.get_parameter("adc_bits")
@@ -304,7 +306,9 @@ class Aem1g_d(Converter):
         super().__init__(config)
         self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
-    def convert(self, v: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
+    ) -> np.typing.NDArray[np.float64]:
         u = v.astype(">u2")  # unsigned 16 bit integer
         a = self.get_parameter("a") / 100  # cm/s -> m/s
         b = self.get_parameter("b") / 100  # cm/s -> m/s
@@ -493,7 +497,7 @@ class Deconvolve(object):
 
     def interpolate(
         self, X_dX: np.typing.NDArray[np.float64], X: np.typing.NDArray[np.float64]
-    ) -> np.typing.NDArray[np.float64]:
+    ) -> np.typing.Any:
         # only interpolate if X and X_dX are not of equal length
         if X is None or (X.shape == X_dX.shape):
             return X  # nothing to do
@@ -502,19 +506,6 @@ class Deconvolve(object):
         t_fast = np.arange(X_dX.shape[0]) / self.fs
         ifun = si_PchipInterpolator(t_slow, X, extrapolate=True)
         return ifun(t_fast)
-
-
-# ConverterDict=defaultdict(lambda : PassThrough,
-#                           piezo=Piezo,
-#                           gnd=Gnd,
-#                           therm=Therm,
-#                           shear=Shear,
-#                           poly=Poly,
-#                           voltage=Voltage,
-#                           inclxy=InclXY,
-#                           inclt=InclT,
-#                           aem1g_a=Aem1g_a,
-#                           none=PassThrough)
 
 
 def get_converter(channel_config: common.ChannelConfigABC) -> type[Converter]:
