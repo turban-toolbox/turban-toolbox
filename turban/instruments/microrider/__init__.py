@@ -2,7 +2,3 @@
 
 # __version__ = version("turban")
 
-
-import logging
-
-logger = logging.getLogger(__name__)
