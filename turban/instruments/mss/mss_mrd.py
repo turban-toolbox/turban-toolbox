@@ -7,7 +7,13 @@ from importlib.metadata import version as pkg_version
 import numpy
 import gsw
 import xarray as xr
-from dateparser import parse as parse_date
+
+try:
+    from dateparser import parse as parse_date
+except ImportError:
+    # need to log warning here, once logging is merged
+    def parse_date(*argv, **kwarg):
+        return datetime.datetime(1970, 1, 1)
 
 from turban.instruments.mss import mss_utils
 from turban.utils.logging import get_logger

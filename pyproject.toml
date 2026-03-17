@@ -10,7 +10,6 @@ license = { text = "GPLv03" }
 dependencies = [
   "arrow>=1.4.0",
   'beartype',
-  "dateparser",
   'gsw',
   'jaxtyping',
   'matplotlib',
