@@ -77,6 +77,7 @@ class FilePaths:
         download_required = False
         for p in self.filepaths:
             if not p.exists():
+                logger.debug(f"File {str(p)} is missing.")
                 download_required = True
                 break
         logger.debug(f"Dowloading is required: {download_required}")
