@@ -21,7 +21,7 @@ def test_model_spectrum():
     ax.legend(["Lueck 2022"])
     ax.grid()
     ax.set_title("Cf. ATOMIX paper Fig. 12")
-    fig.savefig(f"out/tests/test_model_spectrum.png")
+    fig.savefig(f"out/tests/process/shear/test_model_spectrum.png")
 
 
 def test_model_spectrum_nondim():
@@ -36,4 +36,4 @@ def test_model_spectrum_nondim():
     ax.grid()
     ax.set_ylim([1e-2, 2.5])
     ax.set_title("Cf. ATOMIX paper Fig. 3")
-    fig.savefig(f"out/tests/test_model_spectrum_nondim.png")
+    fig.savefig(f"out/tests/process/shear/test_model_spectrum_nondim.png")

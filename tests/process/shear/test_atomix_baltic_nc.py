@@ -31,7 +31,7 @@ def test_spectra_atomix_baltic():
     ax.plot(p.level1.shear[0, :], L1_nc_p)
     ax.set_ylim([100, 0])
     ax.set_title("L1 shear")
-    fig.savefig("out/tests/baltic-level1.png")
+    fig.savefig("out/tests/process/shear/baltic-level1.png")
 
     #
     fig, ax = plt.subplots()
@@ -39,7 +39,7 @@ def test_spectra_atomix_baltic():
     ax.plot(p.level2.shear[0, :], L2_nc_p)
     ax.set_ylim([100, 0])
     ax.set_title("L2 shear")
-    fig.savefig("out/tests/baltic-level2.png")
+    fig.savefig("out/tests/process/shear/baltic-level2.png")
 
     ik = 10
     eps_tur = p.level4.eps[0, ik]
@@ -62,4 +62,4 @@ def test_spectra_atomix_baltic():
     ax.legend([pnc[0], ptu[0], p4[0]], ("netCDF", "turban", "kmax (nc)"))
     ax.set_xscale("log")
     ax.set_yscale("log")
-    fig.savefig("out/tests/baltic-spectra.png")
+    fig.savefig("out/tests/process/shear/baltic-spectra.png")
