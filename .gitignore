@@ -19,6 +19,7 @@ mrd-format-info/
 *.so
 *.png
 
+out/tests/
 __pycache__
 
 qc/
@@ -26,3 +27,4 @@ data/
 scraps/
 
 .coverage
+
