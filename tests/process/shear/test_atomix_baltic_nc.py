@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import netCDF4
 import numpy as np
 
-from turban.process.shear.api import ShearProcessing
+from turban import ShearProcessing
+from turban.utils.plot.shear import plot_level2
 from tests.filepaths import atomix_benchmark_baltic_fpath
 
 
@@ -25,20 +26,12 @@ def test_spectra_atomix_baltic():
     L3_nc_p = nc.groups["L3_spectra"].variables["PRES"][:]
 
     L4_nc_epsi = nc.groups["L4_dissipation"]["EPSI"][:]
-    #
-    fig, ax = plt.subplots()
-    ax.plot(L1_nc_sh[0, :], L1_nc_p)
-    ax.plot(p.level1.shear[0, :], L1_nc_p)
-    ax.set_ylim([100, 0])
-    ax.set_title("L1 shear")
-    fig.savefig("out/tests/process/shear/baltic-level1.png")
 
     #
-    fig, ax = plt.subplots()
-    ax.plot(L2_nc_sh[0, :], L2_nc_p)
-    ax.plot(p.level2.shear[0, :], L2_nc_p)
-    ax.set_ylim([100, 0])
-    ax.set_title("L2 shear")
+    fig, axs = plot_level2(p.level2, p.level1)
+    axs[0].plot(p.level2.time, L2_nc_sh[0, :])
+    axs[2].plot(p.level2.time, L2_nc_sh[1, :])
+    fig.suptitle("Black: raw shear, blue: cleaned (benchmark), red: cleaned (TURBAN)")
     fig.savefig("out/tests/process/shear/baltic-level2.png")
 
     ik = 10
