@@ -1,6 +1,6 @@
 [project]
 name = "turban-toolbox"
-version = "0.0.2"
+version = "0.1.0"
 description = "Turbulence Analysis Toolbox"
 authors = [
   { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
