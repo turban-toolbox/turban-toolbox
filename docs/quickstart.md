@@ -4,7 +4,7 @@ Currently, only shear processing is fully functional. The high-level API can be 
 
 ### Setup
 
-Example data can be downloaded using:
+Example data, also needed for the unit tests, can be downloaded using:
 ```bash
 python tests/filepaths.py --download
 ```
