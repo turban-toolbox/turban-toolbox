@@ -77,6 +77,7 @@ class FilePaths:
         download_required = False
         for p in self.filepaths:
             if not p.exists():
+                logger.debug(f"File {str(p)} is missing.")
                 download_required = True
                 break
         logger.debug(f"Dowloading is required: {download_required}")
@@ -172,5 +173,19 @@ filepaths.add("data/instruments/microrider/data_0413.p")
 filepaths.add("data/instruments/microrider/setupstring_0413.txt")
 filepaths.add("data/instruments/microrider/setupstring_058.txt")
 
+if __name__ == "__main__":
+    import argparse
 
-filepaths.download_data_if_necessary()
+    parser = argparse.ArgumentParser(
+        description="Manage test data files for turban-toolbox"
+    )
+    parser.add_argument(
+        "--download",
+        action="store_true",
+        help="Download test data files if necessary",
+    )
+
+    args = parser.parse_args()
+
+    if args.download:
+        filepaths.download_data_if_necessary()

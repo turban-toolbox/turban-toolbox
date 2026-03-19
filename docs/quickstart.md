@@ -2,6 +2,13 @@
 
 Currently, only shear processing is fully functional. The high-level API can be imported from `turban.process.shear.api`.
 
+### Setup
+
+Example data, also needed for the unit tests, can be downloaded using:
+```bash
+python tests/filepaths.py --download
+```
+
 ### Using the high-level ShearProcessing pipeline
 
 ```python
