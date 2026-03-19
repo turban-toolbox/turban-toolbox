@@ -55,7 +55,7 @@ include-package-data = false
 filterwarnings = "always::UserWarning"
 #addopts = "--pdb"
 log_cli = false
-log_cli_level = "DEBUG"
+log_cli_level = "WARNING"
 
 [tool.black]
 line-length = 88
