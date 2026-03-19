@@ -20,5 +20,9 @@ from turban.utils.plot.shear import plot
 
 from turban.utils.logging import set_turban_loglevel
 
+from turban.utils.logging import LoggerManager
+
+logger_manager = LoggerManager()
+
 # set all turban loggers to WARNING
-set_turban_loglevel("WARNING")
+#set_turban_loglevel("WARNING")

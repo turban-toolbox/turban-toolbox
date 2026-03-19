@@ -21,8 +21,10 @@ from .rsCommon import (
     ChannelConfig,
     channel_config_factory,
 )
-from . import logger
 
+from ... import logger_manager
+
+logger = logger_manager.get_logger(__name__)
 
 class HeaderEnum(enum.IntEnum):
     HeaderSize = 128
