@@ -68,7 +68,7 @@ class MssSensorPoly(MssSensor):
 class MssShearSensor(MssSensor):
     sensitivity: float
     serial_number: str = Field(default="")
-    reference_temperature: float = Field(default=np.nan)
+    reference_temperature: float | None = None
     calibration_date: str = Field(default="")
     calibration_type: Literal["SHE"] = Field(default="SHE")
 
