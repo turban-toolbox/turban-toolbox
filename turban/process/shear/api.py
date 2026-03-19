@@ -1,4 +1,3 @@
-import warnings
 from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
@@ -21,6 +20,9 @@ from turban.process.generic.api import (
     Level4,
     Processing,
 )
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(kw_only=True)
@@ -231,7 +233,7 @@ class ShearLevel3(Level3):
     @property
     def number_signals_vibration_removal(self):
         """N_V in the ATOMIX paper"""
-        warnings.warn("Not implemented")
+        logger.warning("Not implemented")
         return 0
 
     @property
@@ -346,6 +348,9 @@ class ShearLevel4(Level4):
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         # TODO: flag to switch off loading of levels below
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
+            logger.warning(
+                "log_diss_var and log_diss_mad not available from atomix netcdf file."
+            )
             return cls(
                 eps=ds["EPSI"].values,
                 level_below=ShearLevel3.from_atomix_netcdf(fname),

@@ -1,4 +1,3 @@
-import warnings
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Bool
@@ -7,6 +6,9 @@ import xarray as xr
 from turban.utils.util import integrate
 from turban.process.shear.util import model_spectrum
 from turban.utils.util import kolmogorov_length
+
+from turban.utils.logging import get_logger
+logger = get_logger(__name__)
 
 
 def process_level4(
@@ -36,10 +38,10 @@ def process_level4(
     eps_crit = 1e-5
 
     if isinstance(molvisc, float):
-        print(f"Using constant molecular viscosity {molvisc}")
+        logger.info("Using constant molecular viscosity %s", molvisc)
         molvisc = np.array(molvisc)[newaxis]
     else:
-        print(f"Using variable molecular viscosity with mean {np.mean(molvisc)}")
+        logger.info("Using variable molecular viscosity with mean %s", np.mean(molvisc))
 
     # set psi=0 at k=0 (see text just after Eq. 27)
     psi[:, :, 0] = 0.0
@@ -95,7 +97,7 @@ def process_level4(
     )
     num_spec_points_agree = np.equal(num_spec_points, num_spec_points_fom)
     if not np.all(num_spec_points_agree):
-        warnings.warn(
+        logger.warning(
             f"Disagreement about number of available spectral points at {np.where(~num_spec_points_agree)}"
         )
 
@@ -148,7 +150,7 @@ def get_quality_metric(
         #     eps_dev >= 4.2 * log_psi_var / np.sqrt(num_spec_points),
         # )
     else:
-        warnings.warn(
+        logger.warning(
             """Can currently not handle disagreement between more or less than
                       two shear probes"""
         )

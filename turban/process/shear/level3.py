@@ -4,7 +4,9 @@ from jaxtyping import Float, Int
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 from turban.utils.spectra import spectrum
+from turban.utils.logging import get_logger
 
+logger = get_logger(__name__)
 
 def process_level3(
     shear: Float[ndarray, "nshear time_fast"],

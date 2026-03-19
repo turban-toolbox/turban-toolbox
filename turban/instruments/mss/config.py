@@ -1,5 +1,4 @@
 from typing import Literal, Union, Optional, Annotated
-import logging
 import sys
 from typing import cast
 from pathlib import Path
@@ -7,15 +6,12 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 from . import mss_mrd
-    
+
 from turban.process.shear.config import ShearConfig
 from turban.process.shear.api import ShearLevel1
+from turban.utils.logging import get_logger
 
-# Setup logging module
-# TODO should handle this more gracefully, having debug level logging everywhere is annoying
-# logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
-logger = logging.getLogger("turban.instruments.mss")
-# logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 
 # Define standard names for sensors

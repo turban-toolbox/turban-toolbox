@@ -1,7 +1,6 @@
 import json
 from functools import wraps
 from typing import cast, Literal
-import warnings
 import numpy as np
 from numpy import ndarray, newaxis
 from scipy.signal import butter, filtfilt

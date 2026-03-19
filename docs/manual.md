@@ -107,6 +107,16 @@ Similarly, one can easily calculate segment- or chunkwise variance, trends, or o
 
 ## Customising TURBAN
 
+### Logging
+
+TURBAN operates with module-level loggers, one for each `.py` file with the respective name. Their loglevel can be set all at once or only pertaining to specific modules. The following sets the log level to `debug` for all code under `turban/instruments/mss/`:
+
+```python
+from turban import set_turban_loglevel
+set_turban_loglevel("WARNING")  # default
+set_turban_loglevel("DEBUG", "turban.instruments.mss")
+```
+
 ### Configuration objects
 
 TURBAN operates with several kinds of high-level objects, each of which have their own settings:

@@ -1,4 +1,3 @@
-import warnings
 from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int

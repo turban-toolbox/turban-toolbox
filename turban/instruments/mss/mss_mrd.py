@@ -1,7 +1,6 @@
 import datetime
 from pytz import timezone
 import math
-import logging
 import re
 from importlib.metadata import version as pkg_version
 
@@ -11,17 +10,14 @@ import xarray as xr
 from dateparser import parse as parse_date
 
 from turban.instruments.mss import mss_utils
+from turban.utils.logging import get_logger
 
+logger = get_logger(__name__)
 
 version = pkg_version("turban-toolbox")
 
-# Setup logging module
-# logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
-
-def read_mrd(
-    filestream, header_only=False, pos_time_only=False, logger=None
-) -> dict[str, list]:
+def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict[str, list]:
     """Read a binaray SST MRD (Microstructure Raw Data) file
 
     Parameters
@@ -31,11 +27,6 @@ def read_mrd(
     pos_time_only
 
     """
-    if logger is None:
-        logger = logging.getLogger("turban.instruments.mss_mrd")
-        logger.setLevel(logging.DEBUG)
-
-    funcname = "read_mrd():"
     f = filestream
 
     n = 0
@@ -53,7 +44,7 @@ def read_mrd(
     nread = 4096
     bind = 0
     btmp = f.read(nread)
-    logger.info(funcname + "Start reading file")
+    logger.info("Start reading file")
     while True:
         if HAVE_TIME & HAVE_POS & pos_time_only:
             # print('Found time and pos, breaking at',n)
@@ -188,7 +179,7 @@ def read_mrd(
     return data
 
 
-def parse_header(header, logger=None):
+def parse_header(header):
     """Parse an ASCII MRD file header into a configuration dictionary.
 
     Extracts metadata from the ASCII header of a Microstructure Raw Data (MRD)
@@ -198,9 +189,6 @@ def parse_header(header, logger=None):
     ----------
     header : str
         ASCII header text from the MRD file.
-    logger : logging.Logger, optional
-        Logger instance. If None, creates a logger named
-        "turban.instruments.mss_mrd" with DEBUG level.
 
     Returns
     -------
@@ -208,11 +196,6 @@ def parse_header(header, logger=None):
         Configuration dictionary with keys 'ship', 'cruise', 'date_pc', and
         'mss' (which contains a nested dict with channel information).
     """
-    if logger is None:
-        logger = logging.getLogger("turban.instruments.mss_mrd")
-        logger.setLevel(logging.DEBUG)
-
-    funcname = __name__ + ".parse_header():"
     config = {"mss": {"channels": {}}}
     ind_ship = header.find("Ship    :   ") + len("Ship    :   ")
     ship = header[ind_ship : ind_ship + 8]
@@ -258,7 +241,7 @@ def parse_header(header, logger=None):
             FLAG_sensor = False
 
         if FLAG_sensor:
-            # logger.debug(funcname + 'Found sensor')
+            # logger.debug('Found sensor')
             sensor_str.append(hs[i])
             devicename = hsp[1].replace(" ", "")
             if "MSS" in devicename:  # Treat the MSS here
@@ -285,15 +268,9 @@ def parse_header(header, logger=None):
     return config
 
 
-def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Dataset:
-    if logger is None:
-        logger = logging.getLogger("turban.instruments.mss_mrd")
-        logger.setLevel(logging.DEBUG)
-
-    funcname = "raw_to_units():"
-    logger.debug(funcname)
+def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
     rawdatac = rawdata["channels"]
-    # print('rawdata keys',rawdata.keys())
+    # logger.debug('rawdata keys',rawdata.keys())
     try:
         gps = rawdata["gps"]
         gps_date = rawdata["date"]
@@ -305,7 +282,7 @@ def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Datas
 
     count_offset = mss_config.offset
     if rawdata["numsamples"] == 0:
-        logger.info(funcname + " No samples found for conversion.")
+        logger.info("No samples found for conversion.")
         return None
 
     # Create matrix for converted data
@@ -339,8 +316,6 @@ def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Datas
         for k in header.keys():
             if "mss" not in k:  # Ignore the mss part
                 level0_dataset.attrs["header_" + k] = str(header[k])
-    # except:
-    #    logger.debug('Could not add header', exc_info=True)
 
     tstr = datetime.datetime.now().isoformat()
 
@@ -375,13 +350,7 @@ def raw_to_level0(mss_config, rawdata: dict[str, list], logger=None) -> xr.Datas
     return level0_dataset
 
 
-def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None) -> xr.Dataset:
-    if logger is None:
-        logger = logging.getLogger("turban.instruments.mss_mrd")
-        logger.setLevel(logging.DEBUG)
-
-    funcname = __name__ + ".level0_to_level1():"
-    logger.debug(funcname)
+def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
     logger.debug("Pressure sensor:{}".format(mss_config.pressure_sensorname))
     logger.debug("Keys of level0 data:{}".format(level0.keys()))
     if True:
@@ -409,8 +378,8 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None) -> xr.Datas
         )
         # Count the number of samples and divide by sampling frequency, to get a time vector
         time_count = numpy.cumsum(index) / mss_config.sampling_freq
-        print("time count", time_count)
-        print("Time count", numpy.shape(time_count), numpy.shape(index))
+        logger.debug("time count %s", time_count)
+        logger.debug("Time count %s %s", numpy.shape(time_count), numpy.shape(index))
         channelname = "time_count"
         level1_dataset[channelname] = time_count
         level1_dataset[channelname].attrs["units"] = "s"
@@ -466,27 +435,24 @@ def level0_to_level1(mss_config, level0, pspd_rel=None, logger=None) -> xr.Datas
             # self.logger.exception(e)
             config_pspd_rel = None
 
-        # print('config', self.config)
-        # print('config2', config_pspd_rel,config_pspd_rel_data)
         # if self.config['mss']['pspd_rel'] = 'external'
         if mss_config.pspd_rel_method == "constant":
             logger.debug(
-                funcname
-                + "Using constant velocity {:f}".format(
+                "Using constant velocity {:f}".format(
                     mss_config.pspd_rel_constant_vel
                 )
             )
             vsink = numpy.zeros(nsamples) + mss_config.pspd_rel_constant_vel
         elif (pspd_rel is None) or (mss_config.pspd_rel_method == "pressure"):
-            logger.debug(funcname + "Using change of pressure to caluclate velocity")
+            logger.debug("Using change of pressure to caluclate velocity")
             vsink = mss_utils.calc_vsink(
                 press=level0[press_sensorname], fs=mss_config.sampling_freq
             )
         elif mss_config.pspd_rel_method == "external":
-            logger.debug(funcname + "Using external")
+            logger.debug("Using external")
             vsink = pspd_rel
         else:
-            self.logger.warning(funcname + " no method to get velocity past sensor")
+            logger.warning("no method to get velocity past sensor")
             raise ValueError
 
         level1_dataset["PSPD_REL"] = (["index"], vsink)
