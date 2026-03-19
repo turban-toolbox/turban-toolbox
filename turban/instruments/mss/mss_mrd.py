@@ -7,12 +7,20 @@ from importlib.metadata import version as pkg_version
 import numpy
 import gsw
 import xarray as xr
-from dateparser import parse as parse_date
 
 from turban.instruments.mss import mss_utils
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+try:
+    from dateparser import parse as parse_date
+except ImportError:
+    logger.error("dateparser not available, profile timestamp will be wrong")
+
+    def parse_date(*argv, **kwarg):
+        return datetime.datetime(1970, 1, 1)
+
 
 version = pkg_version("turban-toolbox")
 
@@ -438,9 +446,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         # if self.config['mss']['pspd_rel'] = 'external'
         if mss_config.pspd_rel_method == "constant":
             logger.debug(
-                "Using constant velocity {:f}".format(
-                    mss_config.pspd_rel_constant_vel
-                )
+                "Using constant velocity {:f}".format(mss_config.pspd_rel_constant_vel)
             )
             vsink = numpy.zeros(nsamples) + mss_config.pspd_rel_constant_vel
         elif (pspd_rel is None) or (mss_config.pspd_rel_method == "pressure"):

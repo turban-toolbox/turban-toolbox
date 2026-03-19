@@ -12,8 +12,12 @@ To install dependencies with pip for the end user, including packages only neede
 ```bash
 python -m pip install -e ".[mss]"
 ```
+or, including for the microrider:
+```bash
+python -m pip install -e ".[mss,microrider]"
+```
 
-or, for developers, replace with:
+or, for developers, something like:
 ```bash
 python -m pip install -e ".[dev,mss]"
 ```
