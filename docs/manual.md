@@ -20,7 +20,7 @@ l3_reimport = ShearLevel3.from_xarray(ds)  # equal to l3
 
 Molecular viscosity can be set in two ways: Either by using a constant fallback value in the `ShearConfig`:
 
-```python notest
+```{.python notest}
 # Option 1
 from turban import ShearConfig
 cfg = ShearConfig(
@@ -73,7 +73,7 @@ section_number = np.zeros_like(x, dtype=int)
 section_number[1:12] = 1
 ```
 leaving us with 10 samples. We would like to compute dissipation using half-overlapping FFT _segments_ of 2 samples, taking 3 such FFT _segments_ for each dissipation estimate (_chunk_), and an overlap of half a FFT _segment_ between _chunks_. Then:
-```python continuation
+```{.python continuation}
 segment_length = 2
 segment_overlap = 1
 chunk_length = 4 # We can fit 3 half-overlapping segments in here
@@ -90,7 +90,7 @@ When called with exactly the two tuples (`chunk_length`, `chunk_overlap`) and(`s
 3. Inside each segment, counting the samples attributed to each segment.
 
 For instance, given a an array `x` whose last axis has length `samples_len`, we can calculate the FFT over all segments without any loop:
-```python continuation
+```{.python continuation}
 from turban.utils.util import get_chunking_index
 idx = get_chunking_index(
     len(x),
