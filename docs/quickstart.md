@@ -1,8 +1,14 @@
 ## Quickstart
 
-Currently, only shear processing is fully functional. The high-level API can be imported from `turban.process.shear.api`.
+Currently, only shear processing is fully functional. The high-level API can be imported from `turban`.
 
 ### Setup
+
+Install TURBAN with dependency groups as needed, e.g. for MSS + MicroRider support:
+
+```bash
+python -m pip install -e . --group mss --group microrider
+```
 
 Example data, also needed for the unit tests, can be downloaded using:
 ```bash

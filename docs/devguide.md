@@ -1,5 +1,13 @@
 # Developer's guide
 
+## Installation
+
+Install the package in editable mode with the development dependency group:
+
+```bash
+python -m pip install -e . --group dev
+```
+
 ## Type checking
 
 TURBAN uses extensive type annotations. Types are currently (for easier development) runtime-checked with `beartype`. This can easily be disabled by commenting out the two lines in `turban/__init__.py`.

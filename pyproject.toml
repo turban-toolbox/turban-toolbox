@@ -34,15 +34,17 @@ classifiers = [
   'Programming Language :: Python :: 3 :: Only',
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-  "black",
-  "pytest",
-  "pytest-cov",
-  "mkdocs",
-  "pytest-markdown-docs",
-  "pymdown-extensions",
-  "mkdocstrings[python]",
+    "black>=25.11.0",
+    "ipython>=8.18.1",
+    "mypy>=1.19.1",
+    "pytest>=8.4.2",
+    "pytest-cov",
+    "mkdocs",
+    "pytest-markdown-docs",
+    "pymdown-extensions",
+    "mkdocstrings[python]",
 ]
 mss = ["pytz", "dateparser"]
 microrider = ["arrow>=1.4.0"]
@@ -80,16 +82,6 @@ exclude = '''
 )
 
 '''
-
-[dependency-groups]
-dev = [
-    "black>=25.11.0",
-    "ipython>=8.18.1",
-    "mypy>=1.19.1",
-    "pytest>=8.4.2",
-]
-
-
 [tool.mypy]
 python_version = "3.13"
 strict = true  # Enable all checks
