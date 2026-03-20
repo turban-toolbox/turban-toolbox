@@ -21,6 +21,7 @@ mrd-format-info/
 
 __pycache__
 
+site/
 qc/
 data/
 scraps/

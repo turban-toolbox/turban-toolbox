@@ -35,7 +35,15 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pytest", "pytest-cov"]
+dev = [
+  "black",
+  "pytest",
+  "pytest-cov",
+  "mkdocs",
+  "pytest-markdown-docs",
+  "pymdown-extensions",
+  "mkdocstrings[python]",
+]
 mss = ["pytz", "dateparser"]
 microrider = ["arrow>=1.4.0"]
 
