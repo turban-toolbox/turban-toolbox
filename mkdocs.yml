@@ -1,6 +1,6 @@
 site_name: Turbulence analysis (TURBAN) toolbox
 theme:
-  name: material
+  name: readthedocs
   features:
     - navigation.tabs
     - content.code.copy
