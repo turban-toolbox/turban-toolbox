@@ -127,7 +127,6 @@ class LoggerManager:
         try:
             logger = self._loggers[name]
         except KeyError:
-            print("configuring logger")
             logger = logging.getLogger(name)
             config = config or LoggerConfig()
             logger.addHandler(config.handler)
@@ -139,7 +138,6 @@ class LoggerManager:
                 )
         # makes any new logger's level set to any requirements set already.
         for _log_level in self._log_levels:
-            print("Setting log level")
             self._set_level(*_log_level, name, logger)
         return logger
 
@@ -248,4 +246,4 @@ def set_turban_loglevel(level: int | str, pattern: str = "turban") -> None:
     """
     manager = LoggerManager()
     regex_pattern = rf"^{pattern}.*"
-    manager.set_level(level, pattern)
+    manager.set_level(level, regex_pattern)
