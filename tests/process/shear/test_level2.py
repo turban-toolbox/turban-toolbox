@@ -11,7 +11,7 @@ from turban.process.shear.level2 import (
 )
 from turban.utils.util import boolarr_to_sections
 from turban.process.shear.api import ShearLevel1, ShearLevel2
-from tests.filepaths import atomix_benchmark_baltic_fpath
+from turban.utils.filepaths import atomix_benchmark_baltic_fpath
 
 
 def test_despike_benchmark():

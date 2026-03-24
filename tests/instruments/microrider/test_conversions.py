@@ -7,7 +7,7 @@ import pytest
 from scipy.io import loadmat
 
 from turban.instruments.microrider import rsIO
-from tests.filepaths import microrider_data_directory
+from turban.utils.filepaths import microrider_data_directory
 
 logger = logging.getLogger()
 

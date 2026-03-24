@@ -9,9 +9,9 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from tests.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
 
 import xarray as xr
+
 from turban.process.shear.api import (
     ShearProcessing,
     ShearLevel1,
@@ -20,8 +20,8 @@ from turban.process.shear.api import (
     ShearLevel4,
     NetcdfReader,
 )
-
 from turban.process.shear.api import ShearProcessing
+from turban.utils.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
 
 
 @pytest.mark.parametrize("level", [1, 2, 3, 4])

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.instruments.mss.mss_mrd import read_mrd, raw_to_level0, level0_to_level1
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
-from tests.filepaths import atomix_benchmark_baltic_mrd_fpath
+from turban.utils.filepaths import atomix_benchmark_baltic_mrd_fpath
 
 
 def test_mss():

@@ -8,7 +8,7 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
-from . import rsCommon as common
+from turban.instruments.microrider import rsCommon as common
 
 logger = logging.getLogger(__name__)
 

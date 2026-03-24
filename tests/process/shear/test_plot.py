@@ -10,7 +10,7 @@ from turban.process.shear.api import (
 )
 from turban.utils.plot import shear as shplot
 
-from tests.filepaths import atomix_benchmark_faroe_fpath
+from turban.utils.filepaths import atomix_benchmark_faroe_fpath
 
 
 def test_plot():

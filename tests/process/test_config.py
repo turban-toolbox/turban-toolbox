@@ -1,6 +1,6 @@
 from turban.process.generic.config import SegmentConfig
 from turban.process.shear.config import ShearConfig
-from tests.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
+from turban.utils.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
 
 
 def test_config():

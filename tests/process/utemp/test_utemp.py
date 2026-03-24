@@ -14,7 +14,7 @@ from turban.process.utemp.api import UTempConfig, UTempProcessing
 from turban.utils.util import define_sections
 from turban.instruments.mss.mss_utils import deconvolve_mss_ntchp
 
-from tests.filepaths import mss_probeconf_json_fpath, mss_utemp_mrd_fpath
+from turban.utils.filepaths import mss_probeconf_json_fpath, mss_utemp_mrd_fpath
 
 
 def test_mss():
