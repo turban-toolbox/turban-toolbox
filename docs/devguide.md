@@ -53,3 +53,56 @@ TURBAN handles a variety of instruments and a variety of methods of analysing th
 
 Variables in TURBAN code (are supposed to) follow, wherever reasonable, the variable names outlined in `turban/variables.py`.
 
+## Logging
+
+In order to facilitate the use of dedicated loggers with fine-grained
+control over the formatting and logging level of various loggers used
+in the code tree and in dependency modules, TURBAN provides a
+`LoggerManager`.
+
+For a specific module, a logger can be created by
+```python
+from turban.utils.logging import LoggerManager
+logger = LoggerManager().get_logger(__name__)
+```
+or more explicit
+```python
+from turban.utils.logging import LoggerManager
+logger_manager = LoggerManager()
+logger = logger_manager.get_logger(__name__)
+```
+
+The class ```LoggerManager``` is implemented as a singleton, so that
+any instance creation returns always the same object, irrespective if
+an instance was created in some other module. The ```logger```
+instance can then be used as usual
+```python
+logger.debug("This is a debug message")
+```
+
+In the application code it is now easy to set the logging level for
+one or more loggers. 
+```python
+import turban.process.shear 
+import turban.instruments.microrider.rsIO
+import turban.utils.logging as turban_logging
+
+
+logger_manager = turban_logging.LoggerManager()
+logger_manager.set_level("info", "turban.*")
+logger_manager.set_level('debug', 'rsIO')
+```
+This would set all turban loggers to the INFO level, apart from the
+module ```rsIO```, which will be logging DEBUG messages as well.
+
+If you are unsure how a logger is called, you can get all loggers
+managed by the ```logger_manager``` (all TURBAN loggers) by
+```python
+loggers = logger_manager.list_loggers()
+```
+To get access to all loggers, including those of dependency packages,
+you would use
+```python
+all_loggers = logger_manager.list_all_loggers()
+```
+
