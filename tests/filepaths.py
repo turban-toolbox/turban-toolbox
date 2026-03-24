@@ -64,6 +64,14 @@ class FilePaths:
         self.filepaths.append(file_path)
         return str(file_path)
 
+    def auto_download_data_if_necessary(self) -> None:
+        '''Download files if one or more data are missing, if and only if, the environment
+           variable TURBAN_AUTO_DOWNLOAD_TEST_FILES is set to 1.
+        '''
+        flag = os.getenv('TURBAN_AUTO_DOWNLOAD_TEST_FILES')
+        if not flag is None and flag.strip()=='1':
+            self.download_data_if_necessary()
+            
     def download_data_if_necessary(self) -> None:
         """Download if one or more data files are missing
 
@@ -189,3 +197,7 @@ if __name__ == "__main__":
 
     if args.download:
         filepaths.download_data_if_necessary()
+else:
+    # imported as module: checks TURBAN_AUTO_DOWNLOAD_TEST_FILES environment variable to be set before downloading
+    filepaths.auto_download_data_if_necessary()
+    
