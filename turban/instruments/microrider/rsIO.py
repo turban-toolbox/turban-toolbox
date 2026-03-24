@@ -12,9 +12,9 @@ import numpy as np
 import numpy.typing as np_typing
 from scipy.interpolate import interp1d as si_interp1d
 
-from . import rsConversions
-from . import rsConfig_parser
-from .rsCommon import (
+from turban.instruments.microrider import rsConversions
+from turban.instruments.microrider import rsConfig_parser
+from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     Header,
     ChannelConfigABC,
@@ -22,7 +22,7 @@ from .rsCommon import (
     channel_config_factory,
 )
 
-from ... import logger_manager
+from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
 
