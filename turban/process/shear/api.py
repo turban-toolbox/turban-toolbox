@@ -2,7 +2,7 @@ from typing import Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
-from .config import ShearConfig
+from turban.process.shear.config import ShearConfig
 from numpy import newaxis, nan, ndarray
 import numpy as np
 import xarray as xr

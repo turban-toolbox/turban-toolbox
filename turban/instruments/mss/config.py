@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field
 
-from . import mss_mrd
+from turban.instruments.mss import mss_mrd
 
 from turban.process.shear.config import ShearConfig
 from turban.process.shear.api import ShearLevel1
