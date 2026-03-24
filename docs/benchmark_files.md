@@ -18,8 +18,10 @@ connection.
 The manual download is default and requires explicit user action to
 initiate the download. This can be achieved by
 ```bash
-python tests/filepaths.py
+turban_auto_download_data_files [--force]
 ```
+The ```--force``` option enforces the data download, even if
+apparently all data files were downloaded previously.
 
 The downloading procedure can be made automatically by setting the
 environment variable ```TURBAN_AUTO_DOWNLOAD_FILES```, like so
