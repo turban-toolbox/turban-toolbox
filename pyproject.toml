@@ -5,6 +5,7 @@ description = "Turbulence Analysis Toolbox"
 authors = [
   { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
   { name = "Peter Holtermann", email = "peter.holtermann@io-warnemuende.de" },
+  { name = "Lucas Merckelbach", email = "lucas.merckelbach@hereon.de" },  
 ]
 license = { text = "GPLv03" }
 dependencies = [
@@ -50,7 +51,7 @@ mss = ["pytz", "dateparser"]
 microrider = ["arrow>=1.4.0"]
 
 [project.scripts]
-
+turban_download_datafiles="turban.utils.cli:download_datafiles"
 
 [build-system]
 requires = ["setuptools"]

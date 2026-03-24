@@ -3,7 +3,7 @@ import os
 import pytest
 import json
 from turban.instruments.microrider import rsConfig_parser
-from tests.filepaths import microrider_data_directory
+from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
 

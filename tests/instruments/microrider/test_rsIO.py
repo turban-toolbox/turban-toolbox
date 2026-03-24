@@ -10,7 +10,7 @@ import numpy as np
 from scipy.io import loadmat
 
 from turban.instruments.microrider import rsIO, rsConfig_parser, rsCommon
-from tests.filepaths import microrider_data_directory
+from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
 data_url = "https://share.hereon.de/index.php/s/AqMdY8Q47FPQHQR/download"

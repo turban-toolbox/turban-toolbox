@@ -2,7 +2,7 @@ import xarray as xr
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 import matplotlib.pyplot as plt
 
-from tests.filepaths import atomix_benchmark_faroe_fpath
+from turban.utils.filepaths import atomix_benchmark_faroe_fpath
 
 
 def test_compare_turban_to_atomix_faroe_example():

@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from tests import filepaths
+from turban.utils import filepaths
 
 
 @pytest.fixture

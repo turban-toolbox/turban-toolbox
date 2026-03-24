@@ -4,7 +4,7 @@ import numpy as np
 
 from turban import ShearProcessing
 from turban.utils.plot.shear import plot_level2
-from tests.filepaths import atomix_benchmark_baltic_fpath
+from turban.utils.filepaths import atomix_benchmark_baltic_fpath
 
 
 def test_spectra_atomix_baltic():

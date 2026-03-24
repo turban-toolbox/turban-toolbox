@@ -1,4 +1,3 @@
-import logging
 import os
 from pathlib import Path
 import requests
@@ -8,7 +7,9 @@ import tempfile
 from urllib.parse import urlparse
 from zipfile import ZipFile, BadZipFile
 
-logger = logging.getLogger(__name__)
+from turban import logger_manager
+
+logger = logger_manager.get_logger(__name__)
 
 DATA_DOWNLOAD_LINK = "https://share.hereon.de/index.php/s/D89zzgAbdLcCc7m/download"
 ARCHIVE_NAME = "Turban"  # Top level directory name of the link
@@ -46,9 +47,10 @@ class FilePaths:
 
     def __init__(self) -> None:
         self.filepaths: list[str] = []
-        self.top_level: str = Path(__file__).resolve().parent.parent
+        self.top_level: Path = Path(__file__).resolve().parent.parent
         self.url: str = ""
-
+        self._is_data_downloaded = False
+        
     def add(self, path: str | Path) -> str:
         """Adds given string or Path object to the registry.
 
@@ -70,9 +72,10 @@ class FilePaths:
         '''
         flag = os.getenv('TURBAN_AUTO_DOWNLOAD_TEST_FILES')
         if not flag is None and flag.strip()=='1':
+            logger.info(f"Environment variable TURBAN_AUTO_DOWNLOAD_TEST_FILES is set. Checking need for download.")
             self.download_data_if_necessary()
             
-    def download_data_if_necessary(self) -> None:
+    def download_data_if_necessary(self):
         """Download if one or more data files are missing
 
         This method checks if all required files are existing on the current system,
@@ -82,24 +85,29 @@ class FilePaths:
         Data download, and extraction are done in a temporary directoy, before being moved
         to the expected location.
         """
+        if self._is_data_downloaded:
+            return
         download_required = False
         for p in self.filepaths:
             if not p.exists():
-                logger.debug(f"File {str(p)} is missing.")
+                logger.info(f"File {str(p)} is missing.")
                 download_required = True
-                break
-        logger.debug(f"Dowloading is required: {download_required}")
         if download_required:
-            logger.info("Downloading test data files...")
-            url = self.url or DATA_DOWNLOAD_LINK
-            with tempfile.TemporaryDirectory(prefix="turban_", dir=None) as tmpdir:
-                dest_dir = Path(tmpdir)
-                zip_file = self.download_as_zip(url, dest_dir)
-                logger.debug(f"Downloaded {zip_file}.")
-                self.safe_extract_zip(zip_file, dest_dir)
-                copytree(dest_dir / ARCHIVE_NAME, self.top_level)
-            logger.info("Download completed.")
-
+            self.download_data()
+        self._is_data_downloaded = download_required # if downloaded this session, we will not do so again.
+            
+    def download_data(self) -> None:
+        """Downloads test and benchmark data files from external server"""
+        logger.info("Downloading...")
+        url = self.url or DATA_DOWNLOAD_LINK
+        with tempfile.TemporaryDirectory(prefix="turban_", dir=None) as tmpdir:
+            dest_dir = Path(tmpdir)
+            zip_file = self.download_as_zip(url, dest_dir)
+            logger.debug(f"Downloaded {zip_file}.")
+            self.safe_extract_zip(zip_file, dest_dir)
+            copytree(dest_dir / ARCHIVE_NAME, self.top_level)
+        logger.info("Download completed.")
+        
     def download_as_zip(self, url: str, dest_dir: str | Path, timeout: int = 30) -> str:
         """Download URL and write as a zip file
 
@@ -181,23 +189,6 @@ filepaths.add("data/instruments/microrider/data_0413.p")
 filepaths.add("data/instruments/microrider/setupstring_0413.txt")
 filepaths.add("data/instruments/microrider/setupstring_058.txt")
 
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Manage test data files for turban-toolbox"
-    )
-    parser.add_argument(
-        "--download",
-        action="store_true",
-        help="Download test data files if necessary",
-    )
-
-    args = parser.parse_args()
-
-    if args.download:
-        filepaths.download_data_if_necessary()
-else:
-    # imported as module: checks TURBAN_AUTO_DOWNLOAD_TEST_FILES environment variable to be set before downloading
-    filepaths.auto_download_data_if_necessary()
+# imported as module: checks TURBAN_AUTO_DOWNLOAD_TEST_FILES environment variable to be set before downloading
+filepaths.auto_download_data_if_necessary()
     
