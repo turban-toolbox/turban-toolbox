@@ -47,7 +47,7 @@ class FilePaths:
 
     def __init__(self) -> None:
         self.filepaths: list[str] = []
-        self.top_level: Path = Path(__file__).resolve().parent.parent
+        self.top_level: Path = Path(__file__).resolve().parent.parent.parent
         self.url: str = ""
         self._is_data_downloaded = False
         
