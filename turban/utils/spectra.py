@@ -45,17 +45,21 @@ def spectrum(
         Dissipation chunk overlap.
     section_number : ndarray of int, shape (time_fast,), optional
         Section markers.
-    reshape_index : ndarray of int, shape (diss_chunk, fft_chunk, segment_length), optional
+    reshape_index : ndarray of int, shape (diss_chunk, chunk_length), optional
         Precomputed reshaping index. If not provided, is calculated from other parameters.
     y : ndarray, shape (... time_fast), optional
         If provided, compute cross spectral density instead of PSD.
+    kind : {"diagonal", "cross"}, optional
+        Type of spectral density to compute. "diagonal" computes PSD (or CSD with y).
+        "cross" computes cross-spectral density between all pairs of inputs.
     **estimator_kwarg
         Additional keyword arguments passed to welch or csd.
 
     Returns
     -------
-    psi : ndarray, shape (... chunk freq)
-        Power spectral density (PSD) or cross spectral density (CSD).
+    psi : ndarray
+        Power spectral density or cross spectral density. For kind="diagonal",
+        shape is (nx ... chunk freq). For kind="cross", shape is (nx ny ... chunk freq).
     freq : ndarray, shape (freq,)
         Frequency array.
     """
@@ -130,13 +134,14 @@ def apply_var_conserve(
         Power spectral density. Modified in-place.
     dfreq : float
         Frequency resolution.
-    signal_reshape : ndarray, shape (nshear, chunks, freq)
-        Reshaped signal used for variance calculation.
+    signal_reshape : ndarray, shape (nshear, chunk, freq)
+        Reshaped signal (time series) used for variance calculation. Typically
+        the reshaped input signal after applying reshape_index.
 
     Returns
     -------
     ndarray, shape (*any,)
-        Correction factors applied to psi.
+        Correction factors applied to psi (variance ratio per chunk).
     """
     intpsi = psi[..., 1:].sum(axis=-1) * dfreq  # disregard first frequency
     signal_reshape = np.ascontiguousarray(
@@ -156,6 +161,30 @@ def remove_vibration_goodman(
     Float[ndarray, "freq"],  # frequencies
     Num[ndarray, "nsig nsig ntime nfreq"],  # uncleaned
 ]:
+    """Remove vibration contamination from shear probe signals using Goodman method.
+
+    Applies the vibration removal technique as described in the ATOMIX shear paper
+    (Eqs. 15-16) to remove coherent vibration noise from multi-channel shear
+    measurements.
+
+    Parameters
+    ----------
+    signal : ndarray, shape (nsig, time_fast)
+        Shear probe signals to clean.
+    vib : ndarray, shape (nvib, time_fast)
+        Vibration reference signals.
+    **kwarg
+        Keyword arguments passed to spectrum(), including:
+
+    Returns
+    -------
+    psi_f_shear_cleaned : ndarray, shape (nsig, nsig, ntime, nfreq)
+        Cross-spectral density with vibration noise removed and boost correction applied.
+    freq : ndarray, shape (nfreq,)
+        Frequency array.
+    psi_f_sig : ndarray, shape (nsig, nsig, ntime, nfreq)
+        Original uncleaned cross-spectral density of shear signals.
+    """
     if kwarg.get("reshape_index") is None:
         kwarg["reshape_index"] = get_chunking_index(
             kwarg["section_number"],
