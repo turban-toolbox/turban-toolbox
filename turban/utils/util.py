@@ -347,7 +347,7 @@ def atleast_nd_last(arr: Float[ndarray, "... dim0"], targetshape: tuple[int, ...
     return arr
 
 
-def butterfilt(signal, cutoff_freq_Hz, sampfreq, **kwarg):
+def butterfilt(signal, cutoff_freq_Hz, sampfreq, axis=-1, **kwarg):
     """Apply first-order Butterworth filter.
 
     Parameters
@@ -369,7 +369,7 @@ def butterfilt(signal, cutoff_freq_Hz, sampfreq, **kwarg):
     # nondimensionalize using Nyquist freq
     cutoff_nondim = cutoff_freq_Hz / (sampfreq / 2)
     b, a = butter(N=1, Wn=cutoff_nondim, **kwarg)
-    return filtfilt(b, a, signal)
+    return filtfilt(b, a, signal, axis=axis)
 
 
 def channel_mapping(json_fname, *channel_names):
