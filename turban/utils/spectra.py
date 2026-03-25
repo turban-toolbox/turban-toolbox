@@ -145,3 +145,56 @@ def apply_var_conserve(
     corr_factor = np.var(signal_reshape, axis=-1) / intpsi
     psi *= corr_factor[..., newaxis]
     return corr_factor
+
+
+def remove_vibration_goodman(
+    signal: Float[ndarray, "nsig time_fast"],
+    vib: Float[ndarray, "nvib time_fast"],
+    **kwarg,
+) -> tuple[
+    Num[ndarray, "nsig nsig ntime nfreq"],  # vibrations removed
+    Float[ndarray, "freq"],  # frequencies
+    Num[ndarray, "nsig nsig ntime nfreq"],  # uncleaned
+]:
+    if kwarg.get("reshape_index") is None:
+        kwarg["reshape_index"] = get_chunking_index(
+            kwarg["section_number"],
+            (kwarg["chunk_length"], kwarg["chunk_overlap"]),
+        )
+
+    psi_f_sig: Num[ndarray, "nsig nsig ntime nfreq"]
+    psi_f_vib: Num[ndarray, "nvib nvib ntime nfreq"]
+    psi_f_shear_vib: Num[ndarray, "nsig nvib ntime nfreq"]
+
+    psi_f_sig, freq = spectrum(signal, kind="cross", **kwarg)
+    psi_f_vib, _ = spectrum(vib, kind="cross", **kwarg)
+    psi_f_shear_vib, _ = spectrum(signal, y=vib, kind="cross", **kwarg)
+
+    # Eqn 15 in ATOMIX shear paper
+    # invert psi_f_vib over first two (matrix) dimensions
+    try:
+        psi_f_vib_inv = np.moveaxis(
+            np.linalg.inv(np.moveaxis(psi_f_vib, [0, 1], [-2, -1])), [-2, -1], [0, 1]
+        )
+    except np.linalg.LinAlgError:
+        psi_f_vib_inv = np.zeros_like(psi_f_vib)
+    # move axes so we can use the standard matrix multiplication operator @
+    A: Num[ndarray, "ntime nfreq nsig nvib"]
+    A = np.moveaxis(psi_f_shear_vib, [0, 1], [-2, -1])
+    B: Num[ndarray, "ntime nfreq nvib nvib"]
+    B = np.moveaxis(psi_f_vib_inv, [0, 1], [-2, -1])
+    Aconj: Num[ndarray, "ntime nfreq nvib nsig"]
+    Aconj = np.moveaxis(psi_f_shear_vib.conj(), [0, 1], [-2, -1]).swapaxes(-2, -1)
+    psi_f_noise: Num[ndarray, "nsig nsig ntime nfreq"]
+    psi_f_noise = np.moveaxis(A @ B @ Aconj, [-2, -1], [0, 1])
+    psi_f_shear_cleaned = psi_f_sig - psi_f_noise
+
+    # boost cleaned spectrum using Eq. 16 of ATOMIX shear paper
+    chunk_length: int = kwarg["reshape_index"].shape[1]
+    segment_length = kwarg["segment_length"]
+    fft_segments = int(np.floor(2 * chunk_length / segment_length)) - 1
+    vibration_signals = vib.shape[0]
+    boost = 1 - 1.02 * vibration_signals / fft_segments
+    # print(vibration_signals, fft_segments, chunk_length, segment_length, boost)
+    psi_f_shear_cleaned /= boost
+    return psi_f_shear_cleaned, freq, psi_f_sig
