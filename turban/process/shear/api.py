@@ -151,6 +151,22 @@ class ShearLevel3(Level3):
         data: ShearLevel2,
     ) -> dict:
         kwarg = super()._from_level_below_kwarg(data)
+
+        vib: Float[ndarray, "nvib time"] | None
+        if data.cfg.vibration_channels:
+            vibdata = []
+            if data._aux_data is not None:
+                for channel in data.cfg.vibration_channels:
+                    if channel in data._aux_data:
+                        vibdata.append(data._aux_data[channel][1])
+                    else:
+                        logger.error(
+                            f"Requested vibration removal, but channel {channel} missing from aux data"
+                        )
+            vib = np.stack(vibdata) if vibdata else None
+        else:
+            vib = None
+
         k, psi_k_sh, psi_f_sh, freq, senspeed, section_number = process_level3(
             shear=data.shear,
             senspeed=data.senspeed,
@@ -162,6 +178,7 @@ class ShearLevel3(Level3):
             segment_overlap=data.cfg.segment_overlap,
             chunk_length=data.cfg.chunk_length,
             chunk_overlap=data.cfg.chunk_overlap,
+            vib=vib,
         )
 
         spikes_per_chunk = agg_fast_to_slow(

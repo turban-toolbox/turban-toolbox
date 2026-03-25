@@ -3,10 +3,11 @@ import numpy as np
 from jaxtyping import Float, Int
 
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
-from turban.utils.spectra import spectrum
+from turban.utils.spectra import spectrum, remove_vibration_goodman
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
 
 def process_level3(
     shear: Float[ndarray, "nshear time_fast"],
@@ -19,6 +20,7 @@ def process_level3(
     spatial_response_wavenum: float,
     freq_highpass: float,
     section_number: Int[ndarray, "time_fast"],
+    vib: Float[ndarray, "nvib time_fast"] | None = None,
 ) -> tuple[
     Float[ndarray, "time_slow k"],  # k
     Float[ndarray, "nshear time_slow waveno"],  # psi_k_sh
@@ -73,15 +75,25 @@ def process_level3(
         (segment_length, segment_overlap),
     )
 
-    psi_f, freq = spectrum(
-        shear,
-        sampfreq,
+    specarg = dict(
+        sampfreq=sampfreq,
         section_number=section_number,
         chunk_length=chunk_length,
         chunk_overlap=chunk_overlap,
         segment_length=segment_length,
         segment_overlap=segment_overlap,
     )
+
+    # raise ValueError(reshape_index.dtype)
+    if vib is None:
+        psi_f, freq = spectrum(shear, **specarg)
+
+    else:
+        # vibration removal
+        # TODO this currently also deals with off-diagonal elements following
+        # ATOMIX shear paper Eq. 15 - can speed up by omitting them
+        psi_f_cross, freq, _ = remove_vibration_goodman(shear, vib, **specarg)
+        psi_f = psi_f_cross[np.arange(2), np.arange(2)].real  # only autospectra
 
     # platform speed
     senspeeda = agg_fast_to_slow(
@@ -100,8 +112,6 @@ def process_level3(
     waveno: Float[ndarray, "time_slow k"] = freq[newaxis, :] / senspeeda[:, newaxis]
 
     _ = apply_compensation_spatial_response(psi_k, waveno, spatial_response_wavenum)
-
-    # apply_removal_coherent_vibrations(P) # TODO
 
     return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow
 
