@@ -72,6 +72,73 @@ logger_manager = LoggerManager()
 logger = logger_manager.get_logger(__name__)
 ```
 
+Optionally, one can set the log levels for all loggers
+```python
+logger_manager.set_level("warning")
+```
+and tailor the level for a group of loggers (using a regular
+expression)
+```python
+logger_manager.set_level("info", "^turban\.instruments")
+```
+and the logger just created
+```python
+logger_manager.set_level("debug", logger.name)
+```
+
+If a logger is created, an LoggerConfig object can be supplied which
+configures the behaviour of this specific logger. The default
+LoggerConfig configures a logger to write to stderr. However, it is
+easy to change this behaviour in order to write the log messages to a
+file.
+
+```python
+from turban.utils.logging import LoggerManager, LoggerConfig
+import logging
+
+
+logger_manager = LoggerManager()
+logger_stderr = logger_manager.get_logger(__name__)
+
+# define a custom handler
+handler = logging.FileHandler("/tmp/mylogs.txt")
+logger_config = LoggerConfig(handler=handler)
+
+# Make sure we use a unique name when creating a logger to write 
+# to a file, otherwise the configuration of the existing logger will
+# be overriden.
+logger_file = logger_manager.get_logger(__name__+"file",
+                                        config=logger_config)
+
+# set the log level of them *both* to "debug", because the regex
+# formed by with the logger.name matches both loggers...
+
+logger_manager.set_level("debug", logger.name)
+
+logger_file.debug("This message goes to a file")
+logger_stderr.debug("This message goes to stderr")
+```
+
+Two functions are provided as short-hand. To get a logger with a
+default configuration
+
+```python
+import turban
+
+logger = turban.get_logger(__name__)
+```
+and set the logging level of a specific logger
+```python
+import turban
+
+set_turban_loglevel("DEBUG", "turban.instruments.mss")
+```
+
+Note that the ```set_turban_loglevel``` assumes the logger name to be
+fully qualified, that is, a logger name "mss" would not set the logger
+with name "turban.instruments.mss".
+
+
 The class ```LoggerManager``` is implemented as a singleton, so that
 any instance creation returns always the same object, irrespective if
 an instance was created in some other module. The ```logger```
@@ -89,7 +156,7 @@ import turban.utils.logging as turban_logging
 
 
 logger_manager = turban_logging.LoggerManager()
-logger_manager.set_level("info", "turban.*")
+logger_manager.set_level("info", "^turban.*")
 logger_manager.set_level('debug', 'rsIO')
 ```
 This would set all turban loggers to the INFO level, apart from the
