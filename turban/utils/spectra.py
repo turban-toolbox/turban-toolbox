@@ -10,12 +10,12 @@ from turban.utils.util import get_chunking_index
 def spectrum(
     x: Float[ndarray, "... time_fast"],
     sampfreq: float,
-    segment_length: int | None = None,
-    segment_overlap: int | None = None,
+    segment_length: int,
+    segment_overlap: int,
     chunk_length: int | None = None,
     chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk chunk_length"] | None = None,
     y: (
         Float[ndarray, "... time_fast"] | None
     ) = None,  # if not None, return cross spectral density
@@ -64,8 +64,6 @@ def spectrum(
             section_number,
             (chunk_length, chunk_overlap),
         )
-    else:
-        segment_length = reshape_index.shape[-1]
 
     kwarg = dict(
         axis=-1,
