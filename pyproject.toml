@@ -20,7 +20,7 @@ dependencies = [
   'pydantic>=2.0',
   'requests',
   'scipy>=1.10',
-  'setuptools',
+  'setuptools>=65',
   'xarray>=2022.11',
 ]
 
