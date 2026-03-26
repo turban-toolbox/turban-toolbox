@@ -13,7 +13,7 @@ logger = logger_manager.get_logger(__name__)
 
 DATA_DOWNLOAD_LINK = "https://share.hereon.de/index.php/s/D89zzgAbdLcCc7m/download"
 ARCHIVE_NAME = "Turban"  # Top level directory name of the link
-
+TURBAN_AUTO_DOWNLOAD_TEST_FILES = 'TURBAN_AUTO_DOWNLOAD_TEST_FILES'
 
 def copytree(src, dst, *, overwrite=True):
     src = Path(src)
@@ -70,12 +70,24 @@ class FilePaths:
         '''Download files if one or more data are missing, if and only if, the environment
            variable TURBAN_AUTO_DOWNLOAD_TEST_FILES is set to 1.
         '''
-        flag = os.getenv('TURBAN_AUTO_DOWNLOAD_TEST_FILES')
+        flag = os.getenv(TURBAN_AUTO_DOWNLOAD_TEST_FILES)
         if not flag is None and flag.strip()=='1':
             logger.info(f"Environment variable TURBAN_AUTO_DOWNLOAD_TEST_FILES is set. Checking need for download.")
             self.download_data_if_necessary()
-            
-    def download_data_if_necessary(self):
+        else:
+            logger.info(f"Environment variable TURBAN_AUTO_DOWNLOAD_TEST_FILES is not set. Not downloading automatically.")
+
+    def is_download_required(self) -> bool:
+        download_required = False
+        for p in self.filepaths:
+            if not p.exists():
+                logger.info(f"File {str(p)} is missing.")
+                download_required = True
+            else:
+                logger.info(f"File {str(p)} is present.")
+        return download_required
+
+    def download_data_if_necessary(self) -> None:
         """Download if one or more data files are missing
 
         This method checks if all required files are existing on the current system,
@@ -85,16 +97,12 @@ class FilePaths:
         Data download, and extraction are done in a temporary directoy, before being moved
         to the expected location.
         """
+        logger.debug(f"is already downloaded: {self._is_data_downloaded}")
         if self._is_data_downloaded:
             return
-        download_required = False
-        for p in self.filepaths:
-            if not p.exists():
-                logger.info(f"File {str(p)} is missing.")
-                download_required = True
-        if download_required:
+        if self.is_download_required():
             self.download_data()
-        self._is_data_downloaded = download_required # if downloaded this session, we will not do so again.
+            self._is_data_downloaded = True # if downloaded this session, we will not do so again.
             
     def download_data(self) -> None:
         """Downloads test and benchmark data files from external server"""
