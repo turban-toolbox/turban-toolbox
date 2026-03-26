@@ -18,20 +18,11 @@ TURBAN uses black for the code style. Settings are given in `pyproject.toml` (an
 
 ## Tests
 
-TURBAN uses `pytest` for unit testing:
-```bash
-python -m pytest --cov=turban --cov-report html
-```
-Settings are defined in `pyproject.toml`.
+TURBAN uses `pytest` for unit testing. Settings are defined in `pyproject.toml`.
 
-Markdown documents with python snippets can be tested as well, e.g.:
+To run tests, e.g. with test coverage:
 ```bash
-python -m pytest --markdown-docs --markdown-docs-syntax=superfences docs/
-```
-
-To generate a test coverage report:
-```bash
-python -m pytest --markdown-docs --markdown-docs-syntax=superfences 
+python -m pytest --cov=turban --cov-report html tests/ docs/
 ```
 
 ## Code base overview
