@@ -14,7 +14,7 @@ dependencies = [
   'jaxtyping>=0.2.20',
   'matplotlib>=3.6',
   'netCDF4>=1.6',
-  'numba>=0.57',
+  'numba>=0.58',
   'numpy>=2.0',
   'pandas>=1.5',
   'pydantic>=2.0',
@@ -24,7 +24,7 @@ dependencies = [
   'xarray>=2022.11',
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "README.md"
 classifiers = [
   'Development Status :: 4 - Beta',
@@ -70,7 +70,7 @@ log_cli_level = "WARNING"
 
 [tool.black]
 line-length = 88
-target-version = ['py310', 'py311', 'py312', 'py313', 'py314']
+target-version = ['py311', 'py312', 'py313', 'py314']
 include = '\.pyi?$'
 exclude = '''
 
