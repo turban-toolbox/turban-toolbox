@@ -10,7 +10,7 @@ authors = [
 license = { text = "GPLv03" }
 dependencies = [
   'beartype>=0.16',
-  'gsw',
+  'gsw>=3.6',
   'jaxtyping>=0.2.20',
   'matplotlib>=3.6',
   'netCDF4>=1.6.3',
@@ -18,7 +18,7 @@ dependencies = [
   'numpy>=2.0',
   'pandas>=1.5',
   'pydantic>=2.0',
-  'requests',
+  'requests>=2.32.0',
   'scipy>=1.10',
   'setuptools>=65',
   'xarray>=2022.11',
@@ -41,11 +41,11 @@ dev = [
     "ipython>=8.18.1",
     "mypy>=1.19.1",
     "pytest>=8.4.2",
-    "pytest-cov",
-    "mkdocs",
-    "pytest-markdown-docs",
-    "pymdown-extensions",
-    "mkdocstrings[python]",
+    "pytest-cov>=6.0",
+    "mkdocs>=1.6",
+    "pytest-markdown-docs>=0.6",
+    "pymdown-extensions>=10.8",
+    "mkdocstrings[python]>=0.24",
 ]
 mss = ["pytz", "dateparser"]
 microrider = ["arrow>=1.4.0"]
