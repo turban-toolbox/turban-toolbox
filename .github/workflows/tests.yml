@@ -10,7 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.13"]
+        include:
+          - python-version: "3.14"
+          - python-version: "3.9"
+            minimum-deps: true
 
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +24,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
+        if: ${{ !matrix.minimum-deps }}
         run: uv sync --all-groups
+
+      - name: Install minimum dependencies
+        if: ${{ matrix.minimum-deps }}
+        run: uv sync --all-groups --resolution=lowest-direct
 
       - name: Cache test data
         uses: actions/cache@v4
