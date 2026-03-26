@@ -59,7 +59,6 @@ control over the formatting and logging level of various loggers used
 in the code tree and in dependency modules, TURBAN provides a
 `LoggerManager`.
 
-
 ### Use in modules
 Using a logger instance, dedicated to a specific module allows for
 logger messages, that can be traced to a specific module. Typically
