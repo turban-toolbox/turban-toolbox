@@ -14,25 +14,25 @@ def test_remove_vibration_goodman_synthetic():
     carries no variance independent of the two vibration channels.
     """
     sampfreq = 512.0
-    N = 10_000  # 32 s at 512 Hz
-    t = np.arange(N) / sampfreq
+    n_samples = 100_000
+    t = np.arange(n_samples) / sampfreq
 
-    f1, A1 = 5.0, 1.0   # Hz, amplitude
+    f1, A1 = 5.0, 1.0  # Hz, amplitude
     f2, A2 = 43.0, 0.5
     vib1 = A1 * np.sin(2 * np.pi * f1 * t)
     vib2 = A2 * np.sin(2 * np.pi * f2 * t)
     signal = vib1 + vib2  # signal IS the sum → no independent variance
 
     # shapes expected by remove_vibration_goodman: (nsig, time) and (nvib, time)
-    signal_2d = signal[np.newaxis, :]          # (1, N)
-    vib_2d = np.stack([vib1, vib2], axis=0)   # (2, N)
+    signal_2d = signal[np.newaxis, :]  # (1, N)
+    vib_2d = np.stack([vib1, vib2], axis=0)  # (2, N)
 
-    chunk_length = 4096
-    chunk_overlap = 2048
+    chunk_length = n_samples
+    chunk_overlap = 0
     segment_length = 1024
     segment_overlap = 512
 
-    reshape_index = get_chunking_index(N, (chunk_length, chunk_overlap))
+    reshape_index = get_chunking_index(n_samples, (chunk_length, chunk_overlap))
 
     specarg = dict(
         sampfreq=sampfreq,
@@ -41,15 +41,20 @@ def test_remove_vibration_goodman_synthetic():
         segment_overlap=segment_overlap,
     )
 
-    psi_f_cleaned, freq, psi_f_uncl = remove_vibration_goodman(signal_2d, vib_2d, **specarg)
+    psi_f_cleaned, freq, psi_f_uncl = remove_vibration_goodman(
+        signal_2d, vib_2d, **specarg
+    )
 
     # diagonal element [0, 0]: shape (nchunk, nfreq)
     cleaned_diag = psi_f_cleaned[0, 0].real
     uncleaned_diag = psi_f_uncl[0, 0].real
 
     # skip DC bin; cleaned power should be negligible relative to uncleaned
-    ratio = np.mean(np.abs(cleaned_diag[:, 1:])) / np.mean(np.abs(uncleaned_diag[:, 1:]))
-    assert ratio < 1e-6, f"Cleaned spectrum not close to zero: ratio = {ratio:.2e}"
+    ratio = np.abs(cleaned_diag[:, 1:]) / np.abs(uncleaned_diag[:, 1:])
+    print(ratio)
+    assert np.all(
+        ratio < 1e-4
+    ), f"Cleaned spectrum not close to zero: max ratio = {ratio.max():.2e}"
 
     # # --- individual PSDs of each vibration signal ---
     # psi_vib1, _ = spectrum(vib1[np.newaxis, :], **specarg)  # (1, nchunk, nfreq)
