@@ -9,7 +9,7 @@ When reviewing a pull request, pay particular attention to:
 ### Tests (tests/)
 - Every new public function or class in `turban/` should have a corresponding test in `tests/`.
 - Tests should cover the main use case and at least one edge case (e.g. empty input, mismatched shapes, boundary values).
-- New fixtures or shared data paths must be registered in `tests/filepaths.py`.
+- New fixtures or shared data paths must be registered in `turban/utils/filepaths.py`.
 - Flag if only trivial "smoke tests" are present for non-trivial logic.
 
 ### Documentation (docs/)
