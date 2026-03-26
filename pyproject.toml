@@ -13,7 +13,7 @@ dependencies = [
   'gsw',
   'jaxtyping>=0.2.20',
   'matplotlib>=3.6',
-  'netCDF4>=1.6',
+  'netCDF4>=1.6.3',
   'numba>=0.58',
   'numpy>=2.0',
   'pandas>=1.5',
