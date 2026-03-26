@@ -64,7 +64,7 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"
-addopts = "--markdown-docs-syntax=superfences"
+addopts = "--markdown-docs --markdown-docs-syntax=superfences"
 log_cli = false
 log_cli_level = "WARNING"
 

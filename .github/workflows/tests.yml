@@ -30,4 +30,4 @@ jobs:
       - name: Run tests
         env:
           TURBAN_AUTO_DOWNLOAD_TEST_FILES: "1"
-        run: uv run pytest tests/
+        run: uv run pytest tests/ docs/
