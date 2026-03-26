@@ -12,8 +12,13 @@ python -m pip install -e . --group mss --group microrider
 
 Example data, also needed for the unit tests, can be downloaded using:
 ```bash
-python tests/filepaths.py --download
+turban_download_datafiles
 ```
+Alternatively the environment variable TURBAN_AUTO_DOWNLOAD_DATAFILES
+can be set to 1, which has the effect that data are downloaded
+automatically when a test is run. The command
+```turban_download_datafiles``` accepts the option ```--force``` which
+downloads all data, even if they have been downloaded before.
 
 ### Using the high-level ShearProcessing pipeline
 

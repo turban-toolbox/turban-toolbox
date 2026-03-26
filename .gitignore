@@ -27,3 +27,6 @@ data/
 scraps/
 
 .coverage
+
+*~
+uv.lock

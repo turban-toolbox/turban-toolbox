@@ -238,7 +238,7 @@ class ShearLevel3(Level3):
 
     @property
     def log_psi_var(self):
-        """sigma^2_{ln\Psi} in the ATOMIX paper"""
+        r"""sigma^2_{ln\Psi} in the ATOMIX paper"""
         return (
             5
             / 4
@@ -263,7 +263,7 @@ class ShearLevel3(Level3):
 
     @property
     def data_length(self) -> Float[ndarray, "time"]:
-        """l_\epsilon in ATOMIX paper"""
+        r"""l_\epsilon in ATOMIX paper"""
         tau_eps = self.cfg.chunk_length / self.cfg.sampfreq
         return tau_eps * self.senspeed
 

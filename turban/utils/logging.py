@@ -167,7 +167,7 @@ class LoggerManager:
             loggers. If None, all loggers' levels are set.
         """
         if isinstance(level, str):
-            _level = self._levels[level]
+            _level = self._levels[level.lower()]
         else:
             _level = level
 
