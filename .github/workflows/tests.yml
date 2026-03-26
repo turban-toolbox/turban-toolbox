@@ -2,6 +2,8 @@ name: Tests
 
 on:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
   test:
@@ -30,4 +32,12 @@ jobs:
       - name: Run tests
         env:
           TURBAN_AUTO_DOWNLOAD_TEST_FILES: "1"
-        run: uv run pytest tests/ docs/
+        run: uv run pytest tests/ docs/ --cov=turban --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.13'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: true
