@@ -25,6 +25,19 @@ To run tests, e.g. with test coverage:
 python -m pytest --cov=turban --cov-report html tests/ docs/
 ```
 
+### Continuous integration
+
+CI runs two environments on every push and pull request:
+
+| Python | Dependencies | Purpose |
+|--------|-------------|---------|
+| 3.14 | latest | catch breakage on current Python |
+| 3.11 | minimum (`--resolution=lowest-direct`) | verify declared lower bounds in `pyproject.toml` are sufficient |
+
+Python 3.11 is the minimum supported version (`requires-python = ">=3.11"`), enforced by use of `match` statements and `typing.Self`.
+
+Coverage reports are uploaded to Codecov from the 3.14 run only.
+
 ## Code base overview
 
 ### Directory structure
