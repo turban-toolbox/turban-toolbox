@@ -548,7 +548,7 @@ def _integrate_simple(
     x_to: float,
 ):
     y_zero = np.where((x_from <= x) & (x <= x_to), y, 0)
-    return np.trapz(y_zero, x=x)
+    return np.trapezoid(y_zero, x=x)
 
 
 def integrate(
@@ -577,7 +577,7 @@ def integrate(
     """
     y_zero = np.where((x_from[..., newaxis] <= x) & (x <= x_to[..., newaxis]), y, 0.0)
     # TODO: handle all-nan spectra
-    return np.trapz(y_zero, x=x, axis=-1)
+    return np.trapezoid(y_zero, x=x, axis=-1)
 
 
 def diss_chunk_wise_reshape_index(
