@@ -5,7 +5,8 @@ import numpy as np
 from turban.utils.util import get_chunking_index
 from turban.utils.spectra import remove_vibration_goodman, spectrum
 
-from tests.filepaths import atomix_benchmark_faroe_fpath
+from turban.utils.filepaths import atomix_benchmark_faroe_fpath
+
 
 
 @pytest.mark.parametrize("phase_deg", [0, 90, 180, 270])
