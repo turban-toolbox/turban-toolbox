@@ -87,9 +87,9 @@ configuration, which is accessible through the LoggerManager.
 
 Typical use of a logger is to inject feedback information in the code,
 for example
-```python
+```python continuation
 logger.debug("This is a debug message.")
-logger.info(f"{number_of_files} files have been read...")
+logger.info(f"3 files have been read...")
 logger.warning("This is a warning")
 logger.error("Fatal!")
 ```
@@ -106,6 +106,7 @@ The example below demonstrates how a LoggerConfig object can be used
 to log the messages to a file, rather than /dev/sdterr.
 
 ```python
+import logging
 from turban.utils.logging import LoggerManager, LoggerConfig
 
 logger_manager = LoggerManager()
@@ -117,8 +118,6 @@ logger_config = LoggerConfig(handler=handler)
 # create a logger with modified logging behaviour
 logger = logger_manager.get_logger(__name__, logger_config)
 
-:
-:
 logger.debug("This message goes to a file")
 ```
 
