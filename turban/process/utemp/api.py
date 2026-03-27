@@ -22,6 +22,10 @@ from turban.process.generic.api import (
     Processing,
 )
 
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass(kw_only=True)
 class UTempLevel1(Level1):
