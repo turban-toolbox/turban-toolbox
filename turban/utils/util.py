@@ -166,7 +166,7 @@ def agg_fast_to_slow(
     chunk_length: int | None = None,
     chunk_overlap: int | None = None,
     agg_method: Literal["take_first", "take_mid", "take_last"] | str = "mean",
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk fft_chunk"] | None = None,
 ) -> Shaped[ndarray, "*any time_slow"]:
     """
     Aggregate any quantities from fast sampling rate (e.g., shear timeseries)

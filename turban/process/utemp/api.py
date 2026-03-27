@@ -74,6 +74,7 @@ class UTempLevel2(Level2):
                 senspeed=level1.senspeed,
                 # num_despike_iter=num_despike_iter,
                 level_below=level1,
+                cfg=cfg,
             )
         )
         return kwarg
