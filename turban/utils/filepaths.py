@@ -186,7 +186,7 @@ mss_mrd_fpath = filepaths.add("data/instruments/mss/Nien0020.MRD")
 mss_probeconf_json_fpath = filepaths.add(
     "data/instruments/mss/probeconf_mss053_2024.json"
 )
-mss_utemp_mrd_fpath = filepaths.add("data/instruments/mss/probeconf_mss053_2024.json")
+mss_utemp_mrd_fpath = filepaths.add("data/instruments/mss/AO2024_0037.MRD")
 
 microrider_data_directory = filepaths.add("data/instruments/microrider")
 # make sure that individual files are present:
