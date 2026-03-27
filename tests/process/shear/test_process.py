@@ -64,6 +64,27 @@ def test_agg_aux():
     assert p_from_level1.level4.to_xarray().equals(p_from_atomix.level4.to_xarray())
 
 
+def test_goodman_config():
+    l2 = ShearLevel2.from_atomix_netcdf(atomix_benchmark_faroe_fpath)
+    l3_vib = ShearLevel3.from_level_below(l2)
+
+    # now with vibration removal
+    ds = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L2_cleaned")
+    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=0).values, "vib1")
+    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=1).values, "vib2")
+    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=2).values, "vib3")
+    l2.cfg.vibration_channels = ("vib1", "vib2", "vib3")
+    l3_novib = ShearLevel3.from_level_below(l2)
+
+    fig, ax = plt.subplots()
+    ax.loglog(l3_vib.freq, l3_vib.psi_f_sh[0].mean(axis=0), label="Uncleaned")
+    ax.loglog(
+        l3_vib.freq, l3_novib.psi_f_sh[0].mean(axis=0), label="Vibrations removed"
+    )
+    ax.legend()
+    fig.savefig("out/tests/process/shear/goodman.png")
+
+
 def test_baltic_benchmark():
 
     aux_vars = ["time", "press", "temp", "cond"]
