@@ -146,6 +146,7 @@ class UTempLevel3(Level3):
                 senspeed=senspeed_avg,
                 section_number=section_number_slow,
                 level_below=level2,
+                cfg=cfg,
             )
         )
         return kwarg
@@ -175,6 +176,7 @@ class UTempLevel4(Level4):
                 chi=chi,
                 eps=eps,
                 level_below=level3,
+                cfg=cfg,
             )
         )
         return kwarg
