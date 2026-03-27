@@ -70,7 +70,6 @@ def process_level3(
     ii = get_chunking_index(
         section_number,
         (chunk_length, chunk_overlap),
-        (segment_length, segment_overlap),
     )
 
     psi_f, freq = spectrum(
@@ -84,14 +83,13 @@ def process_level3(
     )
 
     # platform speed
-    senspeeda = agg_fast_to_slow(
-        senspeed,
-        section_number_or_data_len=section_number,
-        chunk_length=chunk_length,
-        chunk_overlap=chunk_overlap,
+    senspeeda: Float[ndarray, "time_slow"] = agg_fast_to_slow(
+        senspeed, reshape_index=ii
     )
 
-    section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
+    section_number_slow: Int[ndarray, "time_slow"] = agg_fast_to_slow(
+        section_number, reshape_index=ii, agg_method="max"
+    )
 
     _ = apply_compensation_highpass(psi_f, freq, freq_highpass)
 

@@ -22,6 +22,10 @@ from turban.process.generic.api import (
     Processing,
 )
 
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass(kw_only=True)
 class UTempLevel1(Level1):
@@ -70,6 +74,7 @@ class UTempLevel2(Level2):
                 senspeed=level1.senspeed,
                 # num_despike_iter=num_despike_iter,
                 level_below=level1,
+                cfg=cfg,
             )
         )
         return kwarg
@@ -141,6 +146,7 @@ class UTempLevel3(Level3):
                 senspeed=senspeed_avg,
                 section_number=section_number_slow,
                 level_below=level2,
+                cfg=cfg,
             )
         )
         return kwarg
@@ -170,6 +176,7 @@ class UTempLevel4(Level4):
                 chi=chi,
                 eps=eps,
                 level_below=level3,
+                cfg=cfg,
             )
         )
         return kwarg

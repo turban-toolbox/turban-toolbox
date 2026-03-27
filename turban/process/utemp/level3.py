@@ -8,6 +8,10 @@ from turban.utils.util import integrate, reshape_any_first, reshape_halfoverlap_
 from turban.utils.util import agg_fast_to_slow, get_chunking_index
 from turban.utils.spectra import spectrum
 
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 # nu, kin. viscosity of water; assumed known constant
 viscosity_kinematic = 0.0000016
 # molecular temperature diffusivity [m^2/s]
@@ -35,7 +39,7 @@ def temperature_gradient_spectra(
     Float[ndarray, "time_slow"],  # senspeeda
     Int[ndarray, "time_slow"],  # section_number_slow
     Float[ndarray, "ntemp waveno"],  # psi_noise
-    Int[ndarray, "time_slow n_chunks n_segments"],  # ii
+    Int[ndarray, "time_slow n_chunks"],  # ii
 ]:
     """Compute temperature gradient power spectra and convert to wavenumber domain.
 
@@ -84,7 +88,6 @@ def temperature_gradient_spectra(
     ii = get_chunking_index(
         section_number,
         (chunk_length, chunk_overlap),
-        (segment_length, segment_overlap),
     )
 
     psi_f: Float[ndarray, "ntemp time_slow waveno"]
@@ -103,7 +106,9 @@ def temperature_gradient_spectra(
         senspeed, reshape_index=ii
     )
 
-    section_number_slow = section_number[..., ii].max(axis=-1).max(axis=-1)
+    section_number_slow: Int[ndarray, "time_slow"] = agg_fast_to_slow(
+        section_number, reshape_index=ii, agg_method="max"
+    )
 
     # double check spectral corrections
     psi_f *= correction_frequency_response_bilinear(

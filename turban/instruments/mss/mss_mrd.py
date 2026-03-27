@@ -25,7 +25,7 @@ except ImportError:
 version = pkg_version("turban-toolbox")
 
 
-def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict[str, list]:
+def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict:
     """Read a binaray SST MRD (Microstructure Raw Data) file
 
     Parameters
@@ -290,7 +290,7 @@ def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
 
     count_offset = mss_config.offset
     if rawdata["numsamples"] == 0:
-        logger.info("No samples found for conversion.")
+        logger.error("No samples found for conversion.")
         return None
 
     # Create matrix for converted data
