@@ -86,17 +86,17 @@ def spectrum(
         case "diagonal":
             if y is None:
                 freq, psi = welch(xr, **kwarg, **estimator_kwarg)
+                dfreq = freq[1] - freq[0]
+                # by using scaling 'density' above, variance should already be approximately conserved,
+                # but now we correct for PSD estimator bias manually:
+                _ = apply_var_conserve(psi, dfreq, xr)
+
             else:
                 assert (
                     x.shape[0] == y.shape[0]
                 ), f"For kind {kind}, first dimensions of x and y must match"
                 yr = y[..., reshape_index]
                 freq, psi = csd(xr, yr, **kwarg, **estimator_kwarg)
-
-            dfreq = freq[1] - freq[0]
-            # by using scaling 'density' above, variance should already be approximately conserved,
-            # but now we correct for PSD estimator bias manually:
-            _ = apply_var_conserve(psi, dfreq, xr)
 
         case "cross":
             nx = xr.shape[0]
