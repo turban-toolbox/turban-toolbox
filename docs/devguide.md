@@ -18,21 +18,25 @@ TURBAN uses black for the code style. Settings are given in `pyproject.toml` (an
 
 ## Tests
 
-TURBAN uses `pytest` for unit testing:
-```bash
-python -m pytest --cov=turban --cov-report html
-```
-Settings are defined in `pyproject.toml`.
+TURBAN uses `pytest` for unit testing. Settings are defined in `pyproject.toml`.
 
-Markdown documents with python snippets can be tested as well, e.g.:
+To run tests, e.g. with test coverage:
 ```bash
-python -m pytest --markdown-docs --markdown-docs-syntax=superfences docs/
+python -m pytest --cov=turban --cov-report html tests/ docs/
 ```
 
-To generate a test coverage report:
-```bash
-python -m pytest --markdown-docs --markdown-docs-syntax=superfences 
-```
+### Continuous integration
+
+CI runs two environments on every push and pull request:
+
+| Python | Dependencies | Purpose |
+|--------|-------------|---------|
+| 3.14 | latest | catch breakage on current Python |
+| 3.11 | minimum (`--resolution=lowest-direct`) | verify declared lower bounds in `pyproject.toml` are sufficient |
+
+Python 3.11 is the minimum supported version (`requires-python = ">=3.11"`), enforced by use of `match` statements and `typing.Self`.
+
+Coverage reports are uploaded to Codecov from the 3.14 run only.
 
 ## Code base overview
 

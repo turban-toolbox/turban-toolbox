@@ -9,22 +9,22 @@ authors = [
 ]
 license = { text = "GPLv03" }
 dependencies = [
-  'beartype',
-  'gsw',
-  'jaxtyping',
-  'matplotlib',
-  'netCDF4',
-  'numba',
-  'numpy',
-  'pandas',
-  'pydantic',
-  'requests',
-  'scipy',
-  'setuptools',
-  'xarray',
+  'beartype>=0.16',
+  'gsw>=3.6',
+  'jaxtyping>=0.2.20',
+  'matplotlib>=3.6',
+  'netCDF4>=1.6.3',
+  'numba>=0.58',
+  'numpy>=2.0',
+  'pandas>=1.5',
+  'pydantic>=2.0',
+  'requests>=2.32.0',
+  'scipy>=1.10',
+  'setuptools>=65',
+  'xarray>=2022.11',
 ]
 
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = "README.md"
 classifiers = [
   'Development Status :: 4 - Beta',
@@ -41,11 +41,11 @@ dev = [
     "ipython>=8.18.1",
     "mypy>=1.19.1",
     "pytest>=8.4.2",
-    "pytest-cov",
-    "mkdocs",
-    "pytest-markdown-docs",
-    "pymdown-extensions",
-    "mkdocstrings[python]",
+    "pytest-cov>=6.0",
+    "mkdocs>=1.6",
+    "pytest-markdown-docs>=0.6",
+    "pymdown-extensions>=10.8",
+    "mkdocstrings[python]>=0.24",
 ]
 mss = ["pytz", "dateparser"]
 microrider = ["arrow>=1.4.0"]
@@ -64,13 +64,13 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"
-addopts = "--markdown-docs-syntax=superfences"
+addopts = "--markdown-docs --markdown-docs-syntax=superfences"
 log_cli = false
 log_cli_level = "WARNING"
 
 [tool.black]
 line-length = 88
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313', 'py314']
+target-version = ['py311', 'py312', 'py313', 'py314']
 include = '\.pyi?$'
 exclude = '''
 
