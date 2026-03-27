@@ -25,7 +25,7 @@ except ImportError:
 version = pkg_version("turban-toolbox")
 
 
-def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict[str, list]:
+def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict:
     """Read a binaray SST MRD (Microstructure Raw Data) file
 
     Parameters
