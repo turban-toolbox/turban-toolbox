@@ -1,3 +1,4 @@
+import pytest
 import xarray as xr
 from matplotlib import pyplot as plt
 import numpy as np
@@ -7,20 +8,23 @@ from turban.utils.spectra import remove_vibration_goodman, spectrum
 from tests.filepaths import atomix_benchmark_faroe_fpath
 
 
-def test_remove_vibration_goodman_synthetic():
+@pytest.mark.parametrize("phase_deg", [0, 90, 180, 270])
+def test_remove_vibration_goodman_synthetic(phase_deg):
     """Signal is the sum of two sine curves; both are provided as vibration references.
 
     After Goodman removal the cleaned PSD must be close to zero because the signal
     carries no variance independent of the two vibration channels.
+    Phase offset (degrees) is applied to the second vibration channel.
     """
     sampfreq = 512.0
-    n_samples = 100_000
+    n_samples = 500_000
     t = np.arange(n_samples) / sampfreq
 
     f1, A1 = 5.0, 1.0  # Hz, amplitude
     f2, A2 = 43.0, 0.5
+    phase_rad = np.deg2rad(phase_deg)
     vib1 = A1 * np.sin(2 * np.pi * f1 * t)
-    vib2 = A2 * np.sin(2 * np.pi * f2 * t)
+    vib2 = A2 * np.sin(2 * np.pi * f2 * t + phase_rad)
     signal = vib1 + vib2  # signal IS the sum → no independent variance
 
     # shapes expected by remove_vibration_goodman: (nsig, time) and (nvib, time)
