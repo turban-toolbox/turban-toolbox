@@ -8,6 +8,79 @@ from turban.utils.spectra import remove_vibration_goodman, spectrum
 from turban.utils.filepaths import atomix_benchmark_faroe_fpath
 
 
+@pytest.mark.parametrize(
+    "y_provided, kind",
+    [
+        (False, "diagonal"),
+        (True, "diagonal"),
+        (False, "cross"),
+        (True, "cross"),
+    ],
+)
+def test_spectrum(y_provided, kind):
+    """Check output shapes and basic spectral properties for all (y, kind) combinations.
+
+    Uses two uncorrelated sine waves for x (and different ones for y).
+    """
+    sampfreq = 100.0
+    n_samples = 10_000
+    t = np.arange(n_samples) / sampfreq
+    segment_length = 256
+    segment_overlap = 128
+
+    # x: two channels at 5 and 13 Hz
+    x = np.stack(
+        [np.sin(2 * np.pi * 5 * t), np.sin(2 * np.pi * 13 * t)], axis=0
+    )  # (2, N)
+
+    # y: two channels at 7 and 17 Hz (uncorrelated with x)
+    y = np.stack(
+        [np.sin(2 * np.pi * 7 * t), np.sin(2 * np.pi * 17 * t)], axis=0
+    )  # (2, N)
+
+    reshape_index = get_chunking_index(n_samples, (n_samples, 0))
+    specarg = dict(
+        sampfreq=sampfreq,
+        reshape_index=reshape_index,
+        segment_length=segment_length,
+        segment_overlap=segment_overlap,
+    )
+
+    psi, freq = spectrum(x, y=y if y_provided else None, kind=kind, **specarg)
+
+    nfreq = segment_length // 2 + 1
+    nchunk = 1
+    nx = 2
+
+    assert freq.shape == (nfreq,), f"freq shape mismatch: {freq.shape}"
+
+    if kind == "diagonal":
+        # shape: (nx, nchunk, nfreq)
+        assert psi.shape == (nx, nchunk, nfreq), f"psi shape: {psi.shape}"
+        if not y_provided:
+            # auto-PSD: must be real and non-negative
+            assert np.isrealobj(psi) or np.allclose(
+                psi.imag, 0, atol=1e-10
+            ), "diagonal PSD should be real"
+            assert np.all(psi.real >= 0), "diagonal PSD should be non-negative"
+    else:
+        # kind == "cross", shape: (nx, ny, nchunk, nfreq) with ny == nx == 2
+        ny = nx
+        assert psi.shape == (nx, ny, nchunk, nfreq), f"psi shape: {psi.shape}"
+        if not y_provided:
+            # auto cross-spectrum: diagonal must be real and non-negative
+            for i in range(nx):
+                assert np.allclose(
+                    psi[i, i].imag, 0, atol=1e-10
+                ), f"auto cross-spectrum diagonal [{i},{i}] should be real"
+                assert np.all(
+                    psi[i, i].real >= 0
+                ), f"auto cross-spectrum diagonal [{i},{i}] should be non-negative"
+            # Hermitian: psi[i,j] == conj(psi[j,i])
+            assert np.allclose(
+                psi[0, 1], np.conj(psi[1, 0])
+            ), "cross-spectrum must be Hermitian"
+
 
 @pytest.mark.parametrize("phase_deg", [0, 90, 180, 270])
 def test_remove_vibration_goodman_synthetic(phase_deg):
