@@ -54,7 +54,7 @@ microrider = ["arrow>=1.4.0"]
 turban_download_datafiles="turban.utils.cli:download_datafiles"
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "pip>=24.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
