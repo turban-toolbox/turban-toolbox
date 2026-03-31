@@ -4,9 +4,17 @@ Currently, only shear processing is fully functional. The high-level API can be 
 
 ### Setup
 
-Install TURBAN with dependency groups as needed, e.g. for MSS + MicroRider support:
+Clone the repository:
 
 ```bash
+git clone https://github.com/turban-toolbox/turban-toolbox.git
+cd turban-toolbox
+```
+
+Activate your Python environment of choice. Then, install TURBAN with dependency groups as needed. Requires pip >= 24.1 for `--groups` support:
+
+```bash
+python -m pip install --upgrade pip
 python -m pip install -e . --group mss --group microrider
 ```
 
@@ -37,7 +45,7 @@ plot(p)
 
 ### Manual configuration
 
-If no suitable `ShearProcessing.from_*` method exists, you can configure one manually like this (use `time`, `shear`, etc. from anywhere):
+If no suitable `ShearProcessing.from_*` method exists, you can configure one manually like this (use numpy arrays `time`, `shear`, etc. from anywhere):
 
 ```python
 import numpy as np
@@ -81,5 +89,3 @@ level1 = ShearLevel1(
 p = ShearProcessing(level1)
 plot(p)
 ```
-
-In general, `tests/` and in particular `tests/shear/test_process.py` contain more examples of how to use the high-level data structures.
