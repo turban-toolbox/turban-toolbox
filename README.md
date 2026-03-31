@@ -2,7 +2,7 @@
 
 # Turbulence Analysis Toolbox (Turban-Toolbox)
 
-Welcome to TURBAN. You can find documentation on [readthedocs](https://turban-toolbox.readthedocs.io/en/latest/quickstart/).
+Welcome to TURBAN. You can find documentation on [readthedocs](https://turban-toolbox.readthedocs.io/en/latest/).
 
 Currently, only shear processing is fully functional. It has nascent support for temperature microstructure, and more is on the way (e.g. high-frequency ADCP).
 
