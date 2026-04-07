@@ -43,6 +43,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-cov>=6.0",
     "mkdocs>=1.6",
+    "mkdocs-material>=9.0",
     "pytest-markdown-docs>=0.6",
     "pymdown-extensions>=10.8",
     "mkdocstrings[python]>=0.24",

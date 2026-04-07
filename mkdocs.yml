@@ -4,7 +4,7 @@ edit_uri: edit/main/docs/
 
 site_name: Turbulence analysis (TURBAN) toolbox
 theme:
-  name: readthedocs
+  name: material
   features:
     - navigation.tabs
     - content.code.copy
