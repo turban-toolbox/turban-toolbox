@@ -18,7 +18,7 @@ class Instrument(ABC):
 
 class Dropsonde(Instrument):
 
-    def to_shear_level1(self) -> "ShearLevel1":
+    def to_shear_level1(self, filename:str, cfg: ShearConfig) -> "ShearLevel1":
         """
         Convert raw data to shear level 1
         """
