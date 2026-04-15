@@ -10,11 +10,13 @@ from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class PluginError(Exception):
     pass
 
 
 # Base class for SensorSpeed plugins
+
 
 class SensorSpeedABC(ABC):
 
@@ -70,6 +72,7 @@ class SensorSpeedABC(ABC):
 _SENSOR_SPEED_PLUGIN_REGISTRY: dict[
     str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]
 ] = {}
+
 
 
 # This decorator returns a wrapper, which gets the argument of the
