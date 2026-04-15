@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, TypeVar
 from jaxtyping import Float
 
 import numpy as np
@@ -10,13 +10,11 @@ from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-
 class PluginError(Exception):
     pass
 
 
 # Base class for SensorSpeed plugins
-
 
 class SensorSpeedABC(ABC):
 
