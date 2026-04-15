@@ -13,26 +13,33 @@ from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 class MicroriderAPIError(Exception):
     pass
+
 
 class MicroRiderSondeBase(Instrument):
     def __init__(self, cfg: InstrumentConfig) -> None:
         self.cfg = cfg
         self.sensor_speed_plugin: plugins.SensorSpeedABC
         self._set_sensor_speed_plugin_from_cfg()
-        
+
     @abstractmethod
-    def set_sensor_speed_plugin(self, sensor_speed_plugin: plugins.SensorSpeedABC) -> None:
+    def set_sensor_speed_plugin(
+        self, sensor_speed_plugin: plugins.SensorSpeedABC
+    ) -> None:
         pass
 
-
-    def _check_for_presence_of_required_parameters(self, requested_plugin: str) -> tuple[bool, dict[str, float|str]]:
-        plugin_required_argument_list = plugins.get_registered_plugin_parameter_list(requested_plugin)
+    def _check_for_presence_of_required_parameters(
+        self, requested_plugin: str
+    ) -> tuple[bool, dict[str, float | str]]:
+        plugin_required_argument_list = plugins.get_registered_plugin_parameter_list(
+            requested_plugin
+        )
         plugin_arguments = self.cfg.sensor_speed_plugin_parameters
         # check if required arguments are given.
         argument_list_check = True
-        args: dict[str, float|str] = {}
+        args: dict[str, float | str] = {}
         for n, dtype, v in plugin_required_argument_list:
             if not n in plugin_arguments:
                 argument_list_check = False
@@ -40,7 +47,7 @@ class MicroRiderSondeBase(Instrument):
             else:
                 args[n] = v
         return argument_list_check, args
-    
+
     def _check_for_unused_parameters(self, args: dict[str, str | float]) -> list[str]:
         configured_args = self.cfg.sensor_speed_plugin_parameters
         unused_args = []
@@ -48,15 +55,17 @@ class MicroRiderSondeBase(Instrument):
             if k not in args:
                 unused_args.append(f"{k}={v}")
         return unused_args
-            
 
-        
     def _set_sensor_speed_plugin_from_cfg(self) -> None:
         requested_plugin = self.cfg.sensor_speed_plugin
         if requested_plugin:
-            argument_list_check, args = self._check_for_presence_of_required_parameters(requested_plugin)
+            argument_list_check, args = self._check_for_presence_of_required_parameters(
+                requested_plugin
+            )
             if not argument_list_check:
-                mesg = f"Required parameter {n} for {requested_plugin} is not configured."
+                mesg = (
+                    f"Required parameter {n} for {requested_plugin} is not configured."
+                )
                 logger.error(mesg)
                 raise MicroriderAPIError("Configuration error. (See logs).")
             unused_args = self._check_for_unused_parameters(args)
@@ -67,17 +76,18 @@ class MicroRiderSondeBase(Instrument):
             plugin = plugins.plugin_factory(requested_plugin, args)
             self.set_sensor_speed_plugin(plugin)
 
-            
+
 class MicroriderSlocumSonde(MicroRiderSondeBase):
 
     def __init__(self, cfg: InstrumentConfig) -> None:
         super().__init__(cfg)
-        
 
-    def set_sensor_speed_plugin(self, sensor_speed_plugin: plugins.SensorSpeedABC) -> None:
+    def set_sensor_speed_plugin(
+        self, sensor_speed_plugin: plugins.SensorSpeedABC
+    ) -> None:
         self.sensor_speed_plugin = sensor_speed_plugin
 
-    def to_shear_level1(self, p_filename : str, cfg:ShearConfig) -> ShearLevel1:
+    def to_shear_level1(self, p_filename: str, cfg: ShearConfig) -> ShearLevel1:
         microrider_data = rsIO.read_p_file(p_filename)
         self.sensor_speed_plugin.set_microrider_data(microrider_data)
         time = microrider_data.header.t_fast + microrider_data.header.timestamp
@@ -85,9 +95,13 @@ class MicroriderSlocumSonde(MicroRiderSondeBase):
         level1 = ShearLevel1(
             time=time,
             senspeed=senspeed,
-            cfg = cfg,
-            shear=np.array([microrider_data.sh1.data/senspeed**2,microrider_data.sh2.data/senspeed**2]),
-            section_number=np.ones_like(microrider_data.header.t_fast, dtype=int)
+            cfg=cfg,
+            shear=np.array(
+                [
+                    microrider_data.sh1.data / senspeed**2,
+                    microrider_data.sh2.data / senspeed**2,
+                ]
+            ),
+            section_number=np.ones_like(microrider_data.header.t_fast, dtype=int),
         )
         return level1
-        
