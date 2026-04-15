@@ -18,17 +18,61 @@ class MicroriderAPIError(Exception):
     pass
 
 
-class MicroRiderSondeBase(Instrument):
+class MicroriderSonde(Instrument):
     def __init__(self, cfg: InstrumentConfig) -> None:
         self.cfg = cfg
         self.sensor_speed_plugin: plugins.SensorSpeedABC
         self._set_sensor_speed_plugin_from_cfg()
 
-    @abstractmethod
     def set_sensor_speed_plugin(
         self, sensor_speed_plugin: plugins.SensorSpeedABC
     ) -> None:
-        pass
+        """Set the sensor speed plugin, overwriting any previously set plugin.
+
+        Parameters
+        ----------
+        sensor_speed_plugin : plugins.SensorSpeedABC
+            Plugin instance to use for computing sensor speed.
+        """
+        if hasattr(self, "sensor_speed_plugin"):
+            new_name = sensor_speed_plugin.__class__.__name__
+            old_name = self.sensor_speed_plugin.__class__.__name__
+            logger.warning(f"Overwriting sensor speed plugin: {old_name} -> {new_name}.")
+        self.sensor_speed_plugin = sensor_speed_plugin
+
+    def to_shear_level1(self, p_filename: str, cfg: ShearConfig) -> ShearLevel1:
+        """Read a MicroRider .p file and convert it to a ShearLevel1 dataclass.
+
+        Parameters
+        ----------
+        p_filename : str
+            Path to the MicroRider binary .p file.
+        cfg : ShearConfig
+            Processing configuration for the shear pipeline.
+
+        Returns
+        -------
+        ShearLevel1
+            Level 1 shear data with time, sensor speed, shear from both probes,
+            and a section number array (all ones for a single cast).
+        """
+        microrider_data = rsIO.read_p_file(p_filename)
+        self.sensor_speed_plugin.set_microrider_data(microrider_data)
+        time = microrider_data.header.t_fast + microrider_data.header.timestamp
+        senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
+        level1 = ShearLevel1(
+            time=time,
+            senspeed=senspeed,
+            cfg=cfg,
+            shear=np.array(
+                [
+                    microrider_data.sh1.data / senspeed**2,
+                    microrider_data.sh2.data / senspeed**2,
+                ]
+            ),
+            section_number=np.ones_like(microrider_data.header.t_fast, dtype=int),
+        )
+        return level1
 
     def _check_for_presence_of_required_parameters(
         self, requested_plugin: str
@@ -76,32 +120,3 @@ class MicroRiderSondeBase(Instrument):
             plugin = plugins.plugin_factory(requested_plugin, args)
             self.set_sensor_speed_plugin(plugin)
 
-
-class MicroriderSlocumSonde(MicroRiderSondeBase):
-
-    def __init__(self, cfg: InstrumentConfig) -> None:
-        super().__init__(cfg)
-
-    def set_sensor_speed_plugin(
-        self, sensor_speed_plugin: plugins.SensorSpeedABC
-    ) -> None:
-        self.sensor_speed_plugin = sensor_speed_plugin
-
-    def to_shear_level1(self, p_filename: str, cfg: ShearConfig) -> ShearLevel1:
-        microrider_data = rsIO.read_p_file(p_filename)
-        self.sensor_speed_plugin.set_microrider_data(microrider_data)
-        time = microrider_data.header.t_fast + microrider_data.header.timestamp
-        senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
-        level1 = ShearLevel1(
-            time=time,
-            senspeed=senspeed,
-            cfg=cfg,
-            shear=np.array(
-                [
-                    microrider_data.sh1.data / senspeed**2,
-                    microrider_data.sh2.data / senspeed**2,
-                ]
-            ),
-            section_number=np.ones_like(microrider_data.header.t_fast, dtype=int),
-        )
-        return level1
