@@ -68,7 +68,7 @@ class SensorSpeedABC(ABC):
 # Create a registry of SensorSpeedPlugin classes:
 
 T = TypeVar("T", bound=SensorSpeedABC)  # A type machting also all its derivates.
-_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[T], type[SensorSpeedABC]]] = {}
+_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[T], list[tuple[str, type, float | str]]]] = {}
 
 
 # This decorator returns a wrapper, which gets the argument of the
