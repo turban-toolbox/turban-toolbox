@@ -96,7 +96,7 @@ class ChannelConfigBaseModel(BaseModel):
             raise AttributeError(f"{self.__class__.__name__} has no attribute {k}.")
         return k in self._set_properties
 
-    def copy(self) -> Self:
+    def clone(self) -> Self:
         new = self.model_copy()
         object.__setattr__(new, "_set_properties", list(self._set_properties))
         return new

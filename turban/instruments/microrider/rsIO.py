@@ -100,7 +100,7 @@ class Channel(object):
             Empty channel, with the configuration copied, and the deconvolved flag set.
         """
         name = new_name or self.name
-        config = self.config.copy()
+        config = self.config.clone()
         return Channel(config, deconvolved=deconvolved)
 
     def correct_sign(self) -> None:
