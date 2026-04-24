@@ -16,6 +16,9 @@ logger = get_logger(__name__)
 class MicroriderAPIError(Exception):
     pass
 
+class MicroriderConfig(InstrumentConfig):
+    sensor_speed_plugin: str = ""
+    sensor_speed_plugin_parameters: dict[str, float|str] = {}
 
 
 class MicroriderConfig(InstrumentConfig):
