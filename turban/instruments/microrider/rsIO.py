@@ -17,7 +17,7 @@ from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     Header,
-    ChannelConfigABC,
+    ChannelConfigBaseModel,
     ChannelConfig,
     channel_config_factory,
 )
@@ -70,9 +70,9 @@ class Channel(object):
 
     """
 
-    def __init__(self, channel_config: ChannelConfigABC, deconvolved: bool = False):
+    def __init__(self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False):
         self.name: str = channel_config.name
-        self.config: ChannelConfigABC = channel_config
+        self.config: ChannelConfigBaseModel = channel_config
         self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
             np.array([])
         )
@@ -239,10 +239,10 @@ class ChannelMatrix(object):
             logger.info(f"\t{n:2d}: ch255")
         return channels
 
-    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigABC:
+    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
         _ChannelConfig = channel_config_factory(name)
-        channel_config = _ChannelConfig(name)
+        channel_config = _ChannelConfig(name=name)
         for k_any_case, v in section.items():
             k = k_any_case.lower()
             if k == "name":
@@ -706,7 +706,6 @@ def read_p_file(filename: str, setupstring_filename: str = "") -> MicroRiderData
     """
     header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
-
     full_path = os.path.realpath(filename)
 
     if setupstring_filename:
