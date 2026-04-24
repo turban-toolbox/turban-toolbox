@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-
 import numpy as np
 
 from turban.instruments.generic.api import Instrument
@@ -17,10 +16,14 @@ logger = get_logger(__name__)
 class MicroriderAPIError(Exception):
     pass
 
+class MicroriderConfig(InstrumentConfig):
+    sensor_speed_plugin: str = ""
+    sensor_speed_plugin_parameters: dict[str, float|str] = {}
 
 class MicroriderSonde(Instrument):
-    def __init__(self, cfg: InstrumentConfig) -> None:
-        self.cfg = cfg
+
+    def __init__(self, cfg: MicroriderConfig) -> None:
+        self.cfg: MicroriderConfig = cfg
         self.sensor_speed_plugin: plugins.SensorSpeedABC
         self._set_sensor_speed_plugin_from_cfg()
 
@@ -40,12 +43,12 @@ class MicroriderSonde(Instrument):
             logger.warning(f"Overwriting sensor speed plugin: {old_name} -> {new_name}.")
         self.sensor_speed_plugin = sensor_speed_plugin
 
-    def to_shear_level1(self, p_filename: str, cfg: ShearConfig) -> ShearLevel1:
+    def to_shear_level1(self, filename: str, cfg: ShearConfig) -> ShearLevel1: 
         """Read a MicroRider .p file and convert it to a ShearLevel1 dataclass.
 
         Parameters
         ----------
-        p_filename : str
+        filename : str
             Path to the MicroRider binary .p file.
         cfg : ShearConfig
             Processing configuration for the shear pipeline.
@@ -56,7 +59,7 @@ class MicroriderSonde(Instrument):
             Level 1 shear data with time, sensor speed, shear from both probes,
             and a section number array (all ones for a single cast).
         """
-        microrider_data = rsIO.read_p_file(p_filename)
+        microrider_data = rsIO.read_p_file(filename)
         self.sensor_speed_plugin.set_microrider_data(microrider_data)
         time = microrider_data.header.t_fast + microrider_data.header.timestamp
         senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
@@ -107,10 +110,11 @@ class MicroriderSonde(Instrument):
                 requested_plugin
             )
             if not argument_list_check:
-                mesg = (
-                    f"Required parameter {n} for {requested_plugin} is not configured."
-                )
-                logger.error(mesg)
+                for n in args:
+                    mesg = (
+                        f"Required parameter {n} for {requested_plugin} is not configured."
+                    )
+                    logger.error(mesg)
                 raise MicroriderAPIError("Configuration error. (See logs).")
             unused_args = self._check_for_unused_parameters(args)
             if unused_args:
