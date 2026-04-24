@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, TypeVar
+from typing import Callable
 from jaxtyping import Float
 
 import numpy as np
@@ -24,6 +24,7 @@ class SensorSpeedABC(ABC):
         self._microrider_data: rsIO.MicroRiderData
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
 
+        
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
