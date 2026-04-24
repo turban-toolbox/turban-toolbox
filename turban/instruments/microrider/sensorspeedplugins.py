@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, TypeVar
+from typing import Callable
 from jaxtyping import Float
 
 import numpy as np
@@ -22,8 +22,9 @@ class SensorSpeedABC(ABC):
 
     def __init__(self) -> None:
         self._microrider_data: rsIO.MicroRiderData
-        self._ifun: Callable
+        self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
 
+        
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -43,7 +44,7 @@ class SensorSpeedABC(ABC):
         pass
 
     @abstractmethod
-    def interpolation_factory(self) -> Callable:
+    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build and return the interpolation function for sensor speed.
 
         Returns
@@ -67,8 +68,7 @@ class SensorSpeedABC(ABC):
 
 # Create a registry of SensorSpeedPlugin classes:
 
-T = TypeVar("T", bound=SensorSpeedABC)  # A type machting also all its derivates.
-_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[T], list[tuple[str, type, float | str]]]] = {}
+_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]] = {}
 
 
 # This decorator returns a wrapper, which gets the argument of the
@@ -76,8 +76,8 @@ _SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[T], list[tuple[str, type, fl
 # defined as a callable Callable[[args], result]. See also rsCommon.py
 def register_plugin(
     parameter_list: list[tuple[str, type, float | str]],
-) -> Callable[type[T], type[T]]:
-    def wrapper(cls: type[T]) -> type[T]:
+) -> Callable[[type[SensorSpeedABC]], type[SensorSpeedABC]]:
+    def wrapper(cls: type[SensorSpeedABC]) -> type[SensorSpeedABC]:
         name = cls.__name__
         _SENSOR_SPEED_PLUGIN_REGISTRY[name] = (cls, parameter_list)
         return cls
@@ -139,8 +139,7 @@ def plugin_factory(name: str, args: dict[str, float | str]) -> SensorSpeedABC:
         An instance of the requested plugin.
     """
     C, _ = _SENSOR_SPEED_PLUGIN_REGISTRY[name]
-    c = C(**args)
-    return c
+    return C(**args)
 
 
 @register_plugin([("constant_speed", float, 1.0)])
@@ -172,7 +171,7 @@ class SensorSpeedConstant(SensorSpeedABC):
         """
         return np.ones_like(t) * self._constant_speed
 
-    def interpolation_factory(self) -> Callable:
+    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Not implemented for constant sensor speed.
 
         Raises
@@ -185,7 +184,7 @@ class SensorSpeedConstant(SensorSpeedABC):
 @register_plugin([])
 class SensorSpeedEMC(SensorSpeedABC):
 
-    def interpolation_factory(self) -> Callable:
+    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build a linear spline interpolator from the EM current channel.
 
         The interpolator is constructed once from the slow-rate ``U_EM`` channel
@@ -245,7 +244,7 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         self.data["t"] = t
         self.data["U"] = U
 
-    def interpolation_factory(self) -> Callable:
+    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build a linear spline interpolator from the lookup table.
 
         The interpolator is constructed once from the stored time and speed
