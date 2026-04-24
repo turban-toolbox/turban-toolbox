@@ -24,7 +24,6 @@ class SensorSpeedABC(ABC):
         self._microrider_data: rsIO.MicroRiderData
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
 
-        
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -73,7 +72,6 @@ class SensorSpeedABC(ABC):
 _SENSOR_SPEED_PLUGIN_REGISTRY: dict[
     str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]
 ] = {}
-
 
 
 # This decorator returns a wrapper, which gets the argument of the
