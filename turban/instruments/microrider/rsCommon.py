@@ -69,14 +69,7 @@ class ChannelConfigBaseModel(BaseModel):
     _set_properties: list[str] = PrivateAttr(default_factory=list)
 
     def model_post_init(self, __context: Any) -> None:
-        for field_name in type(self).model_fields:
-            value = getattr(self, field_name)
-            if (
-                (type(value) == float and value != DefaultFloat)
-                or (type(value) == int and value != DefaultInt)
-                or (type(value) == str and value != DefaultStr)
-            ):
-                self._set_properties.append(field_name)
+        self._set_properties = list(self.model_fields_set)
 
     def __repr__(self) -> str:
         s: str = f"{self.__class__.__name__}:\n"
@@ -223,7 +216,7 @@ class ChannelConfigU_EM(ChannelConfigBaseModel):
     cal_date: str = Field(default=DefaultStr)
 
 
-def channel_config_factory(name: str) -> type[ChannelConfigBaseModel]:
+def channel_config_factory(name: str) -> ChannelConfigBaseModel:
     if name not in _CHANNEL_CONFIG_REGISTRY:
         raise ValueError(f"{name} is not a valid channel name.")
-    return _CHANNEL_CONFIG_REGISTRY[name]
+    return _CHANNEL_CONFIG_REGISTRY[name](name=name)
