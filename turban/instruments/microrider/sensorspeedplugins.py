@@ -24,7 +24,6 @@ class SensorSpeedABC(ABC):
         self._microrider_data: rsIO.MicroRiderData
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
 
-        
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -44,7 +43,9 @@ class SensorSpeedABC(ABC):
         pass
 
     @abstractmethod
-    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
+    def interpolation_factory(
+        self,
+    ) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build and return the interpolation function for sensor speed.
 
         Returns
@@ -68,7 +69,9 @@ class SensorSpeedABC(ABC):
 
 # Create a registry of SensorSpeedPlugin classes:
 
-_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]] = {}
+_SENSOR_SPEED_PLUGIN_REGISTRY: dict[
+    str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]
+] = {}
 
 
 # This decorator returns a wrapper, which gets the argument of the
@@ -171,7 +174,9 @@ class SensorSpeedConstant(SensorSpeedABC):
         """
         return np.ones_like(t) * self._constant_speed
 
-    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
+    def interpolation_factory(
+        self,
+    ) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Not implemented for constant sensor speed.
 
         Raises
@@ -181,10 +186,13 @@ class SensorSpeedConstant(SensorSpeedABC):
         """
         raise NotImplementedError
 
+
 @register_plugin([])
 class SensorSpeedEMC(SensorSpeedABC):
 
-    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
+    def interpolation_factory(
+        self,
+    ) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build a linear spline interpolator from the EM current channel.
 
         The interpolator is constructed once from the slow-rate ``U_EM`` channel
@@ -244,7 +252,9 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         self.data["t"] = t
         self.data["U"] = U
 
-    def interpolation_factory(self) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
+    def interpolation_factory(
+        self,
+    ) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
         """Build a linear spline interpolator from the lookup table.
 
         The interpolator is constructed once from the stored time and speed
@@ -305,4 +315,3 @@ class SensorSpeedDataFile(SensorSpeedLookupTable):
         """
         t, U = np.loadtxt(self.filename).T
         self.from_timeseries(t, U)
-    
