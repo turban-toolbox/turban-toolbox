@@ -16,9 +16,11 @@ logger = get_logger(__name__)
 class MicroriderAPIError(Exception):
     pass
 
+
 class MicroriderConfig(InstrumentConfig):
     sensor_speed_plugin: str = ""
-    sensor_speed_plugin_parameters: dict[str, float|str] = {}
+    sensor_speed_plugin_parameters: dict[str, float | str] = {}
+
 
 class MicroriderSonde(Instrument):
 
@@ -40,10 +42,12 @@ class MicroriderSonde(Instrument):
         if hasattr(self, "sensor_speed_plugin"):
             new_name = sensor_speed_plugin.__class__.__name__
             old_name = self.sensor_speed_plugin.__class__.__name__
-            logger.warning(f"Overwriting sensor speed plugin: {old_name} -> {new_name}.")
+            logger.warning(
+                f"Overwriting sensor speed plugin: {old_name} -> {new_name}."
+            )
         self.sensor_speed_plugin = sensor_speed_plugin
 
-    def to_shear_level1(self, filename: str, cfg: ShearConfig) -> ShearLevel1: 
+    def to_shear_level1(self, filename: str, cfg: ShearConfig) -> ShearLevel1:
         """Read a MicroRider .p file and convert it to a ShearLevel1 dataclass.
 
         Parameters
@@ -111,9 +115,7 @@ class MicroriderSonde(Instrument):
             )
             if not argument_list_check:
                 for n in args:
-                    mesg = (
-                        f"Required parameter {n} for {requested_plugin} is not configured."
-                    )
+                    mesg = f"Required parameter {n} for {requested_plugin} is not configured."
                     logger.error(mesg)
                 raise MicroriderAPIError("Configuration error. (See logs).")
             unused_args = self._check_for_unused_parameters(args)
@@ -123,4 +125,3 @@ class MicroriderSonde(Instrument):
             # Now we need to construct the requested plugin with args
             plugin = plugins.plugin_factory(requested_plugin, args)
             self.set_sensor_speed_plugin(plugin)
-

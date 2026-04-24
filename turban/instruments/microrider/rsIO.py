@@ -26,6 +26,7 @@ from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
 
+
 class HeaderEnum(enum.IntEnum):
     HeaderSize = 128
     WordSize = 2
@@ -70,7 +71,9 @@ class Channel(object):
 
     """
 
-    def __init__(self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False):
+    def __init__(
+        self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False
+    ):
         self.name: str = channel_config.name
         self.config: ChannelConfigBaseModel = channel_config
         self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
@@ -118,7 +121,9 @@ class Channel(object):
             return
         if cfg.sign == "unsigned":
             logger.info("Correcting sign")
-            self.data = self.data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
+            self.data = self.data.astype(
+                np.dtype(f">u{HeaderEnum.WordSize}")
+            )  # as unsigned
         else:
             idx = np.where(self.data >= 2**31)[0]
             if len(idx):
