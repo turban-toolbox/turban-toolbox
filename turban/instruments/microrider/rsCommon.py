@@ -104,7 +104,9 @@ class ChannelConfigBaseModel(BaseModel):
 
 # Create a registry of ChannelConfig data classes:
 
-T = TypeVar("T", bound=ChannelConfigBaseModel)  # A type machting also all its derivates.
+T = TypeVar(
+    "T", bound=ChannelConfigBaseModel
+)  # A type machting also all its derivates.
 _CHANNEL_CONFIG_REGISTRY: dict[str, type[ChannelConfigBaseModel]] = {}
 
 
