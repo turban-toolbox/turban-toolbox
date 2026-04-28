@@ -1,4 +1,6 @@
 from typing import Literal, cast
+from itertools import product
+
 from numpy import ndarray, newaxis
 import numpy as np
 from jaxtyping import Float, Int, Complex, Num
@@ -8,20 +10,21 @@ from turban.utils.util import get_chunking_index
 
 
 def spectrum(
-    x: Float[ndarray, "... time_fast"],
+    x: Float[ndarray, "nx ... time_fast"],
     sampfreq: float,
-    segment_length: int | None = None,
-    segment_overlap: int | None = None,
+    segment_length: int,
+    segment_overlap: int,
     chunk_length: int | None = None,
     chunk_overlap: int | None = None,
     section_number: Int[ndarray, "time_fast"] | None = None,
-    reshape_index: Int[ndarray, "diss_chunk fft_chunk segment_length"] | None = None,
+    reshape_index: Int[ndarray, "diss_chunk chunk_length"] | None = None,
     y: (
-        Float[ndarray, "... time_fast"] | None
+        Float[ndarray, "ny ... time_fast"] | None
     ) = None,  # if not None, return cross spectral density
+    kind: Literal["diagonal", "cross"] = "diagonal",
     **estimator_kwarg,
 ) -> tuple[
-    Num[ndarray, "... chunk freq"],
+    Num[ndarray, "nx ... chunk freq"],
     Float[ndarray, "freq"],  # frequencies
 ]:
     """Compute power spectral density or cross spectral density from time series.
@@ -42,17 +45,21 @@ def spectrum(
         Dissipation chunk overlap.
     section_number : ndarray of int, shape (time_fast,), optional
         Section markers.
-    reshape_index : ndarray of int, shape (diss_chunk, fft_chunk, segment_length), optional
+    reshape_index : ndarray of int, shape (diss_chunk, chunk_length), optional
         Precomputed reshaping index. If not provided, is calculated from other parameters.
     y : ndarray, shape (... time_fast), optional
         If provided, compute cross spectral density instead of PSD.
+    kind : {"diagonal", "cross"}, optional
+        Type of spectral density to compute. "diagonal" computes PSD (or CSD with y).
+        "cross" computes cross-spectral density between all pairs of inputs.
     **estimator_kwarg
         Additional keyword arguments passed to welch or csd.
 
     Returns
     -------
-    psi : ndarray, shape (... chunk freq)
-        Power spectral density (PSD) or cross spectral density (CSD).
+    psi : ndarray
+        Power spectral density or cross spectral density. For kind="diagonal",
+        shape is (nx ... chunk freq). For kind="cross", shape is (nx ny ... chunk freq).
     freq : ndarray, shape (freq,)
         Frequency array.
     """
@@ -64,8 +71,6 @@ def spectrum(
             section_number,
             (chunk_length, chunk_overlap),
         )
-    else:
-        segment_length = reshape_index.shape[-1]
 
     kwarg = dict(
         axis=-1,
@@ -75,18 +80,40 @@ def spectrum(
         scaling="density",
     )
 
-    xr = x[..., reshape_index]  # reshape to chunk  length windows
+    xr = x[..., reshape_index]  # reshape to chunk length windows
 
-    if y is None:
-        freq, psi = welch(xr, **kwarg, **estimator_kwarg)
-    else:
-        yr = y[..., reshape_index]
-        freq, psi = csd(xr, yr, **kwarg, **estimator_kwarg)
+    match kind:
+        case "diagonal":
+            if y is None:
+                freq, psi = welch(xr, **kwarg, **estimator_kwarg)
+                dfreq = freq[1] - freq[0]
+                # by using scaling 'density' above, variance should already be approximately conserved,
+                # but now we correct for PSD estimator bias manually:
+                _ = apply_var_conserve(psi, dfreq, xr)
 
-    dfreq = freq[1] - freq[0]
-    # by using scaling 'density' above, variance should already be approximately conserved,
-    # but now we correct for PSD estimator bias manually:
-    _ = apply_var_conserve(psi, dfreq, xr)
+            else:
+                assert (
+                    x.shape[0] == y.shape[0]
+                ), f"For kind {kind}, first dimensions of x and y must match"
+                yr = y[..., reshape_index]
+                freq, psi = csd(xr, yr, **kwarg, **estimator_kwarg)
+
+        case "cross":
+            nx = xr.shape[0]
+            comb: Int[ndarray, "n_combinations 2"]
+            if y is None:
+                yr = xr
+                ny = yr.shape[0]
+            else:
+                yr = y[..., reshape_index]  # reshape to chunk length windows
+                ny = y.shape[0]
+
+            comb = np.array(list(product(range(nx), range(ny))))
+            psi: Num[ndarray, "nx*ny ... chunk freq"]
+            freq, psi = csd(xr[comb[:, 0]], yr[comb[:, 1]], **kwarg, **estimator_kwarg)
+            psi: Num[ndarray, "nx ny ... chunk freq"] = psi.reshape(
+                nx, ny, *psi.shape[1:]
+            )
 
     return psi, freq
 
@@ -107,13 +134,14 @@ def apply_var_conserve(
         Power spectral density. Modified in-place.
     dfreq : float
         Frequency resolution.
-    signal_reshape : ndarray, shape (nshear, chunks, freq)
-        Reshaped signal used for variance calculation.
+    signal_reshape : ndarray, shape (nshear, chunk, freq)
+        Reshaped signal (time series) used for variance calculation. Typically
+        the reshaped input signal after applying reshape_index.
 
     Returns
     -------
     ndarray, shape (*any,)
-        Correction factors applied to psi.
+        Correction factors applied to psi (variance ratio per chunk).
     """
     intpsi = psi[..., 1:].sum(axis=-1) * dfreq  # disregard first frequency
     signal_reshape = np.ascontiguousarray(
@@ -122,3 +150,80 @@ def apply_var_conserve(
     corr_factor = np.var(signal_reshape, axis=-1) / intpsi
     psi *= corr_factor[..., newaxis]
     return corr_factor
+
+
+def remove_vibration_goodman(
+    signal: Float[ndarray, "nsig time_fast"],
+    vib: Float[ndarray, "nvib time_fast"],
+    **kwarg,
+) -> tuple[
+    Num[ndarray, "nsig nsig ntime nfreq"],  # vibrations removed
+    Float[ndarray, "freq"],  # frequencies
+    Num[ndarray, "nsig nsig ntime nfreq"],  # uncleaned
+]:
+    """Remove vibration contamination from shear probe signals using Goodman method.
+
+    Applies the vibration removal technique as described in the ATOMIX shear paper
+    (Eqs. 15-16) to remove coherent vibration noise from multi-channel shear
+    measurements.
+
+    Parameters
+    ----------
+    signal : ndarray, shape (nsig, time_fast)
+        Shear probe signals to clean.
+    vib : ndarray, shape (nvib, time_fast)
+        Vibration reference signals.
+    **kwarg
+        Keyword arguments passed to spectrum(), including:
+
+    Returns
+    -------
+    psi_f_shear_cleaned : ndarray, shape (nsig, nsig, ntime, nfreq)
+        Cross-spectral density with vibration noise removed and boost correction applied.
+    freq : ndarray, shape (nfreq,)
+        Frequency array.
+    psi_f_sig : ndarray, shape (nsig, nsig, ntime, nfreq)
+        Original uncleaned cross-spectral density of shear signals.
+    """
+    if kwarg.get("reshape_index") is None:
+        kwarg["reshape_index"] = get_chunking_index(
+            kwarg["section_number"],
+            (kwarg["chunk_length"], kwarg["chunk_overlap"]),
+        )
+
+    psi_f_sig: Num[ndarray, "nsig nsig ntime nfreq"]
+    psi_f_vib: Num[ndarray, "nvib nvib ntime nfreq"]
+    psi_f_shear_vib: Num[ndarray, "nsig nvib ntime nfreq"]
+
+    psi_f_sig, freq = spectrum(signal, kind="cross", **kwarg)
+    psi_f_vib, _ = spectrum(vib, kind="cross", **kwarg)
+    psi_f_shear_vib, _ = spectrum(signal, y=vib, kind="cross", **kwarg)
+
+    # Eqn 15 in ATOMIX shear paper
+    # invert psi_f_vib over first two (matrix) dimensions
+    try:
+        psi_f_vib_inv = np.moveaxis(
+            np.linalg.inv(np.moveaxis(psi_f_vib, [0, 1], [-2, -1])), [-2, -1], [0, 1]
+        )
+    except np.linalg.LinAlgError:
+        psi_f_vib_inv = np.zeros_like(psi_f_vib)
+    # move axes so we can use the standard matrix multiplication operator @
+    A: Num[ndarray, "ntime nfreq nsig nvib"]
+    A = np.moveaxis(psi_f_shear_vib, [0, 1], [-2, -1])
+    B: Num[ndarray, "ntime nfreq nvib nvib"]
+    B = np.moveaxis(psi_f_vib_inv, [0, 1], [-2, -1])
+    Aconj: Num[ndarray, "ntime nfreq nvib nsig"]
+    Aconj = np.moveaxis(psi_f_shear_vib.conj(), [0, 1], [-2, -1]).swapaxes(-2, -1)
+    psi_f_noise: Num[ndarray, "nsig nsig ntime nfreq"]
+    psi_f_noise = np.moveaxis(A @ B @ Aconj, [-2, -1], [0, 1])
+    psi_f_shear_cleaned = psi_f_sig - psi_f_noise
+
+    # boost cleaned spectrum using Eq. 16 of ATOMIX shear paper
+    chunk_length: int = kwarg["reshape_index"].shape[1]
+    segment_length = kwarg["segment_length"]
+    fft_segments = int(np.floor(2 * chunk_length / segment_length)) - 1
+    vibration_signals = vib.shape[0]
+    boost = 1 - 1.02 * vibration_signals / fft_segments
+    # print(vibration_signals, fft_segments, chunk_length, segment_length, boost)
+    psi_f_shear_cleaned /= boost
+    return psi_f_shear_cleaned, freq, psi_f_sig

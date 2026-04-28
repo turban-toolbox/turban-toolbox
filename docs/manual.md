@@ -16,6 +16,26 @@ l3_reimport = ShearLevel3.from_xarray(ds)  # equal to l3
 ```
 ## Shear processing
 
+### Removal of coherent vibrations
+
+TURBAN has implemented the Goodman method as described in the ATOMIX shear paper. It is not activated by default since vibration channels are not required, but can be achieved in this way:
+
+```python
+import xarray as xr
+from turban import ShearLevel2, ShearLevel3
+from turban.utils.filepaths import atomix_benchmark_faroe_fpath
+
+ds = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L2_cleaned")
+# now, add as many channels as desired to detect coherent vibrations
+l2 = ShearLevel2.from_atomix_netcdf(atomix_benchmark_faroe_fpath)
+l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=0).values, "vib1")
+l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=1).values, "vib2")
+l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=2).values, "vib3")
+l2.cfg.vibration_channels = ("vib1", "vib2", "vib3")
+# now, propagation to ShearLevel3 will automatically remove these 
+l3 = ShearLevel3.from_level_below(l2)
+```
+
 ### Molecular viscosity
 
 Molecular viscosity can be set in two ways: Either by using a constant fallback value in the `ShearConfig`:
