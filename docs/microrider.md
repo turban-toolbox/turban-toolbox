@@ -52,18 +52,19 @@ level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg)
 - `shear` — array of shape `(2, nsamples)`, one row per shear probe
 - `section_number` — all ones (single continuous cast)
 
+
 !!! note "Shear normalisation"
-    The raw shear probe voltage is divided by the square of sensor speed
-    (`sh.data / senspeed**2`) to obtain velocity shear in s⁻¹. Accurate sensor
-    speed is therefore important for the quality of all downstream dissipation estimates.
+	The raw shear probe voltage is divided by the square of sensor speed
+	(`sh.data / senspeed**2`) to obtain velocity shear in s⁻¹. Accurate sensor
+	speed is therefore important for the quality of all downstream dissipation estimates.
 
 ---
 
 ## Sensor speed plugins
 
-Sensor speed is deployment-dependent. A free-falling dropsonde sinks under gravity; a
-glider-mounted sonde moves along the glider flight path; a sonde on an AUV may be towed
-at a controlled speed. The plugin system lets you provide the appropriate speed source
+Sensor speed is deployment-dependent. A free-falling probe sinks under
+gravity; a glider-mounted probe moves along the glider flight
+path. The plugin system lets you provide the appropriate speed source
 without changing any processing code.
 
 All plugins implement `SensorSpeedABC` and must define `get_sensor_speed(t)`, which
@@ -75,6 +76,12 @@ Returns the same speed for all time steps. Useful for bench tests, simulations, 
 deployments where the platform speed is well-known and stable.
 
 ```python
+import turban.instruments.microstructure.sensorspeedplugins as plugins
+from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+
+cfg = MicroriderConfig()
+probe = MicroriderProbe(cfg)
+
 plugin = plugins.SensorSpeedConstant(constant_speed=0.6)  # 0.6 m/s
 probe.set_sensor_speed_plugin(plugin)
 ```
@@ -91,6 +98,12 @@ time grid. No constructor arguments are required; the MicroRider data are suppli
 automatically when `to_shear_level1` is called.
 
 ```python
+import turban.instruments.microstructure.sensorspeedplugins as plugins
+from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+
+cfg = MicroriderConfig()
+probe = MicroriderProbe(cfg)
+
 plugin = plugins.SensorSpeedEMC()
 probe.set_sensor_speed_plugin(plugin)
 ```
@@ -101,7 +114,11 @@ Accepts a user-supplied time and speed array. Useful when sensor speed has been 
 externally (e.g. from a navigation system or DVL) and is available as numpy arrays.
 
 ```python
-import numpy as np
+import turban.instruments.microstructure.sensorspeedplugins as plugins
+from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+
+cfg = MicroriderConfig()
+probe = MicroriderProbe(cfg)
 
 plugin = plugins.SensorSpeedLookupTable()
 plugin.from_timeseries(t=time_array, U=speed_array)
@@ -120,6 +137,12 @@ Reads time and speed from a plain text file with two columns (time in s, speed i
 one row per sample. Internally uses `SensorSpeedLookupTable`.
 
 ```python
+import turban.instruments.microstructure.sensorspeedplugins as plugins
+from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+
+cfg = MicroriderConfig()
+probe = MicroriderProbe(cfg)
+
 plugin = plugins.SensorSpeedDataFile(filename="path/to/speed.txt")
 probe.set_sensor_speed_plugin(plugin)
 ```
@@ -147,7 +170,7 @@ Subclass `SensorSpeedABC` and implement `get_sensor_speed` and `interpolation_fa
 ```python
 import numpy as np
 from jaxtyping import Float
-from typing import Callable
+from collections.abc import Callable
 from turban.instruments.microrider.sensorspeedplugins import SensorSpeedABC, register_plugin
 
 
@@ -201,7 +224,8 @@ probe = MicroriderProbe(cfg=microrider_config)
 ```
 
 Only the fields explicitly passed to `update` override the file-embedded values; all
-other parameters continue to be read from the setup string.
+other parameters continue to be read from the setup string embedded in
+the `.p` file.
 
 ---
 
