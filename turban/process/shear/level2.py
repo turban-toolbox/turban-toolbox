@@ -401,10 +401,16 @@ def replace_spikes(shear, spike_markers, spike_replace_before, spike_replace_aft
     None
         Modifies shear in-place.
     """
-    for marker in np.unique(spike_markers):
-        if marker == 0:
+    n = len(spike_markers)
+    i = 0
+    while i < n:
+        if spike_markers[i] == 0:
+            i += 1
             continue
-        (spike,) = np.where(spike_markers == marker)
-        start = min(spike)
-        stop = max(spike) + 1
+        # Found the start of a spike region
+        start = i
+        current_marker = spike_markers[i]
+        while i < n and spike_markers[i] == current_marker:
+            i += 1
+        stop = i  # exclusive end
         replace_spike(shear, start, stop, spike_replace_before, spike_replace_after)
