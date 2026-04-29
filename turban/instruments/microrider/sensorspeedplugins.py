@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from collections.abc import Callable
 from jaxtyping import Float
 
 import numpy as np
