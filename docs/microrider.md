@@ -1,6 +1,6 @@
-# MicroriderSonde
+# MicroriderProbe
 
-`MicroriderSonde` reads a RSI MicroRider binary `.p` file and converts it into a
+`MicroriderProbe` reads a RSI MicroRider binary `.p` file and converts it into a
 [`ShearLevel1`][turban.process.shear.api.ShearLevel1] dataclass, ready for the turban
 shear processing pipeline. Because sensor speed — the speed of the instrument relative
 to the water — depends on how the instrument is deployed, it is provided through a
@@ -10,7 +10,7 @@ swappable **sensor speed plugin**.
 
 ```python
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderSonde
+from turban.instruments.microrider.api import MicroriderProbe
 from turban.instruments.generic.config import InstrumentConfig
 from turban.process.shear.api import ShearConfig
 
@@ -39,7 +39,7 @@ cfg = ShearConfig(
 microrider_config = InstrumentConfig(sampfreq=512.0, sensors={})
 
 # Create the sonde and attach a sensor speed plugin
-sonde = MicroriderSonde(cfg=microrider_config)
+sonde = MicroriderProbe(cfg=microrider_config)
 sonde.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
 
 # Convert the .p file to ShearLevel1
@@ -176,11 +176,11 @@ factory (see below) and lists it in the registry for introspection.
 
 ## Config-driven plugin selection
 
-`MicroriderSonde` also supports selecting a plugin through the instrument configuration
+`MicroriderProbe` also supports selecting a plugin through the instrument configuration
 object, which is convenient when configuration is loaded from a file rather than
 constructed in code. The relevant fields on the config are `sensor_speed_plugin` (the
 class name as a string) and `sensor_speed_plugin_parameters` (a dictionary of constructor
-arguments). When these are set, `MicroriderSonde` instantiates the plugin automatically
+arguments). When these are set, `MicroriderProbe` instantiates the plugin automatically
 at construction time and no explicit call to `set_sensor_speed_plugin` is needed.
 
 Calling `set_sensor_speed_plugin` after construction always works and overrides any
