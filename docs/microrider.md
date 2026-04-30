@@ -240,6 +240,7 @@ at construction time and no explicit call to `set_sensor_speed_plugin` is needed
 
 ```python
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.process.shear.api import ShearConfig
 
 # Microrider configuration
 microrider_config = MicroriderConfig(
