@@ -1,10 +1,9 @@
-from abc import ABC, abstractmethod
-import copy
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass
 from numpy.typing import NDArray
 from numpy import float64
 from typing import Any, Self, TypeVar
 from collections.abc import Callable
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 @dataclass(kw_only=True)
@@ -59,8 +58,7 @@ DefaultStr = "undefined"
 DefaultInt = -999999999999
 
 
-@dataclass
-class ChannelConfigABC:
+class ChannelConfigBaseModel(BaseModel):
     name: str = ""
     id: int = 0
     type: str = "unknown"
@@ -68,18 +66,10 @@ class ChannelConfigABC:
     sample_rate: float = 0.0
     units: str = ""
 
-    # marks all fields given to the constructor as "set"
-    def __post_init__(self) -> None:
-        cls_fields = fields(self.__class__)
-        self._set_properties: list[str] = []
-        for field in cls_fields:
-            value = getattr(self, field.name)
-            if (
-                (type(value) == float and value != DefaultFloat)
-                or (type(value) == int and value != DefaultInt)
-                or (type(value) == str and value != DefaultStr)
-            ):
-                self._set_properties.append(field.name)
+    _set_properties: list[str] = PrivateAttr(default_factory=list)
+
+    def model_post_init(self, __context: Any) -> None:
+        self._set_properties = list(self.model_fields_set)
 
     def __repr__(self) -> str:
         s: str = f"{self.__class__.__name__}:\n"
@@ -99,14 +89,18 @@ class ChannelConfigABC:
             raise AttributeError(f"{self.__class__.__name__} has no attribute {k}.")
         return k in self._set_properties
 
-    def copy(self) -> Self:
-        return copy.copy(self)
+    def clone(self) -> Self:
+        new = self.model_copy()
+        object.__setattr__(new, "_set_properties", list(self._set_properties))
+        return new
 
 
 # Create a registry of ChannelConfig data classes:
 
-T = TypeVar("T", bound=ChannelConfigABC)  # A type machting also all its derivates.
-_CHANNEL_CONFIG_REGISTRY: dict[str, type[ChannelConfigABC]] = {}
+T = TypeVar(
+    "T", bound=ChannelConfigBaseModel
+)  # A type machting also all its derivates.
+_CHANNEL_CONFIG_REGISTRY: dict[str, type[ChannelConfigBaseModel]] = {}
 
 
 def register_channel_config(names: list[str]) -> Callable[[type[T]], type[T]]:
@@ -119,123 +113,110 @@ def register_channel_config(names: list[str]) -> Callable[[type[T]], type[T]]:
 
 
 @register_channel_config(["Gnd_2"])
-@dataclass
-class ChannelConfig(ChannelConfigABC):
+class ChannelConfig(ChannelConfigBaseModel):
     pass
 
 
 @register_channel_config(["Ax", "Ay"])
-@dataclass
-class ChannelConfigPiezo(ChannelConfigABC):
-    a0: float = field(default=DefaultFloat)
+class ChannelConfigPiezo(ChannelConfigBaseModel):
+    a0: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["T1", "T2"])
-@dataclass
-class ChannelConfigThermistor(ChannelConfigABC):
-    adc_fs: float = field(default=DefaultFloat)
-    adc_bits: int = field(default=DefaultInt)
-    a: float = field(default=DefaultFloat)
-    b: float = field(default=DefaultFloat)
-    g: float = field(default=DefaultFloat)
-    e_b: float = field(default=DefaultFloat)
-    sn: str = field(default=DefaultStr)
-    beta: float = field(default=DefaultFloat)
-    beta_1: float = field(default=DefaultFloat)
-    beta_2: float = field(default=DefaultFloat)
-    beta_3: float = field(default=DefaultFloat)
-    t_0: float = field(default=DefaultFloat)
-    cal_date: str = field(default=DefaultStr)
+class ChannelConfigThermistor(ChannelConfigBaseModel):
+    adc_fs: float = Field(default=DefaultFloat)
+    adc_bits: int = Field(default=DefaultInt)
+    a: float = Field(default=DefaultFloat)
+    b: float = Field(default=DefaultFloat)
+    g: float = Field(default=DefaultFloat)
+    e_b: float = Field(default=DefaultFloat)
+    sn: str = Field(default=DefaultStr)
+    beta: float = Field(default=DefaultFloat)
+    beta_1: float = Field(default=DefaultFloat)
+    beta_2: float = Field(default=DefaultFloat)
+    beta_3: float = Field(default=DefaultFloat)
+    t_0: float = Field(default=DefaultFloat)
+    cal_date: str = Field(default=DefaultStr)
 
 
 @register_channel_config(["T1_dT1", "T2_dT2"])
-@dataclass
-class ChannelConfigThermistorPreEmphasis(ChannelConfigABC):
-    diff_gain: float = field(default=DefaultFloat)
+class ChannelConfigThermistorPreEmphasis(ChannelConfigBaseModel):
+    diff_gain: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["sh1", "sh2"])
-@dataclass
-class ChannelConfigShear(ChannelConfigABC):
-    adc_fs: float = field(default=DefaultFloat)
-    adc_bits: int = field(default=DefaultInt)
-    adc_zero: float = field(default=DefaultFloat)
-    sig_zero: float = field(default=DefaultFloat)
-    diff_gain: float = field(default=DefaultFloat)
-    sens: float = field(default=DefaultFloat)
-    sn: str = field(default=DefaultStr)
-    cal_date: str = field(default=DefaultStr)
+class ChannelConfigShear(ChannelConfigBaseModel):
+    adc_fs: float = Field(default=DefaultFloat)
+    adc_bits: int = Field(default=DefaultInt)
+    adc_zero: float = Field(default=DefaultFloat)
+    sig_zero: float = Field(default=DefaultFloat)
+    diff_gain: float = Field(default=DefaultFloat)
+    sens: float = Field(default=DefaultFloat)
+    sn: str = Field(default=DefaultStr)
+    cal_date: str = Field(default=DefaultStr)
 
 
 @register_channel_config(["P"])
-@dataclass
-class ChannelConfigPressure(ChannelConfigABC):
-    coef0: float = field(default=DefaultFloat)
-    coef1: float = field(default=DefaultFloat)
-    coef2: float = field(default=DefaultFloat)
-    coef3: float = field(default=DefaultFloat)
-    cal_date: str = field(default=DefaultStr)
+class ChannelConfigPressure(ChannelConfigBaseModel):
+    coef0: float = Field(default=DefaultFloat)
+    coef1: float = Field(default=DefaultFloat)
+    coef2: float = Field(default=DefaultFloat)
+    coef3: float = Field(default=DefaultFloat)
+    cal_date: str = Field(default=DefaultStr)
 
 
 @register_channel_config(["P_dP"])
-@dataclass
-class ChannelConfigPressurePreEmphasis(ChannelConfigABC):
-    diff_gain: float = field(default=DefaultFloat)
+class ChannelConfigPressurePreEmphasis(ChannelConfigBaseModel):
+    diff_gain: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["PV"])
-@dataclass
-class ChannelConfigPressureVoltage(ChannelConfigABC):
-    coef0: float = field(default=DefaultFloat)
-    coef1: float = field(default=DefaultFloat)
-    coef2: float = field(default=DefaultFloat)
+class ChannelConfigPressureVoltage(ChannelConfigBaseModel):
+    coef0: float = Field(default=DefaultFloat)
+    coef1: float = Field(default=DefaultFloat)
+    coef2: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["Gnd"])
-@dataclass
-class ChannelConfigGnd(ChannelConfigABC):
-    coef0: float = field(default=DefaultFloat)
+class ChannelConfigGnd(ChannelConfigBaseModel):
+    coef0: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["V_Bat"])
-@dataclass
-class ChannelConfigVoltage(ChannelConfigABC):
-    adc_fs: float = field(default=DefaultFloat)
-    adc_bits: float = field(default=DefaultFloat)
-    adc_zero: float = field(default=DefaultFloat)
-    g: float = field(default=DefaultFloat)
+class ChannelConfigVoltage(ChannelConfigBaseModel):
+    adc_fs: float = Field(default=DefaultFloat)
+    adc_bits: float = Field(default=DefaultFloat)
+    adc_zero: float = Field(default=DefaultFloat)
+    g: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["Incl_Y", "Incl_X", "Incl_T"])
-@dataclass
-class ChannelConfigInclinometer(ChannelConfigABC):
-    coef0: float = field(default=DefaultFloat)
-    coef1: float = field(default=DefaultFloat)
+class ChannelConfigInclinometer(ChannelConfigBaseModel):
+    coef0: float = Field(default=DefaultFloat)
+    coef1: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["EMC_Cur"])
-@dataclass
-class ChannelConfigEMC_CUR(ChannelConfigABC):
-    adc_fs: float = field(default=DefaultFloat)
-    adc_bits: float = field(default=DefaultFloat)
-    adc_zero: float = field(default=DefaultFloat)
-    g: float = field(default=DefaultFloat)
+class ChannelConfigEMC_CUR(ChannelConfigBaseModel):
+    adc_fs: float = Field(default=DefaultFloat)
+    adc_bits: float = Field(default=DefaultFloat)
+    adc_zero: float = Field(default=DefaultFloat)
+    g: float = Field(default=DefaultFloat)
 
 
 @register_channel_config(["U_EM"])
-@dataclass
-class ChannelConfigU_EM(ChannelConfigABC):
-    adc_fs: float = field(default=DefaultFloat)
-    adc_bits: float = field(default=DefaultFloat)
-    adc_zero: float = field(default=DefaultFloat)
-    a: float = field(default=DefaultFloat)
-    b: float = field(default=DefaultFloat)
-    bias: float = field(default=DefaultFloat)
-    sn: str = field(default=DefaultStr)
-    cal_date: str = field(default=DefaultStr)
+class ChannelConfigU_EM(ChannelConfigBaseModel):
+    adc_fs: float = Field(default=DefaultFloat)
+    adc_bits: float = Field(default=DefaultFloat)
+    adc_zero: float = Field(default=DefaultFloat)
+    a: float = Field(default=DefaultFloat)
+    b: float = Field(default=DefaultFloat)
+    bias: float = Field(default=DefaultFloat)
+    sn: str = Field(default=DefaultStr)
+    cal_date: str = Field(default=DefaultStr)
 
 
-def channel_config_factory(name: str) -> type[ChannelConfigABC]:
+def channel_config_factory(name: str) -> ChannelConfigBaseModel:
     if name not in _CHANNEL_CONFIG_REGISTRY:
         raise ValueError(f"{name} is not a valid channel name.")
-    return _CHANNEL_CONFIG_REGISTRY[name]
+    return _CHANNEL_CONFIG_REGISTRY[name](name=name)

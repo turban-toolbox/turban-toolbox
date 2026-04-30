@@ -17,7 +17,7 @@ from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     Header,
-    ChannelConfigABC,
+    ChannelConfigBaseModel,
     ChannelConfig,
     channel_config_factory,
 )
@@ -25,6 +25,7 @@ from turban.instruments.microrider.rsCommon import (
 from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
+
 
 class HeaderEnum(enum.IntEnum):
     HeaderSize = 128
@@ -70,9 +71,11 @@ class Channel(object):
 
     """
 
-    def __init__(self, channel_config: ChannelConfigABC, deconvolved: bool = False):
+    def __init__(
+        self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False
+    ):
         self.name: str = channel_config.name
-        self.config: ChannelConfigABC = channel_config
+        self.config: ChannelConfigBaseModel = channel_config
         self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
             np.array([])
         )
@@ -100,7 +103,7 @@ class Channel(object):
             Empty channel, with the configuration copied, and the deconvolved flag set.
         """
         name = new_name or self.name
-        config = self.config.copy()
+        config = self.config.clone()
         return Channel(config, deconvolved=deconvolved)
 
     def correct_sign(self) -> None:
@@ -118,7 +121,9 @@ class Channel(object):
             return
         if cfg.sign == "unsigned":
             logger.info("Correcting sign")
-            self.data = self.data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
+            self.data = self.data.astype(
+                np.dtype(f">u{HeaderEnum.WordSize}")
+            )  # as unsigned
         else:
             idx = np.where(self.data >= 2**31)[0]
             if len(idx):
@@ -239,10 +244,9 @@ class ChannelMatrix(object):
             logger.info(f"\t{n:2d}: ch255")
         return channels
 
-    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigABC:
+    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
-        _ChannelConfig = channel_config_factory(name)
-        channel_config = _ChannelConfig(name)
+        channel_config = channel_config_factory(name)
         for k_any_case, v in section.items():
             k = k_any_case.lower()
             if k == "name":
@@ -689,15 +693,13 @@ class MicroRiderData(object):
             )
 
 
-def read_p_file(filename: str, setupstring_filename: str = "") -> MicroRiderData:
+def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[]) -> MicroRiderData:
     """Function to read a single .p file.
 
     Parameters
     ----------
     filename : str
          Name of .p file to read
-    setupstring_filename : str (Optional : "")
-         Name of external setup file to be used.
 
     Returns
     -------
@@ -706,23 +708,17 @@ def read_p_file(filename: str, setupstring_filename: str = "") -> MicroRiderData
     """
     header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
-
     full_path = os.path.realpath(filename)
-
-    if setupstring_filename:
-        with open(setupstring_filename, "r") as fd:
-            setupstring = fd.read()
-    else:
-        setupstring = ""
 
     with open(filename, "rb") as fd:
         header_parser = HeaderParser()
         header_data = header_parser.parse(fd)
         n_records = header_parser.check_for_bad_blocks(fd)
-        if not setupstring:  # not set by external file
-            # read embedded setupstring (leaves the fp in the correct place)
-            setupstring = header_parser.read_setupstring(fd, header_data)
+        # read embedded setupstring (leaves the fp in the correct place)
+        setupstring = header_parser.read_setupstring(fd, header_data)
         microrider_config.parse(setupstring)
+        for channel_config in channel_configs:
+            microrider_config.update_config(channel_config)
         data = MicroRiderData(full_path, microrider_config)
         data.add_header_data(header_data, n_records)
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
