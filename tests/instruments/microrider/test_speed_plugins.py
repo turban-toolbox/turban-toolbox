@@ -140,3 +140,20 @@ def test_sensor_sensitivity(probePostConfigureSensitivity, data_path, shear_cfg)
     assert np.abs(level1.shear[0].mean()) < np.float64(1e-99) # should be very close to 0.
     assert np.abs(level1.shear[1].mean()) < np.float64(1e-99)
 
+
+def test_requesting_nonexisting_plugin():
+    with pytest.raises(plugins.PluginError):
+        plugin = plugins.get_registered_plugin_parameter_list("non_exisiting")
+
+def test_overwriting_plugin_prints_log(probePreConfigured, caplog):
+    probe = probePreConfigured
+    _t = np.linspace(_T0, _T1)
+    _U = np.ones_like(_t)
+    plugin = plugins.SensorSpeedLookupTable()
+    plugin.from_timeseries(_t, _U)
+    with caplog.at_level("WARNING"):
+        probe.set_sensor_speed_plugin(plugin)
+    record = caplog.records[0]
+    assert record.levelname=="WARNING" and record.message.startswith("Overwriting sensor speed plugin:")
+
+
