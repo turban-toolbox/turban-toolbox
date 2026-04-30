@@ -42,7 +42,7 @@ probe = MicroriderProbe(cfg=microrider_config)
 probe.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
 
 # Convert the .p file to ShearLevel1
-level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg)
+level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
 ```
 
 `level1` is a `ShearLevel1` instance containing:
@@ -76,8 +76,8 @@ Returns the same speed for all time steps. Useful for bench tests, simulations, 
 deployments where the platform speed is well-known and stable.
 
 ```python
-import turban.instruments.microstructure.sensorspeedplugins as plugins
-from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+import turban.instruments.microrider.sensorspeedplugins as plugins
+from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
 cfg = MicroriderConfig()
 probe = MicroriderProbe(cfg)
@@ -98,8 +98,8 @@ time grid. No constructor arguments are required; the MicroRider data are suppli
 automatically when `to_shear_level1` is called.
 
 ```python
-import turban.instruments.microstructure.sensorspeedplugins as plugins
-from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+import turban.instruments.microrider.sensorspeedplugins as plugins
+from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
 cfg = MicroriderConfig()
 probe = MicroriderProbe(cfg)
@@ -114,8 +114,8 @@ Accepts a user-supplied time and speed array. Useful when sensor speed has been 
 externally (e.g. from a navigation system or DVL) and is available as numpy arrays.
 
 ```python
-import turban.instruments.microstructure.sensorspeedplugins as plugins
-from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+import turban.instruments.microrider.sensorspeedplugins as plugins
+from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
 cfg = MicroriderConfig()
 probe = MicroriderProbe(cfg)
@@ -137,8 +137,8 @@ Reads time and speed from a plain text file with two columns (time in s, speed i
 one row per sample. Internally uses `SensorSpeedLookupTable`.
 
 ```python
-import turban.instruments.microstructure.sensorspeedplugins as plugins
-from turban.instruments.microstructure.api import MicroriderProbe, MicroriderConfig
+import turban.instruments.microrider.sensorspeedplugins as plugins
+from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
 cfg = MicroriderConfig()
 probe = MicroriderProbe(cfg)
@@ -241,15 +241,38 @@ at construction time and no explicit call to `set_sensor_speed_plugin` is needed
 ```python
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
+# Microrider configuration
 microrider_config = MicroriderConfig(
     sampfreq=512.0,
     sensors={},
     sensor_speed_plugin="SensorSpeedConstant",
     sensor_speed_plugin_parameters={"constant_speed": 0.6},
 )
+
+# Processing configuration
+cfg = ShearConfig(
+    sampfreq=512.0,
+    segment_length=1024,
+    segment_overlap=512,
+    chunk_length=2048,
+    chunk_overlap=1024,
+    freq_cutoff_antialias=999.0,
+    freq_cutoff_corrupt=999.0,
+    freq_highpass=0.15,
+    spatial_response_wavenum=50.0,
+    waveno_cutoff_spatial_corr=999.0,
+    spike_threshold=8.0,
+    max_tries=10,
+    spike_replace_before=256,
+    spike_replace_after=256,
+    spike_include_before=10,
+    spike_include_after=20,
+    cutoff_freq_lp=0.5,
+)
+
 probe = MicroriderProbe(cfg=microrider_config)
 # No further call to set_sensor_speed_plugin needed.
-level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg)
+level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
 ```
 
 Calling `set_sensor_speed_plugin` after construction always works and overrides any
