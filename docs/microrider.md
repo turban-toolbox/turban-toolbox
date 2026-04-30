@@ -8,7 +8,7 @@ swappable **sensor speed plugin**.
 
 ## Quickstart
 
-```python
+```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 from turban.process.shear.api import ShearConfig
@@ -42,7 +42,7 @@ probe = MicroriderProbe(cfg=microrider_config)
 probe.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
 
 # Convert the .p file to ShearLevel1
-level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
+level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg)
 ```
 
 `level1` is a `ShearLevel1` instance containing:
@@ -79,7 +79,7 @@ deployments where the platform speed is well-known and stable.
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-cfg = MicroriderConfig()
+cfg = MicroriderConfig(sampfreq=512.0, sensors={})
 probe = MicroriderProbe(cfg)
 
 plugin = plugins.SensorSpeedConstant(constant_speed=0.6)  # 0.6 m/s
@@ -97,11 +97,11 @@ the MicroRider itself. The slow-rate `U_EM` data are linearly interpolated onto 
 time grid. No constructor arguments are required; the MicroRider data are supplied
 automatically when `to_shear_level1` is called.
 
-```python
+```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-cfg = MicroriderConfig()
+cfg = MicroriderConfig(sampfreq=512.0, sensors={})
 probe = MicroriderProbe(cfg)
 
 plugin = plugins.SensorSpeedEMC()
@@ -113,11 +113,11 @@ probe.set_sensor_speed_plugin(plugin)
 Accepts a user-supplied time and speed array. Useful when sensor speed has been computed
 externally (e.g. from a navigation system or DVL) and is available as numpy arrays.
 
-```python
+```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-cfg = MicroriderConfig()
+cfg = MicroriderConfig(sampfreq=512.0, sensors={})
 probe = MicroriderProbe(cfg)
 
 plugin = plugins.SensorSpeedLookupTable()
@@ -136,11 +136,11 @@ Speed is linearly interpolated onto the fast time grid when `get_sensor_speed` i
 Reads time and speed from a plain text file with two columns (time in s, speed in m/s),
 one row per sample. Internally uses `SensorSpeedLookupTable`.
 
-```python
+```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-cfg = MicroriderConfig()
+cfg = MicroriderConfig(sampfreq=512.0, sensors={})
 probe = MicroriderProbe(cfg)
 
 plugin = plugins.SensorSpeedDataFile(filename="path/to/speed.txt")
@@ -167,7 +167,7 @@ The file format expected by `numpy.loadtxt`:
 
 Subclass `SensorSpeedABC` and implement `get_sensor_speed` and `interpolation_factory`:
 
-```python
+```python 
 import numpy as np
 from jaxtyping import Float
 from collections.abc import Callable
@@ -205,7 +205,7 @@ passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
 Use `channel_config_factory` to obtain a pre-populated config object for a named channel,
 then call `update` to override specific fields:
 
-```python
+```python 
 from turban.instruments.microrider.rsCommon import channel_config_factory
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
@@ -238,7 +238,7 @@ class name as a string) and `sensor_speed_plugin_parameters` (a dictionary of co
 arguments). When these are set, `MicroriderProbe` instantiates the plugin automatically
 at construction time and no explicit call to `set_sensor_speed_plugin` is needed.
 
-```python
+```python notest
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 from turban.process.shear.api import ShearConfig
 
