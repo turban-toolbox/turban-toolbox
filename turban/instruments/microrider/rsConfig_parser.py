@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from turban.instruments.microrider.rsCommon import ChannelConfigBaseModel
+from turban.instruments.generic.channels import ChannelConfigBaseModel
 from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
@@ -116,6 +116,7 @@ class MicroRiderConfig:
                         cfg[field_name] = getattr(channel_config, field_name)
                     updated = True
         if not updated:
+            breakpoint()
             logger.warning(f"A user-supplied sensor configuration ({channel_config.name}) was supplied, but no match was found.")
             
     @property

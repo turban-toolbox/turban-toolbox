@@ -3,8 +3,8 @@ import numpy as np
 
 from turban.instruments.generic.api import Instrument
 from turban.instruments.generic.config import InstrumentConfig
+from turban.instruments.generic.channels import ChannelConfigBaseModel
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.rsCommon import ChannelConfigBaseModel
 from turban.instruments.microrider import rsIO
 from turban.process.shear.api import ShearLevel1
 from turban.process.shear.config import ShearConfig

@@ -17,6 +17,8 @@ from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     Header,
+)
+from turban.instruments.generic.channels import (
     ChannelConfigBaseModel,
     ChannelConfig,
     channel_config_factory,
