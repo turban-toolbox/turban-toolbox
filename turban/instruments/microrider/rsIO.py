@@ -15,9 +15,9 @@ from scipy.interpolate import interp1d as si_interp1d
 from turban.instruments.generic.api import InstrumentEnum
 from turban.instruments.generic.channels import (
     ChannelConfigBaseModel,
-    ChannelConfig,
     channel_config_factory,
 )
+import turban.instruments.microrider.channels
 from turban.instruments.microrider import rsConversions
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
@@ -241,11 +241,13 @@ class ChannelMatrix(object):
             logger.info(f"\t{n:2d}: {channel_name}")
         if np.any(self.matrix == 255):
             logger.debug("Created Channel 255...")
-            channel_config = ChannelConfig(name="ch255", id=255, type="")
+            channel_config = channel_config_factory("ch255", prefix=InstrumentEnum.MicroRider)
+            channel_config.id = 255
+            channel_config.type = ""
             channels["ch255"] = Channel(channel_config)
             n += 1
             logger.info(f"\t{n:2d}: ch255")
-        return channels
+        return channels 
 
     def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
