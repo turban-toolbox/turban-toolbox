@@ -9,7 +9,8 @@ import zipfile
 import numpy as np
 from scipy.io import loadmat
 
-from turban.instruments.microrider import rsIO, rsConfig_parser, rsCommon
+from turban.instruments.generic import channels
+from turban.instruments.microrider import rsIO, rsConfig_parser
 from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
@@ -131,7 +132,7 @@ def test_channel_matrix(microrider_config_data):
 
 
 def test_channel_config():
-    channel_config = rsCommon.ChannelConfig(name="ch255", id=255, type="")
+    channel_config = channels.ChannelConfig(name="ch255", id=255, type="")
     assert channel_config.name == "ch255"
     assert channel_config.id == 255
     assert channel_config.type == ""
@@ -144,7 +145,7 @@ def test_channel_config():
 
 
 def test_channel_config_is_set():
-    channel_config = rsCommon.ChannelConfigThermistor(name="T1", id=12, type="therm")
+    channel_config = channels.ChannelConfigThermistor(name="T1", id=12, type="therm")
     assert channel_config.is_set("name")
     assert not channel_config.is_set("a")
     with pytest.raises(

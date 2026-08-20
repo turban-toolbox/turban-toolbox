@@ -12,16 +12,17 @@ import numpy as np
 import numpy.typing as np_typing
 from scipy.interpolate import interp1d as si_interp1d
 
+from turban.instruments.generic.api import InstrumentEnum
+from turban.instruments.generic.channels import (
+    ChannelConfigBaseModel,
+    ChannelConfig,
+    channel_config_factory,
+)
 from turban.instruments.microrider import rsConversions
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     Header,
-)
-from turban.instruments.generic.channels import (
-    ChannelConfigBaseModel,
-    ChannelConfig,
-    channel_config_factory,
 )
 
 from turban import logger_manager
@@ -248,7 +249,7 @@ class ChannelMatrix(object):
 
     def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
-        channel_config = channel_config_factory(name)
+        channel_config = channel_config_factory(name, prefix=InstrumentEnum.MicroRider)
         for k_any_case, v in section.items():
             k = k_any_case.lower()
             if k == "name":

@@ -1,8 +1,13 @@
 from abc import abstractmethod, ABC
+import enum
+
 from turban.instruments.generic.config import InstrumentConfig
 from turban.process.shear.api import ShearLevel1
 from turban.process.shear.config import ShearConfig
 
+class InstrumentEnum:
+    MSS = "MSS_"
+    MicroRider = "MR_"
 
 class Instrument(ABC):
     def __init__(self, cfg: InstrumentConfig):

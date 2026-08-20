@@ -3,9 +3,10 @@ import pathlib
 import numpy as np
 import pytest
 
+from turban.instruments.generic.api import InstrumentEnum
+from turban.instruments.generic.channels import channel_config_factory
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderConfig, MicroriderProbe
-from turban.instruments.microrider.rsCommon import channel_config_factory
 from turban.process.shear.api import ShearConfig
 
 # Start and end times for data_0413.p
@@ -45,9 +46,9 @@ def shear_cfg():
 
 @pytest.fixture(scope="session")
 def channel_cfgs():
-    sh1 = channel_config_factory("sh1")
+    sh1 = channel_config_factory("sh1", InstrumentEnum.MicroRider)
     sh1.update("sens", 1e99)
-    sh2 = channel_config_factory("sh2")
+    sh2 = channel_config_factory("sh2", InstrumentEnum.MicroRider)
     sh2.update("sens", 1e99)
     return [sh1, sh2]
 

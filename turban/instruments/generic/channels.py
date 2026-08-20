@@ -2,6 +2,8 @@ from typing import Any, Self, TypeVar
 from collections.abc import Callable
 from pydantic import BaseModel, Field, PrivateAttr
 
+from turban.instruments.generic.api import InstrumentEnum
+
 DefaultFloat = -9999999999999.0
 DefaultStr = "undefined"
 DefaultInt = -999999999999
@@ -52,26 +54,28 @@ T = TypeVar(
 _CHANNEL_CONFIG_REGISTRY: dict[str, type[ChannelConfigBaseModel]] = {}
 
 
-def register_channel_config(names: list[str]) -> Callable[[type[T]], type[T]]:
+def register_channel_config(instrument_prefix: str,
+                            names: list[str]) -> Callable[[type[T]], type[T]]:
     def wrapper(cls: type[T]) -> type[T]:
         for name in names:
-            _CHANNEL_CONFIG_REGISTRY[name] = cls
+            key = f"{instrument_prefix}{name}"
+            _CHANNEL_CONFIG_REGISTRY[key] = cls
         return cls
 
     return wrapper
 
 
-@register_channel_config(["Gnd_2"])
+@register_channel_config(InstrumentEnum.MicroRider, ["Gnd_2"])
 class ChannelConfig(ChannelConfigBaseModel):
     pass
 
 
-@register_channel_config(["Ax", "Ay"])
+@register_channel_config(InstrumentEnum.MicroRider, ["Ax", "Ay"])
 class ChannelConfigPiezo(ChannelConfigBaseModel):
     a0: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["T1", "T2"])
+@register_channel_config(InstrumentEnum.MicroRider, ["T1", "T2"])
 class ChannelConfigThermistor(ChannelConfigBaseModel):
     adc_fs: float = Field(default=DefaultFloat)
     adc_bits: int = Field(default=DefaultInt)
@@ -88,12 +92,12 @@ class ChannelConfigThermistor(ChannelConfigBaseModel):
     cal_date: str = Field(default=DefaultStr)
 
 
-@register_channel_config(["T1_dT1", "T2_dT2"])
+@register_channel_config(InstrumentEnum.MicroRider, ["T1_dT1", "T2_dT2"])
 class ChannelConfigThermistorPreEmphasis(ChannelConfigBaseModel):
     diff_gain: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["sh1", "sh2"])
+@register_channel_config(InstrumentEnum.MicroRider, ["sh1", "sh2"])
 class ChannelConfigShear(ChannelConfigBaseModel):
     adc_fs: float = Field(default=DefaultFloat)
     adc_bits: int = Field(default=DefaultInt)
@@ -105,7 +109,7 @@ class ChannelConfigShear(ChannelConfigBaseModel):
     cal_date: str = Field(default=DefaultStr)
 
 
-@register_channel_config(["P"])
+@register_channel_config(InstrumentEnum.MicroRider, ["P"])
 class ChannelConfigPressure(ChannelConfigBaseModel):
     coef0: float = Field(default=DefaultFloat)
     coef1: float = Field(default=DefaultFloat)
@@ -114,24 +118,24 @@ class ChannelConfigPressure(ChannelConfigBaseModel):
     cal_date: str = Field(default=DefaultStr)
 
 
-@register_channel_config(["P_dP"])
+@register_channel_config(InstrumentEnum.MicroRider, ["P_dP"])
 class ChannelConfigPressurePreEmphasis(ChannelConfigBaseModel):
     diff_gain: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["PV"])
+@register_channel_config(InstrumentEnum.MicroRider, ["PV"])
 class ChannelConfigPressureVoltage(ChannelConfigBaseModel):
     coef0: float = Field(default=DefaultFloat)
     coef1: float = Field(default=DefaultFloat)
     coef2: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["Gnd"])
+@register_channel_config(InstrumentEnum.MicroRider, ["Gnd"])
 class ChannelConfigGnd(ChannelConfigBaseModel):
     coef0: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["V_Bat"])
+@register_channel_config(InstrumentEnum.MicroRider, ["V_Bat"])
 class ChannelConfigVoltage(ChannelConfigBaseModel):
     adc_fs: float = Field(default=DefaultFloat)
     adc_bits: float = Field(default=DefaultFloat)
@@ -139,13 +143,13 @@ class ChannelConfigVoltage(ChannelConfigBaseModel):
     g: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["Incl_Y", "Incl_X", "Incl_T"])
+@register_channel_config(InstrumentEnum.MicroRider, ["Incl_Y", "Incl_X", "Incl_T"])
 class ChannelConfigInclinometer(ChannelConfigBaseModel):
     coef0: float = Field(default=DefaultFloat)
     coef1: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["EMC_Cur"])
+@register_channel_config(InstrumentEnum.MicroRider, ["EMC_Cur"])
 class ChannelConfigEMC_CUR(ChannelConfigBaseModel):
     adc_fs: float = Field(default=DefaultFloat)
     adc_bits: float = Field(default=DefaultFloat)
@@ -153,7 +157,7 @@ class ChannelConfigEMC_CUR(ChannelConfigBaseModel):
     g: float = Field(default=DefaultFloat)
 
 
-@register_channel_config(["U_EM"])
+@register_channel_config(InstrumentEnum.MicroRider, ["U_EM"])
 class ChannelConfigU_EM(ChannelConfigBaseModel):
     adc_fs: float = Field(default=DefaultFloat)
     adc_bits: float = Field(default=DefaultFloat)
@@ -165,8 +169,11 @@ class ChannelConfigU_EM(ChannelConfigBaseModel):
     cal_date: str = Field(default=DefaultStr)
 
 
-def channel_config_factory(name: str) -> ChannelConfigBaseModel:
-    key = name
+def channel_config_factory(name: str, prefix: str) -> ChannelConfigBaseModel:
+    key = f"{prefix}{name}"
     if key not in _CHANNEL_CONFIG_REGISTRY:
         raise ValueError(f"{key} is not a valid channel name.")
     return _CHANNEL_CONFIG_REGISTRY[key](name=name)
+
+def microrider_channel_config_factory(name: str) -> ChannelConfigBaseModel:
+    return channel_config_factory(name, InstrumentEnum.MicroRider)
