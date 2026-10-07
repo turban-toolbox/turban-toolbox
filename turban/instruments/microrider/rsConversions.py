@@ -4,6 +4,8 @@ from collections import defaultdict
 import typing
 
 import numpy as np
+from numpy import ndarray
+from jaxtyping import Float64, Int16, UInt16
 
 from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
@@ -27,8 +29,8 @@ class Converter(ABC):
         self.defaults: common.ChannelConfigABC
 
     def __call__(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         return self.convert(v)
 
     def get_parameter(self, p: str) -> int | float:
@@ -88,8 +90,8 @@ class Converter(ABC):
 
     @abstractmethod
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         pass
 
 
@@ -101,8 +103,8 @@ class Piezo(Converter):
         self.defaults = common.ChannelConfigPiezo(a0=0.0, units="[ counts ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         a0 = self.get_parameter("a0")
         v_unit = v.astype(np.float64) - a0
         return v_unit
@@ -119,8 +121,8 @@ class Gnd(Converter):
         self.defaults = common.ChannelConfig(units="[ counts ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         return v.astype(np.float64)
 
 
@@ -132,8 +134,8 @@ class Therm(Converter):
         self.defaults = common.ChannelConfigThermistor(units="[ °C ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         a = self.get_parameter("a")
         b = self.get_parameter("b")
         adc_fs = self.get_parameter("adc_fs")
@@ -178,8 +180,8 @@ class Shear(Converter):
         )
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         v = v.astype(np.float64)
         adc_zero = self.get_parameter("adc_zero")
         sig_zero = self.get_parameter("sig_zero")
@@ -200,8 +202,8 @@ class Poly(Converter):
         self.defaults = common.ChannelConfigPressure(units=" ")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         polyVals: list[float | int] = []
         for i in range(9):
             p = self.get_optional_parameter(f"coef{i:d}")
@@ -220,8 +222,8 @@ class Voltage(Converter):
         self.defaults = common.ChannelConfigVoltage(adc_zero=0.0, g=1.0, units="[ V ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         adc_zero = self.get_parameter("adc_zero")
         gain = self.get_parameter("g")
         adc_fs = self.get_parameter("adc_fs")
@@ -238,8 +240,8 @@ class Incl(Converter):
         self.adis = Adis()
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         coefs = [self.get_parameter("coef1"), self.get_parameter("coef0")]
         if v.dtype == ">i2":
             v = v.astype(np.int16)
@@ -277,15 +279,15 @@ class Aem1g_a(Converter):
         self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         bias = self.get_parameter("bias")
         adc_fs = self.get_parameter("adc_fs")
         adc_bits = self.get_parameter("adc_bits")
         adc_zero = self.get_optional_parameter("adc_zero")
         a = self.get_parameter("a") / 100  # cm/s -> m/s
         b = self.get_parameter("b") / 100  # cm/s -> m/s
-        v_unit: np.typing.NDArray[np.float64]
+        v_unit: Float64[ndarray, "time"]
         if adc_zero is None:
             adc_zero = adc_fs / 2
         v_unit = adc_zero + v * adc_fs / 2**adc_bits
@@ -308,13 +310,13 @@ class Aem1g_d(Converter):
         self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
     def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Float64[ndarray, "time"] | Int16[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         u = v.astype(">u2")  # unsigned 16 bit integer
         a = self.get_parameter("a") / 100  # cm/s -> m/s
         b = self.get_parameter("b") / 100  # cm/s -> m/s
         bias = self.get_parameter("bias")
-        v_unit: np.typing.NDArray[np.float64]
+        v_unit: Float64[ndarray, "time"]
         v_unit = a + b * u
         v_unit -= bias
         if b > 1:
@@ -334,8 +336,8 @@ class PassThrough(Converter):
         self.defaults = common.ChannelConfig()
 
     def convert(
-        self, v: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64]
-    ) -> np.typing.NDArray[np.float64]:
+        self, v: Int16[ndarray, "time"] | Float64[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         return v.astype(np.float64)
 
 
@@ -355,18 +357,18 @@ class Adis(object):
     """
 
     def __init__(self) -> None:
-        # self.errorFlag : np.typing.NDArray[np.int16] = np.array([], dtype=np.int16)
-        # self.oldFlag : np.typing.NDArray[np.int16] = np.array([], dtype=np.int16)
+        # self.errorFlag : Int16[ndarray, "time"] = np.array([], dtype=np.int16)
+        # self.oldFlag : Int16[ndarray, "time"] = np.array([], dtype=np.int16)
         pass
 
-    def convert(self, v: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+    def convert(self, v: Int16[ndarray, "time"]) -> Float64[ndarray, "time"]:
         u = v.astype(">u2")  # unsigned 16 bit integer
         b = np.bitwise_and(u, 1 << 15) // (1 << 15)  # b==1: new data b==0: old data
         # self.oldFlag = np.where(b==0)[0]
         b = np.bitwise_and(u, 1 << 14) // (1 << 14)  # b==1: error b==0: no error
         # self.errorFlag = np.where(b==1)[0]
         b = np.bitwise_and(u, (1 << 13) + (1 << 12))
-        v_raw: np.typing.NDArray[np.int16] | np.typing.NDArray[np.uint16]
+        v_raw: Int16[ndarray, "time"] | UInt16[ndarray, "time"]
         if np.all(b == 0):
             # dtype = '>u2' # big endian unsigned int 2 byte (16 bit)
             v_raw = np.bitwise_and(u, (1 << 13) - 1)
@@ -444,8 +446,8 @@ class Deconvolve(object):
 
     def __init__(
         self,
-        X_dX: np.typing.NDArray[np.float64],
-        X: np.typing.NDArray[np.float64],
+        X_dX: Float64[ndarray, "time"],
+        X: Float64[ndarray, "time"],
         fs: float,
         diff_gain: float,
     ):
@@ -456,8 +458,8 @@ class Deconvolve(object):
         self.X = X
 
     def bw_filter(
-        self, X_dX: np.typing.NDArray[np.float64], X: np.typing.NDArray[np.float64]
-    ) -> np.typing.NDArray[np.float64]:
+        self, X_dX: Float64[ndarray, "time"], X: Float64[ndarray, "time"]
+    ) -> Float64[ndarray, "time"]:
         fc = 1 / (2 * np.pi * self.diff_gain)
         b, a = ss.butter(1, fc / (self.fs / 2))
         if not X is None:
@@ -497,7 +499,7 @@ class Deconvolve(object):
         return X_hires
 
     def interpolate(
-        self, X_dX: np.typing.NDArray[np.float64], X: np.typing.NDArray[np.float64]
+        self, X_dX: Float64[ndarray, "time"], X: Float64[ndarray, "time"]
     ) -> typing.Any:
         # only interpolate if X and X_dX are not of equal length
         if X is None or (X.shape == X_dX.shape):

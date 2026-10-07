@@ -9,7 +9,9 @@ from typing import Any, Self
 
 import arrow
 import numpy as np
-import numpy.typing as np_typing
+from numpy import ndarray
+from jaxtyping import Float64, Int, Int16
+
 from scipy.interpolate import interp1d as si_interp1d
 
 from turban.instruments.microrider import rsConversions
@@ -25,6 +27,7 @@ from turban.instruments.microrider.rsCommon import (
 from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
+
 
 class HeaderEnum(enum.IntEnum):
     HeaderSize = 128
@@ -73,12 +76,8 @@ class Channel(object):
     def __init__(self, channel_config: ChannelConfigABC, deconvolved: bool = False):
         self.name: str = channel_config.name
         self.config: ChannelConfigABC = channel_config
-        self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
-            np.array([])
-        )
-        self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
-            np.array([])
-        )
+        self.data: Float64[ndarray, "time"] | Int16[ndarray, "time"] = np.array([])
+        self._data: Float64[ndarray, "time"] | Int16[ndarray, "time"] = np.array([])
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
         self.converted_into_units: bool = False
         self.deconvolved: bool = deconvolved
@@ -118,7 +117,9 @@ class Channel(object):
             return
         if cfg.sign == "unsigned":
             logger.info("Correcting sign")
-            self.data = self.data.astype(np.dtype(f">u{HeaderEnum.WordSize}"))  # as unsigned
+            self.data = self.data.astype(
+                np.dtype(f">u{HeaderEnum.WordSize}")
+            )  # as unsigned
         else:
             idx = np.where(self.data >= 2**31)[0]
             if len(idx):
@@ -197,7 +198,7 @@ class ChannelMatrix(object):
 
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
-    ) -> np_typing.NDArray[np.int64]:
+    ) -> Int[ndarray, "row column"]:
         matrix = []
         matrix_section = microrider_config.get_section("matrix")
         # we don't always have the number of rows given anymore.
@@ -525,7 +526,7 @@ class MicroRiderData(object):
         timestr = date.strftime("%H-%M-%S")
         return timestamp, datestr, timestr
 
-    def add_channel_data(self, data_snr: np_typing.NDArray[np.int16]) -> None:
+    def add_channel_data(self, data_snr: Int16[ndarray, "scan matrix_element"]) -> None:
         """Adds the channel data, from array with dtype i2/u2
 
         Parameters

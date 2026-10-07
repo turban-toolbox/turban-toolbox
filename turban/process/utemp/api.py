@@ -19,7 +19,9 @@ from turban.process.generic.api import (
     Level2,
     Level3,
     Level4,
+    Level,
     Processing,
+    TimeseriesLevel,
 )
 
 from turban.utils.logging import get_logger
@@ -184,4 +186,9 @@ class UTempLevel4(Level4):
 
 class UTempProcessing(Processing):
 
-    _level_mapping = {1: UTempLevel1, 2: UTempLevel2, 3: UTempLevel3, 4: UTempLevel4}
+    _level_mapping: dict[Level, type[TimeseriesLevel]] = {
+        Level.L1: UTempLevel1,
+        Level.L2: UTempLevel2,
+        Level.L3: UTempLevel3,
+        Level.L4: UTempLevel4,
+    }
