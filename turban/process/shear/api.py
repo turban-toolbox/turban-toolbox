@@ -10,7 +10,11 @@ import xarray as xr
 from turban.utils.util import agg_fast_to_slow
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
-from turban.process.shear.level4 import process_level4, get_quality_metric
+from turban.process.shear.level4 import (
+    process_level4,
+    get_quality_metric,
+    figure_of_merit,
+)
 from turban.process.generic.api import (
     AuxDataTypehintLevel12,
     AuxDataTypehintLevel34,
@@ -296,6 +300,7 @@ class ShearLevel4(Level4):
     kolm_length: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
+    waveno_cutoff: Float[ndarray, "nshear time"]  # upper limit of eps estimate
     quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
     molvisc: Float[ndarray, "time"] | float
@@ -322,6 +327,7 @@ class ShearLevel4(Level4):
             fom,
             log_diss_mad,
             num_spec_points,
+            waveno_cutoff,
         ) = process_level4(
             psi=level3.psi_k_sh,
             waveno=level3.waveno,
@@ -356,6 +362,7 @@ class ShearLevel4(Level4):
                 kolm_length=kolm_length,
                 resolved_var_frac=resolved_var_frac,
                 num_spec_points=num_spec_points,
+                waveno_cutoff=waveno_cutoff,
                 quality_metric=quality_metric,
                 molvisc=molvisc,
                 level_below=level3,
@@ -367,12 +374,19 @@ class ShearLevel4(Level4):
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         # TODO: flag to switch off loading of levels below
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
-            logger.warning(
-                "log_diss_var and log_diss_mad not available from atomix netcdf file."
+            logger.warning("log_diss_var not available from atomix netcdf file.")
+            level3 = ShearLevel3.from_atomix_netcdf(fname)
+            _, log_diss_mad, _ = figure_of_merit(
+                waveno=level3.waveno,
+                waveno_cutoff=ds["KMAX"].values,
+                eps=ds["EPSI"].values,
+                molvisc=ds["KVISC"].values,
+                psi=level3.psi_k_sh,
+                log_psi_var=level3.log_psi_var,
             )
             return cls(
                 eps=ds["EPSI"].values,
-                level_below=ShearLevel3.from_atomix_netcdf(fname),
+                level_below=level3,
                 time=ds["TIME"].values,
                 eps_source_flag=ds["METHOD"].values.astype(int) + 1,
                 section_number=ds["SECTION_NUMBER"].values.astype(int),
@@ -380,10 +394,11 @@ class ShearLevel4(Level4):
                 molvisc=ds["KVISC"].values,
                 resolved_var_frac=ds["VAR_RESOLVED"].values,
                 num_spec_points=ds["N_S"].values.astype(int),
+                waveno_cutoff=ds["KMAX"].values,
                 kolm_length=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
                 ** 0.25,
                 log_diss_var=np.nan * np.ones_like(ds["EPSI"].values),
-                log_diss_mad=np.nan * np.ones_like(ds["EPSI"].values),
+                log_diss_mad=log_diss_mad,
             )
 
 
