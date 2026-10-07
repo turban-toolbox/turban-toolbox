@@ -1,5 +1,6 @@
 """Defines high-level API to interact with TURBAN toolbox"""
 
+from enum import IntEnum
 from functools import wraps
 from inspect import isclass
 from typing import get_type_hints, ClassVar, cast
@@ -17,6 +18,16 @@ from turban.variables import VARIABLES
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class Level(IntEnum):
+    """Processing level number (see the four processing levels in the manual)."""
+
+    L1 = 1
+    L2 = 2
+    L3 = 3
+    L4 = 4
+
 
 # For Level1/2
 AuxDataTypehintLevel12 = dict[
@@ -61,7 +72,7 @@ class TimeseriesLevel:
 
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     _coords: ClassVar[list[str]] = ["time"]
-    _level: ClassVar[int]
+    _level: ClassVar[Level]
 
     def arrays_as_xr_dicts(self):
         """Separate array-typed fields into data-variable and coordinate dicts.
@@ -325,7 +336,7 @@ class Level1(AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[int] = 1
+    _level: ClassVar[Level] = Level.L1
 
     # TODO should consider using pydantic or similar for runtime checking of user input
     # (e.g., positive platform speed, etc.)
@@ -336,7 +347,7 @@ class Level2(HasLevelBelow, AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[int] = 2
+    _level: ClassVar[Level] = Level.L2
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
@@ -369,7 +380,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
 
     _coords = ["time", "freq"]
 
-    _level: ClassVar[int] = 3
+    _level: ClassVar[Level] = Level.L3
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level2) -> dict:
@@ -431,7 +442,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
 class Level4(HasLevelBelow, AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[int] = 4
+    _level: ClassVar[Level] = Level.L4
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level3) -> dict:
@@ -485,16 +496,16 @@ class Processing(ABC):
 
     @property
     @abstractmethod
-    def _level_mapping(self) -> dict:
+    def _level_mapping(self) -> dict[Level, type[TimeseriesLevel]]:
         """Mapping from level number to the corresponding level class.
 
         Returns
         -------
-        dict
-            Dict of ``{int: TimeseriesLevel subclass}`` for levels 1–4.
+        dict[Level, type[TimeseriesLevel]]
+            Dict of ``{Level: TimeseriesLevel subclass}`` for levels 1–4.
         """
         # Slightly clumsy way of requiring a class attribute called _level_mapping
-        return {1: Level1, 2: Level2, 3: Level3, 4: Level4}
+        return {Level.L1: Level1, Level.L2: Level2, Level.L3: Level3, Level.L4: Level4}
 
     def __init__(
         self,
@@ -507,8 +518,9 @@ class Processing(ABC):
         data : TimeseriesLevel
             Starting data object at any level.
         """
-        for l in range(data._level + 1, 5):
-            data = self._level_mapping[l].from_level_below(data)
+        for l in Level:
+            if l > data._level:
+                data = self._level_mapping[l].from_level_below(data)
         self.data = data
 
     @property
