@@ -393,7 +393,7 @@ class ShearProcessing(Processing):
     def from_atomix_netcdf(
         cls,
         fname: str,
-        level: int,
+        level: Literal[1, 2, 3, 4],
         data_aux: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None,
     ):
         """
@@ -403,10 +403,7 @@ class ShearProcessing(Processing):
         instructions if level<=2). If one wishes to use the simplified data aggregation
         API, one should first create a ShearLevelN object, then use .add_aux_data().
         """
-        if level in cls._level_mapping:
-            data = cls._level_mapping[level].from_atomix_netcdf(fname)
-        else:
-            raise ValueError(f"Level must be in {cls._level_mapping.keys()}")
+        data = cls._level_mapping[level].from_atomix_netcdf(fname)
         data.add_aux_data(data_aux)
         return cls(data)
 
