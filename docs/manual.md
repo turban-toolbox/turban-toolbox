@@ -64,6 +64,30 @@ level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
 # which level 4 will then use
 ```
 
+### Figure of merit and its ingredients
+
+ATOMIX defines as a poor figure of merit (FOM), i.e. $\mathrm{FOM} = \mathrm{MAD} / (\sigma_{\ln\Psi} T_M) > 1.4$, where the threshold of 1.4 is empirical. `ShearLevel4` stores the ingredients needed to recompute the FOM (`waveno_cutoff`, `log_diss_mad`, `num_spec_points`), including `log_psi_var` from `ShearLevel3`:
+
+```python
+import numpy as np
+from turban import ShearLevel3, ShearLevel4
+from turban.process.shear.level4 import figure_of_merit
+
+l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
+l4 = ShearLevel4.from_level_below(l3)
+
+fom, log_diss_mad, num_spec_points = figure_of_merit(
+    waveno=l3.waveno,
+    waveno_cutoff=l4.waveno_cutoff,  # upper wavenumber limit of the eps estimate
+    eps=l4.eps,
+    molvisc=l4.molvisc,
+    psi=l3.psi_k_sh,
+    log_psi_var=l3.log_psi_var,  # sigma_{ln Psi}
+)
+# T_M in the ATOMIX paper
+tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  
+```
+
 
 ## Sections, segments, and chunks
 

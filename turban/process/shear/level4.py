@@ -31,6 +31,7 @@ def process_level4(
     Float[ndarray, "nshear time"],  # Figure of Merit
     Float[ndarray, "nshear time"],  # Mean Absolute Deviation of log(psi)
     Int[ndarray, "nshear time"],  # number of spectral points
+    Float[ndarray, "nshear time"],  # upper wavenumber limit of eps estimate
 ]:
     """
     Produce epsilon estimates from shear power spectra.
@@ -106,6 +107,7 @@ def process_level4(
         fom,
         log_diss_mad,
         num_spec_points,
+        waveno_cutoff,
     )
 
 
@@ -191,17 +193,25 @@ def get_log_diss_var(
 
 
 def figure_of_merit(
-    waveno: Float[ndarray, "nshear waveno"],
+    waveno: Float[ndarray, "time waveno"],
     waveno_cutoff: Float[ndarray, "nshear time"],
-    eps: Float[ndarray, "nshear waveno"],
-    molvisc: Float[ndarray, "time"],
+    eps: Float[ndarray, "nshear time"],
+    molvisc: Float[ndarray, "time"] | float,
     psi: Float[ndarray, "nshear time waveno"],
     log_psi_var: float,
 ) -> tuple[
-    Float[ndarray, "nshear time"],
-    Float[ndarray, "nshear time"],
-    Int[ndarray, "nshear time"],
+    Float[ndarray, "nshear time"],  # Figure of Merit
+    Float[ndarray, "nshear time"],  # Mean Absolute Deviation of log(psi)
+    Int[ndarray, "nshear time"],  # number of spectral points
 ]:
+    """
+    Figure of merit (FOM) as in the ATOMIX paper: mean absolute deviation of the
+    observed from the model log-spectrum up to `waveno_cutoff`, normalised by
+    `log_psi_var` and T_M. All inputs are available on `ShearLevel4` and its
+    `level_below`, so the FOM can be recomputed outside of the processing chain.
+    """
+    if isinstance(molvisc, float):
+        molvisc = np.array(molvisc)[newaxis]
     psi_model = model_spectrum(waveno, eps, molvisc)
     use_waveno = waveno[newaxis, :, :] <= waveno_cutoff[:, :, newaxis]
     use_psi = np.where(use_waveno, psi, np.nan)[..., 1:]
@@ -236,7 +246,7 @@ def inertial_range_fit(
     )
     waveno_cutoff = 0.01 * k_kolmogorov
     ln_epsilon_fitrange = np.where(
-        waveno[newaxis, ...] < waveno_cutoff[:, :, newaxis],
+        waveno[newaxis, ...] <= waveno_cutoff[:, :, newaxis],
         ln_epsilon,
         np.nan,
     )
