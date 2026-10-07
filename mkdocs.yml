@@ -23,6 +23,7 @@ markdown_extensions:
   - footnotes
   - attr_list
   - pymdownx.superfences
+  - admonition
 
 nav:
   - Home: index.md

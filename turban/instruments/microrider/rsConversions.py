@@ -9,6 +9,7 @@ from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
 from turban.instruments.microrider import rsCommon as common
+from turban.instruments.generic import channels
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,9 @@ class Converter(ABC):
         channel configuration dataclass
     """
 
-    def __init__(self, config: common.ChannelConfigABC) -> None:
-        self.config: common.ChannelConfigABC = config
-        self.defaults: common.ChannelConfigABC
+    def __init__(self, config: channels.ChannelConfigBaseModel) -> None:
+        self.config: channels.ChannelConfigBaseModel = config
+        self.defaults: channels.ChannelConfigBaseModel
 
     def __call__(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -96,9 +97,9 @@ class Converter(ABC):
 class Piezo(Converter):
     """Specific converter method for Piezo type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigPiezo(a0=0.0, units="[ counts ]")
+        self.defaults = channels.ChannelConfigPiezo(a0=0.0, units="[ counts ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -114,9 +115,9 @@ class Gnd(Converter):
     Does not do any conversion.
     """
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfig(units="[ counts ]")
+        self.defaults = channels.ChannelConfig(units="[ counts ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -125,11 +126,11 @@ class Gnd(Converter):
 
 
 class Therm(Converter):
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         """Specific converter method for thermistor type channels"""
 
         super().__init__(config)
-        self.defaults = common.ChannelConfigThermistor(units="[ °C ]")
+        self.defaults = channels.ChannelConfigThermistor(units="[ °C ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -171,9 +172,9 @@ class Therm(Converter):
 class Shear(Converter):
     """Specific converter method for shear type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigShear(
+        self.defaults = channels.ChannelConfigShear(
             adc_zero=0.0, sig_zero=0.0, units="[ s^{-1} ]"
         )
 
@@ -195,9 +196,9 @@ class Shear(Converter):
 class Poly(Converter):
     """Specific converter method for polynomial type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigPressure(units=" ")
+        self.defaults = channels.ChannelConfigPressure(units=" ")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -215,9 +216,9 @@ class Poly(Converter):
 class Voltage(Converter):
     """Specific converter method for voltage type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigVoltage(adc_zero=0.0, g=1.0, units="[ V ]")
+        self.defaults = channels.ChannelConfigVoltage(adc_zero=0.0, g=1.0, units="[ V ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -231,9 +232,9 @@ class Voltage(Converter):
 
 
 class Incl(Converter):
-    """Specific converter method common to attitude type channels"""
+    """Specific converter method channels to attitude type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
         self.adis = Adis()
 
@@ -254,17 +255,17 @@ class Incl(Converter):
 class InclXY(Incl):
     """Specific converter method for attitude type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigInclinometer(units="[ ° ]")
+        self.defaults = channels.ChannelConfigInclinometer(units="[ ° ]")
 
 
 class InclT(Incl):
     """Specific converter method for attitude's temperature type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigInclinometer(
+        self.defaults = channels.ChannelConfigInclinometer(
             coef0=624.0, coef1=-0.47, units="[ °C ]"
         )
 
@@ -272,9 +273,9 @@ class InclT(Incl):
 class Aem1g_a(Converter):
     """Specific converter method for Aem1g_a type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
+        self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -303,9 +304,9 @@ The analog values should be used for this channel type."""
 class Aem1g_d(Converter):
     """Specific converter method for Aem1g_d type channels"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
+        self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
     def convert(
         self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
@@ -329,9 +330,9 @@ The digital values should be used for this channel type."""
 class PassThrough(Converter):
     """Pass through converter"""
 
-    def __init__(self, config: common.ChannelConfigABC):
+    def __init__(self, config: channels.ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = common.ChannelConfig()
+        self.defaults = channels.ChannelConfig()
 
     def convert(
         self, v: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64]
@@ -509,7 +510,7 @@ class Deconvolve(object):
         return ifun(t_fast)
 
 
-def get_converter(channel_config: common.ChannelConfigABC) -> type[Converter]:
+def get_converter(channel_config: channels.ChannelConfigBaseModel) -> type[Converter]:
     """Converter factory
 
     Parameters
