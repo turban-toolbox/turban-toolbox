@@ -18,7 +18,9 @@ from turban.process.generic.api import (
     Level2,
     Level3,
     Level4,
+    Level,
     Processing,
+    TimeseriesLevel,
 )
 from turban.utils.logging import get_logger
 
@@ -387,13 +389,18 @@ class ShearLevel4(Level4):
 
 class ShearProcessing(Processing):
 
-    _level_mapping = {1: ShearLevel1, 2: ShearLevel2, 3: ShearLevel3, 4: ShearLevel4}
+    _level_mapping: dict[Level, type[TimeseriesLevel]] = {
+        Level.L1: ShearLevel1,
+        Level.L2: ShearLevel2,
+        Level.L3: ShearLevel3,
+        Level.L4: ShearLevel4,
+    }
 
     @classmethod
     def from_atomix_netcdf(
         cls,
         fname: str,
-        level: Literal[1, 2, 3, 4],
+        level: Level | int,
         data_aux: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None,
     ):
         """
@@ -403,7 +410,7 @@ class ShearProcessing(Processing):
         instructions if level<=2). If one wishes to use the simplified data aggregation
         API, one should first create a ShearLevelN object, then use .add_aux_data().
         """
-        data = cls._level_mapping[level].from_atomix_netcdf(fname)
+        data = cls._level_mapping[Level(level)].from_atomix_netcdf(fname)
         data.add_aux_data(data_aux)
         return cls(data)
 
