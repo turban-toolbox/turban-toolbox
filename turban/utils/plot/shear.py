@@ -12,6 +12,7 @@ from turban.process.shear.api import (
     ShearLevel3,
     ShearLevel4,
 )
+from turban.process.generic.api import Level
 from turban.process.shear.util import model_spectrum
 from turban.utils.util import define_sections
 from turban.utils.logging import get_logger
@@ -71,10 +72,10 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     elif isinstance(data, xr.DataTree):
         out = []
         for level, class_ in (
-            (1, ShearLevel1),
-            (2, ShearLevel2),
-            (3, ShearLevel3),
-            (4, ShearLevel4),
+            (Level.L1, ShearLevel1),
+            (Level.L2, ShearLevel2),
+            (Level.L3, ShearLevel3),
+            (Level.L4, ShearLevel4),
         ):
             level_name = f"level{level}"
             if level_name in data:
@@ -99,10 +100,10 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
 def plot(*data: Any, subset: SubsetSpec | None = None):
     """Make all possible plots from any number of supplied data."""
     plot_map = {
-        1: plot_level1,
-        2: plot_level2,
-        3: plot_level3,
-        4: plot_level4,
+        Level.L1: plot_level1,
+        Level.L2: plot_level2,
+        Level.L3: plot_level3,
+        Level.L4: plot_level4,
     }
     level_data_items = [level for item in data for level in _to_levels(item)]
     level_data_levels = [item._level for item in level_data_items]
@@ -136,7 +137,7 @@ def _to_dataset(data: ShearLevelType | xr.Dataset) -> xr.Dataset:
     return data.to_xarray()
 
 
-def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
+def _parse_level_inputs(*data: Any) -> dict[Level, ShearLevelType]:
     """Parse mixed data inputs into a dict keyed by level number.
 
     Parameters
@@ -147,8 +148,8 @@ def _parse_level_inputs(*data: Any) -> dict[int, ShearLevelType]:
 
     Returns
     -------
-    dict[int, ShearLevelType]
-        Mapping from level number (1–4) to corresponding ShearLevel instance.
+    dict[Level, ShearLevelType]
+        Mapping from level (1–4) to corresponding ShearLevel instance.
     """
     level_items = tuple(level for item in data for level in _to_levels(item))
     out = {}
@@ -220,7 +221,7 @@ def plot_level1(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(1)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.L1)), subset)
 
     data_vars = set(ds.data_vars) - {"section_number", "shear", "senspeed"}
     n_panels = len(data_vars)
@@ -275,9 +276,9 @@ def plot_level2(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(2)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.L2)), subset)
     valid_section = ds["section_number"] != 0
-    data_l1 = levels.get(1, None)
+    data_l1 = levels.get(Level.L1, None)
     ds1 = None
     if data_l1 is not None:
         ds1 = _clip(_to_dataset(data_l1), subset)
@@ -334,8 +335,8 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
         if Level 4 data is provided.
     """
     levels = _parse_level_inputs(*data)
-    data_l3 = levels.get(3)
-    data_l4 = levels.get(4, None)
+    data_l3 = levels.get(Level.L3)
+    data_l4 = levels.get(Level.L4, None)
 
     if data_l3 is None:
         raise ValueError("plot_level3 requires Level 3 data")
@@ -419,7 +420,7 @@ def plot_level4(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(4)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.L4)), subset)
     nshear = len(ds.nshear)
 
     # Create figure with panels for eps and quality metrics
