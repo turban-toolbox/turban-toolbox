@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import copy
 from dataclasses import dataclass, field, fields
-from numpy.typing import NDArray
-from numpy import float64
+from jaxtyping import Float64
+from numpy import ndarray
 from typing import Any, Self, TypeVar
 from collections.abc import Callable
 
@@ -45,8 +45,8 @@ class Header:
     fs_slow: float
     header_version: float
     matrix_count: int
-    t_slow: NDArray[float64]
-    t_fast: NDArray[float64]
+    t_slow: Float64[ndarray, "time_slow"]
+    t_fast: Float64[ndarray, "time_fast"]
     timestamp: float
     date: str
     time: str
