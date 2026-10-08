@@ -24,3 +24,4 @@ python:
 mkdocs:
   # Path to your MkDocs configuration file.
   configuration: mkdocs.yml
+  fail_on_warning: true
