@@ -9,6 +9,7 @@ authors = [
 ]
 license = { text = "GPLv03" }
 dependencies = [
+  "arrow>=1.4.0",
   'beartype>=0.16',
   'gsw>=3.6',
   'jaxtyping>=0.2.20',
