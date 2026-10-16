@@ -202,18 +202,15 @@ By default `MicroriderProbe` reads sensor parameters (e.g. shear probe sensitivi
 from the setup string embedded in the `.p` file. You can override individual parameters by
 passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
 
-Use `channel_config_factory` to obtain a pre-populated config object for a named channel,
-then call `update` to override specific fields:
+Create a `MicroRiderChannelConfig` with the channel `name` and only the fields you want
+to override:
 
 ```python 
-from turban.instruments.microrider.rsCommon import channel_config_factory
+from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-sh1 = channel_config_factory("sh1")
-sh1.update("sens", 0.0700)  # V / (rad s⁻¹)
-
-sh2 = channel_config_factory("sh2")
-sh2.update("sens", 0.0970)
+sh1 = MicroRiderChannelConfig(name="sh1", sens=0.0700)  # V / (rad s⁻¹)
+sh2 = MicroRiderChannelConfig(name="sh2", sens=0.0970)
 
 microrider_config = MicroriderConfig(
     sampfreq=512.0,
@@ -223,9 +220,13 @@ microrider_config = MicroriderConfig(
 probe = MicroriderProbe(cfg=microrider_config)
 ```
 
-Only the fields explicitly passed to `update` override the file-embedded values; all
-other parameters continue to be read from the setup string embedded in
-the `.p` file.
+Only the fields explicitly passed override the file-embedded values; all other
+parameters continue to be read from the setup string embedded in the `.p` file.
+When the `.p` file is read, each channel gets a config class matching its `type`
+in the setup string (e.g. `ShearChannel`, `ThermChannel`, `PolyChannel` in
+`turban.instruments.microrider.rsConversions`), which also does the conversion into
+physical units. Channels of unknown type, or with an incomplete calibration, are
+left in counts.
 
 ---
 

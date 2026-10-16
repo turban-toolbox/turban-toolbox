@@ -1,343 +1,354 @@
-from abc import ABC, abstractmethod
-import logging
-from collections import defaultdict
+"""Channel configurations and conversions to physical units for the MicroRider.
+
+Each channel type (the ``type`` key of a ``[channel]`` section in the setup
+string) is represented by one pydantic model that holds the calibration
+parameters, their defaults, and the ``convert`` method that turns raw counts
+into physical units. ``make_channel_config`` selects the model for a section.
+"""
+
+import re
+from typing import Annotated, Any, Literal, Self
 import typing
 
 import numpy as np
 
+from pydantic import (
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
+)
 from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
-from turban.instruments.microrider import rsCommon as common
-from turban.instruments.generic import channels
+from turban.instruments.generic.channels import ChannelConfigBaseModel, RawArray
+from turban.utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
-class Converter(ABC):
-    """Base class for detailed converter classes
+def _number_to_str(v: Any) -> Any:
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return str(v)
+    return v
 
-    Parameters
-    ----------
-    config : ChannelConfig
-        channel configuration dataclass
+
+# Serial numbers like "487" are parsed as numbers by the setup string parser.
+# Note: formatting is lost by then, e.g. "059" arrives as 59 and becomes "59".
+SerialNumber = Annotated[str, BeforeValidator(_number_to_str)]
+
+
+def _counts_to_volts(
+    v: RawArray, adc_fs: float, adc_bits: int
+) -> np.typing.NDArray[np.float64]:
+    return v.astype(np.float64) * adc_fs / 2**adc_bits
+
+
+class MicroRiderChannelConfig(ChannelConfigBaseModel):
+    """Base class for MicroRider channel configurations
+
+    Keys from the setup string that are not declared as fields are kept as
+    extra attributes. This also allows partial user-supplied overrides, e.g.
+    ``MicroRiderChannelConfig(name="sh1", sens=0.0712)``.
+
+    Without a more specific type, no conversion is applied.
     """
 
-    def __init__(self, config: channels.ChannelConfigBaseModel) -> None:
-        self.config: channels.ChannelConfigBaseModel = config
-        self.defaults: channels.ChannelConfigBaseModel
-
-    def __call__(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        return self.convert(v)
-
-    def get_parameter(self, p: str) -> int | float:
-        """Looks up a parameter setting from the configuration
-
-        Parameters
-        ----------
-        p : string
-            parameter name
-
-        Returns
-        float
-            value of parameter setting.
-
-        The method returs the value set in the configuration, or a default value when no
-        value is configured. If also no default value is given, a ValueError is raised.
-        """
-        # return the value if it is configured
-        if self.config.is_set(p):
-            return_value = getattr(self.config, p)
-            if isinstance(return_value, int) or isinstance(return_value, float):
-                return return_value
-            else:
-                raise ValueError("Unexpected config value encountered.")
-        # not configured, return the value from the defaults, if configured
-        if self.defaults.is_set(p):
-            return_value = getattr(self.defaults, p)
-            if isinstance(return_value, int) or isinstance(return_value, float):
-                return return_value
-            else:
-                raise ValueError("Unexpected default value encountered.")
-        else:
-            raise ValueError(
-                f"Parameter {p} is required, but not given in config or default dict"
-            )
-
-    def get_optional_parameter(self, p: str) -> int | float | None:
-        """Looks up a parameter setting from the configuration
-
-        Parameters
-        ----------
-        p : string
-            parameter name
-
-        Returns
-        float
-            value of parameter setting.
-
-        The method returs the value set in the configuration, or a default value when no
-        value is configured. If also no default value is given None is returned.
-        """
-        try:
-            return_value = self.get_parameter(p)
-        except ValueError:
-            return_value = None
-        return return_value
-
-    @abstractmethod
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        pass
+    model_config = ConfigDict(extra="allow")
 
 
-class Piezo(Converter):
-    """Specific converter method for Piezo type channels"""
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigPiezo(a0=0.0, units="[ counts ]")
+class PreEmphasisChannel(MicroRiderChannelConfig):
+    """Pre-emphasised channel (T1_dT1, P_dP, ...)
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        a0 = self.get_parameter("a0")
-        v_unit = v.astype(np.float64) - a0
-        return v_unit
-
-
-class Gnd(Converter):
-    """Specific converter method for GND type channels
-
-    Does not do any conversion.
+    Not converted itself; only provides ``diff_gain`` for the deconvolution.
+    The deconvolved channel is converted with the config of the channel
+    without pre-emphasis (T1, P, ...).
     """
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfig(units="[ counts ]")
+    diff_gain: float
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        return v.astype(np.float64)
+    # Names of pre-emphasised channels that are deconvolved: T1_dT1, T2_dT2, P_dP
+    name_regex = re.compile(r"([TP]\w?)_d\1")
 
 
-class Therm(Converter):
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        """Specific converter method for thermistor type channels"""
+class PassThroughChannel(MicroRiderChannelConfig):
+    """Fallback for unknown channel types or incomplete calibrations"""
 
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigThermistor(units="[ °C ]")
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        a = self.get_parameter("a")
-        b = self.get_parameter("b")
-        adc_fs = self.get_parameter("adc_fs")
-        adc_bits = self.get_parameter("adc_bits")
-        g = self.get_parameter("g")
-        e_b = self.get_parameter("e_b")
-        t_0 = self.get_parameter("t_0")
+class GndChannel(MicroRiderChannelConfig):
+    """Ground channel, no conversion"""
 
-        Z = ((v - a) / b) * (adc_fs / 2**adc_bits) * 2 / (g * e_b)
+    type: Literal["gnd"]
+    units: str = "counts"
+
+
+class PiezoChannel(MicroRiderChannelConfig):
+    """Piezo-accelerometer channel (Ax, Ay)"""
+
+    type: Literal["piezo"]
+    a0: float = 0.0
+    units: str = "counts"
+
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        return v.astype(np.float64) - self.a0
+
+
+class ShearChannel(MicroRiderChannelConfig):
+    """Shear probe channel (sh1, sh2)"""
+
+    type: Literal["shear"]
+    adc_fs: float
+    adc_bits: int
+    diff_gain: float
+    sens: float
+    adc_zero: float = 0.0
+    sig_zero: float = 0.0
+    sn: SerialNumber = ""
+    cal_date: str = ""
+    units: str = "s-1"
+
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        volts = _counts_to_volts(v, self.adc_fs, self.adc_bits)
+        volts += self.adc_zero - self.sig_zero
+        return volts / (self.diff_gain * self.sens * 2 * float(np.sqrt(2)))
+
+
+class ThermChannel(MicroRiderChannelConfig):
+    """Thermistor channel (T1, T2)"""
+
+    type: Literal["therm"]
+    adc_fs: float
+    adc_bits: int
+    a: float
+    b: float
+    g: float
+    e_b: float
+    t_0: float
+    beta: float | None = None
+    beta_1: float | None = None
+    beta_2: float | None = None
+    beta_3: float | None = None
+    sn: SerialNumber = ""
+    cal_date: str = ""
+    units: str = "degC"
+
+    @model_validator(mode="after")
+    def _require_beta(self) -> Self:
+        if self.beta is None and self.beta_1 is None:
+            raise ValueError(f"{self.name}: thermistor needs beta or beta_1")
+        return self
+
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        z = (v.astype(np.float64) - self.a) / self.b
+        z *= (self.adc_fs / 2**self.adc_bits) * 2 / (self.g * self.e_b)
         # Avoid taking log of negative numbers in case of broken sensor:
-        Z = Z.clip(-0.6, 0.6, out=Z)
-        R = (1 - Z) / (1 + Z)
-        log_R = np.log(R)
-        beta = self.get_optional_parameter("beta") or self.get_optional_parameter(
-            "beta_1"
-        )
-        if beta is None:
-            logger.error("No beta or beta_1 for this thermistor")
-            ValueError("No beta or beta_1 for this thermistor")
-        else:
-            physical = 1 / t_0 + (1 / beta) * log_R
-
-        beta_2 = self.get_optional_parameter("beta_2")
-        if not beta_2 is None:
-            physical += (1 / beta_2) * log_R**2
-
-        beta_3 = self.get_optional_parameter("beta_3")
-        if not beta_3 is None:
-            physical += (1 / beta_3) * log_R**3
-
-        physical = 1 / physical - 273.15
-        return physical
+        z = z.clip(-0.6, 0.6)
+        log_r = np.log((1 - z) / (1 + z))
+        beta = self.beta if self.beta is not None else self.beta_1
+        assert beta is not None  # guaranteed by _require_beta
+        inv_t = 1 / self.t_0 + log_r / beta
+        if self.beta_2 is not None:
+            inv_t += log_r**2 / self.beta_2
+        if self.beta_3 is not None:
+            inv_t += log_r**3 / self.beta_3
+        return 1 / inv_t - 273.15
 
 
-class Shear(Converter):
-    """Specific converter method for shear type channels"""
+class PolyChannel(MicroRiderChannelConfig):
+    """Polynomial channel (P, PV, ...): coef0 + coef1*v + coef2*v**2 + ...
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigShear(
-            adc_zero=0.0, sig_zero=0.0, units="[ s^{-1} ]"
-        )
+    The setup string keys coef0..coef8 are collected into ``coefs``.
+    """
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        v = v.astype(np.float64)
-        adc_zero = self.get_parameter("adc_zero")
-        sig_zero = self.get_parameter("sig_zero")
-        adc_fs = self.get_parameter("adc_fs")
-        adc_bits = self.get_parameter("adc_bits")
-        diff_gain = self.get_parameter("diff_gain")
-        sens = self.get_parameter("sens")
-        v_unit = (adc_fs / 2**adc_bits) * v + (adc_zero - sig_zero)
-        v_unit /= diff_gain * sens * 2 * float(np.sqrt(2))
-        return v_unit
+    type: Literal["poly"]
+    coefs: list[float] = Field(min_length=1)
+    cal_date: str = ""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _collect_coefs(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "coefs" not in data:
+            data = dict(data)
+            coefs = []
+            for i in range(9):
+                if f"coef{i}" not in data:
+                    break
+                coefs.append(data.pop(f"coef{i}"))
+            data["coefs"] = coefs
+        return data
 
-class Poly(Converter):
-    """Specific converter method for polynomial type channels"""
-
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigPressure(units=" ")
-
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        polyVals: list[float | int] = []
-        for i in range(9):
-            p = self.get_optional_parameter(f"coef{i:d}")
-            if p is None:
-                break
-            polyVals.insert(0, p)
-        v_unit = np.polyval(polyVals, v).astype(np.float64)
-        return v_unit
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        return np.polynomial.polynomial.polyval(v.astype(np.float64), self.coefs)
 
 
-class Voltage(Converter):
-    """Specific converter method for voltage type channels"""
+class VoltageChannel(MicroRiderChannelConfig):
+    """Voltage channel (V_Bat, EMC_Cur)"""
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigVoltage(adc_zero=0.0, g=1.0, units="[ V ]")
+    type: Literal["voltage"]
+    adc_fs: float
+    adc_bits: int
+    adc_zero: float = 0.0
+    g: float = 1.0
+    units: str = "V"
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        adc_zero = self.get_parameter("adc_zero")
-        gain = self.get_parameter("g")
-        adc_fs = self.get_parameter("adc_fs")
-        adc_bits = self.get_parameter("adc_bits")
-        v_unit = (adc_zero + v * adc_fs / 2**adc_bits) / gain
-        return v_unit
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        volts = _counts_to_volts(v, self.adc_fs, self.adc_bits)
+        return (self.adc_zero + volts) / self.g
 
 
-class Incl(Converter):
-    """Specific converter method channels to attitude type channels"""
+class _InclChannel(MicroRiderChannelConfig):
+    """ADIS16209 inclinometer channel"""
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.adis = Adis()
+    coef0: float
+    coef1: float
 
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        coefs = [self.get_parameter("coef1"), self.get_parameter("coef0")]
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
         if v.dtype == ">i2":
             v = v.astype(np.int16)
         if not v.dtype == np.int16:
             raise ValueError("Unexpected datatype encountered.")
-        v_raw = self.adis.convert(v.astype(np.int16))
         # old data and errors are all ignored. Should we set all those elements to nan?
-        v_unit = np.polyval(coefs, v_raw).astype(np.float64)
-        return v_unit
+        v_raw = Adis().convert(v.astype(np.int16))
+        return self.coef0 + self.coef1 * v_raw
 
 
-class InclXY(Incl):
-    """Specific converter method for attitude type channels"""
+class InclXYChannel(_InclChannel):
+    """Inclinometer angle channel (Incl_X, Incl_Y)"""
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigInclinometer(units="[ ° ]")
+    type: Literal["inclxy"]
+    units: str = "deg"
 
 
-class InclT(Incl):
-    """Specific converter method for attitude's temperature type channels"""
+class InclTChannel(_InclChannel):
+    """Inclinometer temperature channel (Incl_T)"""
 
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigInclinometer(
-            coef0=624.0, coef1=-0.47, units="[ °C ]"
+    type: Literal["inclt"]
+    coef0: float = 624.0
+    coef1: float = -0.47
+    units: str = "degC"
+
+
+class _Aem1gChannel(MicroRiderChannelConfig):
+    """JFE Advantech AEM1-G electromagnetic current meter"""
+
+    a: float  # cm/s, as given in the calibration report
+    b: float  # cm/s per V (analog) or per count (digital)
+    bias: float = 0.0  # m/s
+    sn: SerialNumber = ""
+    cal_date: str = ""
+    units: str = "m s-1"
+
+
+class Aem1gAnalogChannel(_Aem1gChannel):
+    type: Literal["aem1g_a"]
+    adc_fs: float
+    adc_bits: int
+    adc_zero: float | None = None  # defaults to adc_fs / 2
+
+    @model_validator(mode="after")
+    def _check_coefs(self) -> Self:
+        if self.b / 100 < 1:
+            logger.warning(
+                f"{self.name}: provided coefficients (a, b) are not correct. Each "
+                "instrument provides two sets of calibration results - one for "
+                "analog output and one for digital output. The analog values "
+                "should be used for this channel type."
+            )
+        return self
+
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        adc_zero = self.adc_fs / 2 if self.adc_zero is None else self.adc_zero
+        volts = adc_zero + _counts_to_volts(v, self.adc_fs, self.adc_bits)
+        return self.a / 100 + self.b / 100 * volts - self.bias
+
+
+class Aem1gDigitalChannel(_Aem1gChannel):
+    type: Literal["aem1g_d"]
+
+    @model_validator(mode="after")
+    def _check_coefs(self) -> Self:
+        if self.b / 100 > 1:
+            logger.warning(
+                f"{self.name}: provided coefficients (a, b) are not correct. Each "
+                "instrument provides two sets of calibration results - one for "
+                "analog output and one for digital output. The digital values "
+                "should be used for this channel type."
+            )
+        return self
+
+    def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
+        u = v.astype(">u2").astype(np.float64)  # unsigned 16 bit integer
+        return self.a / 100 + self.b / 100 * u - self.bias
+
+
+MicroRiderChannel = Annotated[
+    GndChannel
+    | PiezoChannel
+    | ShearChannel
+    | ThermChannel
+    | PolyChannel
+    | VoltageChannel
+    | InclXYChannel
+    | InclTChannel
+    | Aem1gAnalogChannel
+    | Aem1gDigitalChannel,
+    Field(discriminator="type"),
+]
+
+_channel_adapter = TypeAdapter(MicroRiderChannel)
+KNOWN_TYPES = {
+    "gnd",
+    "piezo",
+    "shear",
+    "therm",
+    "poly",
+    "voltage",
+    "inclxy",
+    "inclt",
+    "aem1g_a",
+    "aem1g_d",
+}
+
+
+def make_channel_config(section: dict[str, Any]) -> MicroRiderChannelConfig:
+    """Builds a channel configuration from a ``[channel]`` section
+
+    Parameters
+    ----------
+    section : dict[str, Any]
+        key-value pairs of one ``[channel]`` section of the setup string.
+
+    Returns
+    -------
+    MicroRiderChannelConfig
+        configuration of the class matching the channel type. Pre-emphasised
+        channels (T1_dT1, P_dP, ...) get a PreEmphasisChannel, selected by name
+        as they share the type of the channel without pre-emphasis. Channels of
+        unknown type, or with an incomplete calibration, get a
+        PassThroughChannel, which leaves the data in counts.
+
+    Raises
+    ------
+    pydantic.ValidationError
+        if a pre-emphasised channel has no diff_gain.
+    """
+    kwargs = {k.lower(): v for k, v in section.items()}
+    name = str(kwargs.get("name", ""))
+    if PreEmphasisChannel.name_regex.fullmatch(name):
+        return PreEmphasisChannel.model_validate(kwargs)
+    if kwargs.get("type") not in KNOWN_TYPES:
+        return PassThroughChannel.model_validate(kwargs)
+    try:
+        return _channel_adapter.validate_python(kwargs)
+    except ValidationError as e:
+        logger.warning(
+            f"Channel {name!r} is not converted into units "
+            f"(incomplete configuration): {e}"
         )
-
-
-class Aem1g_a(Converter):
-    """Specific converter method for Aem1g_a type channels"""
-
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
-
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        bias = self.get_parameter("bias")
-        adc_fs = self.get_parameter("adc_fs")
-        adc_bits = self.get_parameter("adc_bits")
-        adc_zero = self.get_optional_parameter("adc_zero")
-        a = self.get_parameter("a") / 100  # cm/s -> m/s
-        b = self.get_parameter("b") / 100  # cm/s -> m/s
-        v_unit: np.typing.NDArray[np.float64]
-        if adc_zero is None:
-            adc_zero = adc_fs / 2
-        v_unit = adc_zero + v * adc_fs / 2**adc_bits
-        v_unit = a + b * v_unit
-        v_unit -= bias
-        if b < 1:
-            m = """Provided coefficients (a,b) are not correct.  Each
-instrument provides two sets of calibration results 
-- one for analog output and one for digital output. 
-The analog values should be used for this channel type."""
-            logger.warning(m)
-        return v_unit
-
-
-class Aem1g_d(Converter):
-    """Specific converter method for Aem1g_d type channels"""
-
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
-
-    def convert(
-        self, v: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16]
-    ) -> np.typing.NDArray[np.float64]:
-        u = v.astype(">u2")  # unsigned 16 bit integer
-        a = self.get_parameter("a") / 100  # cm/s -> m/s
-        b = self.get_parameter("b") / 100  # cm/s -> m/s
-        bias = self.get_parameter("bias")
-        v_unit: np.typing.NDArray[np.float64]
-        v_unit = a + b * u
-        v_unit -= bias
-        if b > 1:
-            m = """Provided coefficients (a,b) are not correct.  Each
-instrument provides two sets of calibration results 
-- one for analog output and one for digital output. 
-The digital values should be used for this channel type."""
-            logger.warning(m)
-        return v_unit
-
-
-class PassThrough(Converter):
-    """Pass through converter"""
-
-    def __init__(self, config: channels.ChannelConfigBaseModel):
-        super().__init__(config)
-        self.defaults = channels.ChannelConfig()
-
-    def convert(
-        self, v: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64]
-    ) -> np.typing.NDArray[np.float64]:
-        return v.astype(np.float64)
+        return PassThroughChannel.model_validate(kwargs)
 
 
 class Adis(object):
@@ -508,51 +519,3 @@ class Deconvolve(object):
         t_fast = np.arange(X_dX.shape[0]) / self.fs
         ifun = si_PchipInterpolator(t_slow, X, extrapolate=True)
         return ifun(t_fast)
-
-
-def get_converter(channel_config: channels.ChannelConfigBaseModel) -> type[Converter]:
-    """Converter factory
-
-    Parameters
-    ----------
-    channel_config : ChannelConfig
-        channel configuration dataclass
-
-    Returns
-    -------
-    Converter object, relevant for the requested channel type.
-
-    Note : this code uses the match/case structure and requires therefore python 3.10+
-    """
-    converter: type[Converter]
-    try:
-        sensor_type = channel_config.type
-    except KeyError:
-        sensor_type = "none"
-    match sensor_type:
-        case "piezo":
-            converter = Piezo
-        case "gnd":
-            converter = Gnd
-        case "therm":
-            converter = Therm
-        case "shear":
-            converter = Shear
-        case "poly":
-            converter = Poly
-        case "voltage":
-            converter = Voltage
-        case "inclxy":
-            converter = InclXY
-        case "inclt":
-            converter = InclT
-        case "aem1g_a":
-            converter = Aem1g_a
-        case "aem1g_d":
-            converter = Aem1g_d
-        case "none":
-            converter = PassThrough
-        case _:
-            converter = PassThrough
-
-    return converter

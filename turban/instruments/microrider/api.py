@@ -3,9 +3,9 @@ import numpy as np
 
 from turban.instruments.generic.api import Instrument
 from turban.instruments.generic.config import InstrumentConfig
-from turban.instruments.generic.channels import ChannelConfigBaseModel
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider import rsIO
+from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 from turban.process.shear.api import ShearLevel1
 from turban.process.shear.config import ShearConfig
 
@@ -21,7 +21,7 @@ class MicroriderAPIError(Exception):
 class MicroriderConfig(InstrumentConfig):
     sensor_speed_plugin: str = ""
     sensor_speed_plugin_parameters: dict[str, float | str] = {}
-    channel_cfgs: list[ChannelConfigBaseModel] = []
+    channel_cfgs: list[MicroRiderChannelConfig] = []
 
 class MicroriderProbe(Instrument):
 

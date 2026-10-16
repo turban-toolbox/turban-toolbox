@@ -3,8 +3,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from turban.instruments.generic.api import InstrumentEnum
-from turban.instruments.generic.channels import channel_config_factory
+from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderConfig, MicroriderProbe
 from turban.process.shear.api import ShearConfig
@@ -46,10 +45,9 @@ def shear_cfg():
 
 @pytest.fixture(scope="session")
 def channel_cfgs():
-    sh1 = channel_config_factory("sh1", InstrumentEnum.MicroRider)
-    sh1.update("sens", 1e99)
-    sh2 = channel_config_factory("sh2", InstrumentEnum.MicroRider)
-    sh2.update("sens", 1e99)
+    # partial user overrides: only the set fields are merged into the .P config
+    sh1 = MicroRiderChannelConfig(name="sh1", sens=1e99)
+    sh2 = MicroRiderChannelConfig(name="sh2", sens=1e99)
     return [sh1, sh2]
 
 
