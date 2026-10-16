@@ -200,33 +200,31 @@ factory (see below) and lists it in the registry for introspection.
 
 By default `MicroriderProbe` reads sensor parameters (e.g. shear probe sensitivity `sens`)
 from the setup string embedded in the `.p` file. You can override individual parameters by
-passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
-
-Create a `MicroRiderChannelConfig` with the channel `name` and only the fields you want
-to override:
+passing a list of dictionaries in `MicroriderConfig.channel_cfgs`, each with the channel
+`name` and only the fields you want to override:
 
 ```python 
-from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
-
-sh1 = MicroRiderChannelConfig(name="sh1", sens=0.0700)  # V / (rad s⁻¹)
-sh2 = MicroRiderChannelConfig(name="sh2", sens=0.0970)
 
 microrider_config = MicroriderConfig(
     sampfreq=512.0,
     sensors={},
-    channel_cfgs=[sh1, sh2],
+    channel_cfgs=[
+        {"name": "sh1", "sens": 0.0700},  # V / (rad s⁻¹)
+        {"name": "sh2", "sens": 0.0970},
+    ],
 )
 probe = MicroriderProbe(cfg=microrider_config)
 ```
 
-Only the fields explicitly passed override the file-embedded values; all other
-parameters continue to be read from the setup string embedded in the `.p` file.
-When the `.p` file is read, each channel gets a config class matching its `type`
+All other parameters continue to be read from the setup string embedded in the `.p`
+file. When the `.p` file is read, each channel gets a config class matching its `type`
 in the setup string (e.g. `ShearChannel`, `ThermChannel`, `PolyChannel` in
 `turban.instruments.microrider.rsConversions`), which also does the conversion into
-physical units. Channels of unknown type, or with an incomplete calibration, are
-left in counts.
+physical units. The overrides are validated against that class: a field name the
+channel type does not have, an invalid value, or a channel name that is not in the
+file raises an error. Channels of unknown type, or with an incomplete calibration in
+the setup string, are left in counts.
 
 ---
 

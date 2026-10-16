@@ -195,13 +195,20 @@ class ChannelMatrix(object):
     ----------
     microrider_config : dict[str, str|int|float|list[int]]
         dictionary holding the MR configuration
+    channel_cfgs : list[dict[str, Any]] | None
+        user-supplied channel settings that override those of the setup
+        string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     """
 
-    def __init__(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> None:
+    def __init__(
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.matrix = self._get_matrix(microrider_config)
         self.number_of_elements = np.prod(self.matrix.shape)
-        self.channels = self._create_channels(microrider_config)
+        self.channels = self._create_channels(microrider_config, channel_cfgs or [])
 
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
@@ -226,16 +233,34 @@ class ChannelMatrix(object):
         return np.array(matrix)
 
     def _create_channels(
-        self, microrider_config: rsConfig_parser.MicroRiderConfig
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]],
     ) -> dict[str, Channel]:
         """ """
         channels: dict[str, Channel] = {}
+        overrides: dict[str, dict[str, Any]] = {}
+        for channel_cfg in channel_cfgs:
+            if "name" not in channel_cfg:
+                raise ValueError(f"Channel configuration without name: {channel_cfg}")
+            if channel_cfg["name"] in overrides:
+                raise ValueError(f"Channel {channel_cfg['name']!r} configured twice.")
+            overrides[channel_cfg["name"]] = channel_cfg
+        available = set(microrider_config.get_channel_name_map())
+        unknown = set(overrides) - available
+        if unknown:
+            raise ValueError(
+                f"Configuration given for channels {sorted(unknown)}, which are "
+                f"not in the data file. Available: {sorted(available)}"
+            )
 
         logger.info("Available channels:")
         for n in range(microrider_config.number_of_channels):
             section_name = f"channel{n:02d}"
             section_dict = microrider_config.get_section(section_name)
-            channel_config = make_channel_config(section_dict)
+            channel_config = make_channel_config(
+                section_dict, overrides.get(section_dict["name"])
+            )
             channel_name = channel_config.name
             channels[channel_name] = Channel(channel_config)
             logger.info(f"\t{n:2d}: {channel_name}")
@@ -436,12 +461,20 @@ class MicroRiderData(object):
 
     config: system configuration, extracted from the setupfile string.
 
+    channel_cfgs : list[dict[str, Any]] | None
+        user-supplied channel settings, see ChannelMatrix.
+
     """
 
-    def __init__(self, path: str, config: rsConfig_parser.MicroRiderConfig) -> None:
+    def __init__(
+        self,
+        path: str,
+        config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.config: rsConfig_parser.MicroRiderConfig = config
         self.header: Header
-        self.channel_matrix: ChannelMatrix = ChannelMatrix(config)
+        self.channel_matrix: ChannelMatrix = ChannelMatrix(config, channel_cfgs)
         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
         self._path = path
 
@@ -682,7 +715,7 @@ class MicroRiderData(object):
 
 
 def read_p_file(
-    filename: str, channel_configs: list[MicroRiderChannelConfig] = []
+    filename: str, channel_cfgs: list[dict[str, Any]] | None = None
 ) -> MicroRiderData:
     """Function to read a single .p file.
 
@@ -690,6 +723,9 @@ def read_p_file(
     ----------
     filename : str
          Name of .p file to read
+    channel_cfgs : list[dict[str, Any]] | None
+         user-supplied channel settings that override those of the setup
+         string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     Returns
     -------
@@ -707,9 +743,7 @@ def read_p_file(
         # read embedded setupstring (leaves the fp in the correct place)
         setupstring = header_parser.read_setupstring(fd, header_data)
         microrider_config.parse(setupstring)
-        for channel_config in channel_configs:
-            microrider_config.update_config(channel_config)
-        data = MicroRiderData(full_path, microrider_config)
+        data = MicroRiderData(full_path, microrider_config, channel_cfgs)
         data.add_header_data(header_data, n_records)
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
 

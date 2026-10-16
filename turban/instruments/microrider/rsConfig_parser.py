@@ -1,7 +1,6 @@
 import re
 from typing import Any
 
-from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
@@ -100,24 +99,6 @@ class MicroRiderConfig:
 
                 self._config[self._current_section][key] = parsed_value
 
-    def update_config(self, channel_config: MicroRiderChannelConfig) -> None:
-        updated = False
-        for ch, cfg in self._config.items():
-            try:
-                channel_name = cfg['name']
-            except KeyError:
-                continue
-            else:
-                if channel_name == channel_config.name:
-                    for field_name in channel_config.model_fields_set:
-                        if field_name == "name":
-                            continue
-                        # set any set fields.
-                        cfg[field_name] = getattr(channel_config, field_name)
-                    updated = True
-        if not updated:
-            logger.warning(f"A user-supplied sensor configuration ({channel_config.name}) was supplied, but no match was found.")
-            
     @property
     def number_of_channels(self) -> int:
         return self._number_of_channels

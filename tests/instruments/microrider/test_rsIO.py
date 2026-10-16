@@ -132,6 +132,28 @@ def test_channel_matrix(microrider_config_data):
     assert channel_matrix.number_of_elements == 72
 
 
+@pytest.mark.parametrize("microrider_config_data", ["0413"], indirect=True)
+def test_channel_matrix_override(microrider_config_data):
+    channel_matrix = rsIO.ChannelMatrix(
+        microrider_config_data["microrider_config"], [{"name": "sh1", "sens": 1.0}]
+    )
+    assert channel_matrix.channels["sh1"].config.sens == 1.0
+
+
+@pytest.mark.parametrize("microrider_config_data", ["0413"], indirect=True)
+@pytest.mark.parametrize(
+    "channel_cfgs,match",
+    [
+        ([{"name": "sh9", "sens": 1.0}], "sh9"),
+        ([{"sens": 1.0}], "without name"),
+        ([{"name": "sh1", "sens": 1.0}, {"name": "sh1", "sens": 2.0}], "twice"),
+    ],
+)
+def test_channel_matrix_override_errors(microrider_config_data, channel_cfgs, match):
+    with pytest.raises(ValueError, match=match):
+        rsIO.ChannelMatrix(microrider_config_data["microrider_config"], channel_cfgs)
+
+
 def test_channel_config():
     channel_config = PassThroughChannel(name="ch255", id=255, type="")
     assert channel_config.name == "ch255"

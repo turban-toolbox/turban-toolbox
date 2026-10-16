@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
+from typing import Any
+
 import numpy as np
 
 from turban.instruments.generic.api import Instrument
 from turban.instruments.generic.config import InstrumentConfig
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider import rsIO
-from turban.instruments.microrider.rsConversions import MicroRiderChannelConfig
 from turban.process.shear.api import ShearLevel1
 from turban.process.shear.config import ShearConfig
 
@@ -21,7 +22,10 @@ class MicroriderAPIError(Exception):
 class MicroriderConfig(InstrumentConfig):
     sensor_speed_plugin: str = ""
     sensor_speed_plugin_parameters: dict[str, float | str] = {}
-    channel_cfgs: list[MicroRiderChannelConfig] = []
+    # Channel settings overriding those of the setup string in the .p file,
+    # e.g. [{"name": "sh1", "sens": 0.0712}]
+    channel_cfgs: list[dict[str, Any]] = []
+
 
 class MicroriderProbe(Instrument):
 

@@ -7,19 +7,12 @@ into physical units. ``make_channel_config`` selects the model for a section.
 """
 
 import re
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, ClassVar, Literal, Self
 import typing
 
 import numpy as np
 
-from pydantic import (
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    TypeAdapter,
-    ValidationError,
-    model_validator,
-)
+from pydantic import BeforeValidator, ConfigDict, ValidationError, model_validator
 from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
@@ -49,15 +42,14 @@ def _counts_to_volts(
 class MicroRiderChannelConfig(ChannelConfigBaseModel):
     """Base class for MicroRider channel configurations
 
-    Keys from the setup string that are not declared as fields are kept as
-    extra attributes. This also allows partial user-supplied overrides, e.g.
-    ``MicroRiderChannelConfig(name="sh1", sens=0.0712)``.
+    Unknown fields are rejected. Keys in the setup string that a channel type
+    does not use are dropped by ``make_channel_config`` before validation;
+    keys in user-supplied overrides are not, so a misspelled override fails.
 
     Without a more specific type, no conversion is applied.
     """
 
-    model_config = ConfigDict(extra="allow")
-
+    model_config = ConfigDict(extra="forbid")
 
 
 class PreEmphasisChannel(MicroRiderChannelConfig):
@@ -71,7 +63,7 @@ class PreEmphasisChannel(MicroRiderChannelConfig):
     diff_gain: float
 
     # Names of pre-emphasised channels that are deconvolved: T1_dT1, T2_dT2, P_dP
-    name_regex = re.compile(r"([TP]\w?)_d\1")
+    name_regex: ClassVar[re.Pattern[str]] = re.compile(r"([TP]\w?)_d\1")
 
 
 class PassThroughChannel(MicroRiderChannelConfig):
@@ -158,27 +150,30 @@ class ThermChannel(MicroRiderChannelConfig):
 
 
 class PolyChannel(MicroRiderChannelConfig):
-    """Polynomial channel (P, PV, ...): coef0 + coef1*v + coef2*v**2 + ...
-
-    The setup string keys coef0..coef8 are collected into ``coefs``.
-    """
+    """Polynomial channel (P, PV, ...): coef0 + coef1*v + coef2*v**2 + ..."""
 
     type: Literal["poly"]
-    coefs: list[float] = Field(min_length=1)
+    coef0: float
+    coef1: float | None = None
+    coef2: float | None = None
+    coef3: float | None = None
+    coef4: float | None = None
+    coef5: float | None = None
+    coef6: float | None = None
+    coef7: float | None = None
+    coef8: float | None = None
     cal_date: str = ""
 
-    @model_validator(mode="before")
-    @classmethod
-    def _collect_coefs(cls, data: Any) -> Any:
-        if isinstance(data, dict) and "coefs" not in data:
-            data = dict(data)
-            coefs = []
-            for i in range(9):
-                if f"coef{i}" not in data:
-                    break
-                coefs.append(data.pop(f"coef{i}"))
-            data["coefs"] = coefs
-        return data
+    @property
+    def coefs(self) -> list[float]:
+        """Coefficients coef0, coef1, ... up to the first one not set"""
+        coefs = []
+        for i in range(9):
+            c = getattr(self, f"coef{i}")
+            if c is None:
+                break
+            coefs.append(c)
+        return coefs
 
     def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
         return np.polynomial.polynomial.polyval(v.astype(np.float64), self.coefs)
@@ -284,42 +279,43 @@ class Aem1gDigitalChannel(_Aem1gChannel):
         return self.a / 100 + self.b / 100 * u - self.bias
 
 
-MicroRiderChannel = Annotated[
-    GndChannel
-    | PiezoChannel
-    | ShearChannel
-    | ThermChannel
-    | PolyChannel
-    | VoltageChannel
-    | InclXYChannel
-    | InclTChannel
-    | Aem1gAnalogChannel
-    | Aem1gDigitalChannel,
-    Field(discriminator="type"),
-]
-
-_channel_adapter = TypeAdapter(MicroRiderChannel)
-KNOWN_TYPES = {
-    "gnd",
-    "piezo",
-    "shear",
-    "therm",
-    "poly",
-    "voltage",
-    "inclxy",
-    "inclt",
-    "aem1g_a",
-    "aem1g_d",
+# Channel type (the ``type`` key in the setup string) -> configuration class
+CHANNEL_TYPES: dict[str, type[MicroRiderChannelConfig]] = {
+    "gnd": GndChannel,
+    "piezo": PiezoChannel,
+    "shear": ShearChannel,
+    "therm": ThermChannel,
+    "poly": PolyChannel,
+    "voltage": VoltageChannel,
+    "inclxy": InclXYChannel,
+    "inclt": InclTChannel,
+    "aem1g_a": Aem1gAnalogChannel,
+    "aem1g_d": Aem1gDigitalChannel,
 }
 
 
-def make_channel_config(section: dict[str, Any]) -> MicroRiderChannelConfig:
+def _known_fields(
+    cls: type[MicroRiderChannelConfig], kwargs: dict[str, Any]
+) -> dict[str, Any]:
+    """Drops setup string keys that the configuration class does not use"""
+    unused = set(kwargs) - set(cls.model_fields)
+    if unused:
+        logger.debug(f"{kwargs.get('name')!r}: ignoring setup keys {sorted(unused)}")
+    return {k: v for k, v in kwargs.items() if k in cls.model_fields}
+
+
+def make_channel_config(
+    section: dict[str, Any], override: dict[str, Any] | None = None
+) -> MicroRiderChannelConfig:
     """Builds a channel configuration from a ``[channel]`` section
 
     Parameters
     ----------
     section : dict[str, Any]
         key-value pairs of one ``[channel]`` section of the setup string.
+    override : dict[str, Any] | None
+        user-supplied values that replace those of the setup string,
+        e.g. ``{"name": "sh1", "sens": 0.0712}``.
 
     Returns
     -------
@@ -327,28 +323,39 @@ def make_channel_config(section: dict[str, Any]) -> MicroRiderChannelConfig:
         configuration of the class matching the channel type. Pre-emphasised
         channels (T1_dT1, P_dP, ...) get a PreEmphasisChannel, selected by name
         as they share the type of the channel without pre-emphasis. Channels of
-        unknown type, or with an incomplete calibration, get a
-        PassThroughChannel, which leaves the data in counts.
+        unknown type, or with an incomplete calibration in the setup string, get
+        a PassThroughChannel, which leaves the data in counts.
 
     Raises
     ------
     pydantic.ValidationError
-        if a pre-emphasised channel has no diff_gain.
+        if a pre-emphasised channel has no diff_gain, or if the override has a
+        field that the channel type does not have, or an invalid value.
     """
     kwargs = {k.lower(): v for k, v in section.items()}
     name = str(kwargs.get("name", ""))
+    cls: type[MicroRiderChannelConfig]
     if PreEmphasisChannel.name_regex.fullmatch(name):
-        return PreEmphasisChannel.model_validate(kwargs)
-    if kwargs.get("type") not in KNOWN_TYPES:
-        return PassThroughChannel.model_validate(kwargs)
+        cls = PreEmphasisChannel
+    else:
+        cls = CHANNEL_TYPES.get(str(kwargs.get("type", "")), PassThroughChannel)
+    kwargs = _known_fields(cls, kwargs)
+    if override is not None:
+        # not filtered: unknown fields in user input must fail.
+        kwargs.update({k.lower(): v for k, v in override.items()})
+        return cls.model_validate(kwargs)
+    if cls is PreEmphasisChannel:  # without diff_gain, deconvolution is impossible
+        return cls.model_validate(kwargs)
     try:
-        return _channel_adapter.validate_python(kwargs)
+        return cls.model_validate(kwargs)
     except ValidationError as e:
         logger.warning(
             f"Channel {name!r} is not converted into units "
             f"(incomplete configuration): {e}"
         )
-        return PassThroughChannel.model_validate(kwargs)
+        return PassThroughChannel.model_validate(
+            _known_fields(PassThroughChannel, kwargs)
+        )
 
 
 class Adis(object):

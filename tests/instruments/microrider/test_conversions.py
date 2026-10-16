@@ -148,7 +148,6 @@ def test_make_channel_config_preemphasis_channel_requires_diff_gain():
         make_channel_config(dict(name="T1_dT1", type="therm"))
 
 
-
 def test_numeric_sn_is_accepted():
     cfg = make_channel_config({**_SHEAR_SECTION, "SN": 487})
     assert isinstance(cfg, ShearChannel)
@@ -163,3 +162,31 @@ def test_numbers_rejected_for_other_str_fields():
 def test_make_channel_config_poly_without_coefs_passes_through():
     cfg = make_channel_config(dict(name="PV", type="poly"))
     assert type(cfg) is PassThroughChannel
+
+
+def test_make_channel_config_ignores_unused_setup_keys():
+    cfg = make_channel_config(dict(name="Gnd", type="gnd", coef0=0.0))
+    assert type(cfg).__name__ == "GndChannel"
+
+
+def test_make_channel_config_override():
+    cfg = make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sens": 0.08})
+    assert isinstance(cfg, ShearChannel)
+    assert cfg.sens == 0.08
+    assert cfg.adc_fs == 4.096  # from the setup string
+
+
+def test_make_channel_config_override_completes_calibration():
+    section = {k: v for k, v in _SHEAR_SECTION.items() if k != "sens"}
+    cfg = make_channel_config(section, {"name": "sh1", "sens": 0.08})
+    assert isinstance(cfg, ShearChannel)
+
+
+def test_make_channel_config_override_unknown_field_fails():
+    with pytest.raises(ValidationError, match="sense"):
+        make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sense": 0.08})
+
+
+def test_make_channel_config_override_invalid_value_fails():
+    with pytest.raises(ValidationError, match="sens"):
+        make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sens": "abc"})
