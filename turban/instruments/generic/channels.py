@@ -20,13 +20,6 @@ class ChannelConfigBaseModel(BaseModel):
     sample_rate: float = 0.0
     units: str = ""
 
-    def __repr__(self) -> str:
-        s: str = f"{self.__class__.__name__}:\n"
-        for k in type(self).model_fields:
-            if k in self.model_fields_set:
-                s += f"    {k}: {getattr(self, k)}\n"
-        return s
-
     def convert(self, v: RawArray) -> np.typing.NDArray[np.float64]:
         """Converts raw data into physical units. Default: no conversion."""
         return v.astype(np.float64)
