@@ -9,8 +9,9 @@ import zipfile
 import numpy as np
 from scipy.io import loadmat
 
-from turban.instruments.generic import channels
+from turban.instruments.generic.channels import ChannelConfigBaseModel
 from turban.instruments.microrider import rsIO, rsConfig_parser
+from turban.instruments.microrider.rsConversions import PassThroughChannel
 from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
@@ -131,30 +132,44 @@ def test_channel_matrix(microrider_config_data):
     assert channel_matrix.number_of_elements == 72
 
 
+@pytest.mark.parametrize("microrider_config_data", ["0413"], indirect=True)
+def test_channel_matrix_override(microrider_config_data):
+    channel_matrix = rsIO.ChannelMatrix(
+        microrider_config_data["microrider_config"], [{"name": "sh1", "sens": 1.0}]
+    )
+    assert channel_matrix.channels["sh1"].config.sens == 1.0
+
+
+@pytest.mark.parametrize("microrider_config_data", ["0413"], indirect=True)
+@pytest.mark.parametrize(
+    "channel_cfgs,match",
+    [
+        ([{"name": "sh9", "sens": 1.0}], "sh9"),
+        ([{"sens": 1.0}], "without name"),
+        ([{"name": "sh1", "sens": 1.0}, {"name": "sh1", "sens": 2.0}], "twice"),
+    ],
+)
+def test_channel_matrix_override_errors(microrider_config_data, channel_cfgs, match):
+    with pytest.raises(ValueError, match=match):
+        rsIO.ChannelMatrix(microrider_config_data["microrider_config"], channel_cfgs)
+
+
 def test_channel_config():
-    channel_config = channels.ChannelConfig(name="ch255", id=255, type="")
+    channel_config = PassThroughChannel(name="ch255", id=255, type="")
     assert channel_config.name == "ch255"
     assert channel_config.id == 255
     assert channel_config.type == ""
-    channel_config.update("name", "CH255")
+    channel_config.name = "CH255"
     assert channel_config.name == "CH255"
+
+
+def test_channel_config_base_rejects_unknown_field():
+    # MicroRider configs allow extra fields; the generic base does not.
+    channel_config = ChannelConfigBaseModel(name="ch255")
     with pytest.raises(
-        AttributeError, match="ChannelConfig has no attribute not_exsting."
+        ValueError, match='"ChannelConfigBaseModel" object has no field "not_exsting"'
     ):
-        channel_config.update("not_exsting", 13)
-
-
-def test_channel_config_is_set():
-    channel_config = channels.ChannelConfigThermistor(name="T1", id=12, type="therm")
-    assert channel_config.is_set("name")
-    assert not channel_config.is_set("a")
-    with pytest.raises(
-        AttributeError, match="ChannelConfigThermistor has no attribute a0"
-    ):
-        channel_config.is_set("a0")
-    channel_config.update("a", 1)
-    assert channel_config.is_set("a")
-
+        channel_config.not_exsting = 13
 
 #
 # Test MicroRiderData class

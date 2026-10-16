@@ -3,9 +3,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from turban.instruments.generic.api import InstrumentEnum
-from turban.instruments.generic.channels import channel_config_factory
-import turban.instruments.microrider.sensorspeedplugins as plugins
+import turban.instruments.microrider.sensorspeedplugins as senspeed
 from turban.instruments.microrider.api import MicroriderConfig, MicroriderProbe
 from turban.process.shear.api import ShearConfig
 
@@ -46,10 +44,9 @@ def shear_cfg():
 
 @pytest.fixture(scope="session")
 def channel_cfgs():
-    sh1 = channel_config_factory("sh1", InstrumentEnum.MicroRider)
-    sh1.update("sens", 1e99)
-    sh2 = channel_config_factory("sh2", InstrumentEnum.MicroRider)
-    sh2.update("sens", 1e99)
+    # partial user overrides: only the set fields are merged into the .P config
+    sh1 = {"name": "sh1", "sens": 1e99}
+    sh2 = {"name": "sh2", "sens": 1e99}
     return [sh1, sh2]
 
 
@@ -60,35 +57,43 @@ def probe():
 
 
 @pytest.fixture
-def probePostConfigureSensitivity(channel_cfgs):
-    cfg = MicroriderConfig(sampfreq=1.0,
-                           sensors={},
-                           channel_cfgs=channel_cfgs,
-                           sensor_speed_plugin='SensorSpeedConstant',
-                           sensor_speed_plugin_parameters={'constant_speed':1.0}
-                           )
-    return MicroriderProbe(cfg=cfg)
-
-@pytest.fixture
-def probePreConfigured():
-    cfg = MicroriderConfig(sampfreq=1.0,
-                           sensors={},
-                           sensor_speed_plugin='SensorSpeedConstant',
-                           sensor_speed_plugin_parameters={'constant_speed':1.0})
+def probe_custom_sensitivity(channel_cfgs):
+    cfg = MicroriderConfig(sampfreq=1.0, sensors={}, channel_cfgs=channel_cfgs)
     return MicroriderProbe(cfg=cfg)
 
 
+# Unit tests of the sensor speed functions
+def test_senspeed_constant():
+    t = np.linspace(0.0, 1.0, 11)
+    np.testing.assert_array_equal(senspeed.senspeed_constant(t, 0.6), 0.6)
 
-# Tests that explicitly set the sensor speed plugin
+
+def test_senspeed_constant_empty():
+    assert senspeed.senspeed_constant(np.array([]), 0.6).shape == (0,)
+
+
+def test_senspeed_from_lookup_table():
+    t_table = np.array([0.0, 1.0, 2.0])
+    U_table = np.array([0.0, 1.0, 0.0])
+    U = senspeed.senspeed_from_lookup_table(np.array([0.5, 1.0, 1.5]), t_table, U_table)
+    np.testing.assert_allclose(U, [0.5, 1.0, 0.5])
+
+
+def test_senspeed_from_lookup_table_mismatched_lengths():
+    with pytest.raises(Exception):
+        senspeed.senspeed_from_lookup_table(
+            np.array([0.5]), np.array([0.0, 1.0]), np.array([0.0, 1.0, 2.0])
+        )
+
+
+# Tests through MicroriderProbe.to_shear_level1
 def test_sensor_speed_constant(probe, data_path, shear_cfg):
-    probe.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=1.0))
-    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg)
+    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg, senspeed=1.0)
     assert level1.shear[0].std() == _SHEAR_STD
 
 
 def test_sensor_speed_emc(probe, data_path, shear_cfg):
-    probe.set_sensor_speed_plugin(plugins.SensorSpeedEMC())
-    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg)
+    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg, senspeed="em")
     assert level1.senspeed.shape == level1.time.shape
     assert level1.senspeed.mean() == _EMC_SPEED_MEAN
 
@@ -96,65 +101,18 @@ def test_sensor_speed_emc(probe, data_path, shear_cfg):
 def test_sensor_speed_lookup_table(probe, data_path, shear_cfg):
     _t = np.linspace(_T0, _T1)
     _U = np.ones_like(_t)
-    plugin = plugins.SensorSpeedLookupTable()
-    plugin.from_timeseries(_t, _U)
-    probe.set_sensor_speed_plugin(plugin)
-    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg)
+    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg, senspeed=(_t, _U))
     assert level1.shear[0].std() == _SHEAR_STD
 
 
-def test_sensor_speed_data_file(probe, data_path, shear_cfg, tmp_path):
-    _t = np.linspace(_T0, _T1)
-    _U = np.ones_like(_t)
-    speed_file = tmp_path / "testdata.dat"
-    np.savetxt(speed_file, np.array((_t, _U)).T)
-    probe.set_sensor_speed_plugin(plugins.SensorSpeedDataFile(str(speed_file)))
-    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg)
-    assert level1.shear[0].std() == _SHEAR_STD
+def test_sensor_speed_invalid_string(probe, data_path, shear_cfg):
+    with pytest.raises(Exception):
+        probe.to_shear_level1(str(data_path), cfg=shear_cfg, senspeed="foo")
 
 
-def test_custom_plugin(probe, data_path, shear_cfg):
-    @plugins.register_plugin([("scale", float, 1.0)])
-    class SensorSpeedTestCustom(plugins.SensorSpeedABC):
-        def __init__(self, scale: float) -> None:
-            self._scale = scale
-
-        def interpolation_factory(self):
-            raise NotImplementedError
-
-        def get_sensor_speed(self, t):
-            return np.ones_like(t) * self._scale
-
-    probe.set_sensor_speed_plugin(SensorSpeedTestCustom(scale=1.0))
-    level1 = probe.to_shear_level1(str(data_path), cfg=shear_cfg)
-    assert level1.shear[0].std() == _SHEAR_STD
-
-
-# Tests by configuration speed plugin
-def test_sensor_speed_constant_pre_configured(probePreConfigured, data_path, shear_cfg):
-    level1 = probePreConfigured.to_shear_level1(str(data_path), cfg=shear_cfg)
-    assert level1.shear[0].std() == _SHEAR_STD
-
-    
-def test_sensor_sensitivity(probePostConfigureSensitivity, data_path, shear_cfg):
-    level1 = probePostConfigureSensitivity.to_shear_level1(str(data_path), cfg=shear_cfg)
+def test_sensor_sensitivity(probe_custom_sensitivity, data_path, shear_cfg):
+    level1 = probe_custom_sensitivity.to_shear_level1(
+        str(data_path), cfg=shear_cfg, senspeed=1.0
+    )
     assert np.abs(level1.shear[0].mean()) < np.float64(1e-99) # should be very close to 0.
     assert np.abs(level1.shear[1].mean()) < np.float64(1e-99)
-
-
-def test_requesting_nonexisting_plugin():
-    with pytest.raises(plugins.PluginError):
-        plugin = plugins.get_registered_plugin_parameter_list("non_exisiting")
-
-def test_overwriting_plugin_prints_log(probePreConfigured, caplog):
-    probe = probePreConfigured
-    _t = np.linspace(_T0, _T1)
-    _U = np.ones_like(_t)
-    plugin = plugins.SensorSpeedLookupTable()
-    plugin.from_timeseries(_t, _U)
-    with caplog.at_level("WARNING"):
-        probe.set_sensor_speed_plugin(plugin)
-    record = caplog.records[0]
-    assert record.levelname=="WARNING" and record.message.startswith("Overwriting sensor speed plugin:")
-
-

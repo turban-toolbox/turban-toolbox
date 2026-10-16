@@ -12,13 +12,13 @@ import numpy as np
 import numpy.typing as np_typing
 from scipy.interpolate import interp1d as si_interp1d
 
-from turban.instruments.generic.api import InstrumentEnum
-from turban.instruments.generic.channels import (
-    ChannelConfigBaseModel,
-    channel_config_factory,
-)
-import turban.instruments.microrider.channels
 from turban.instruments.microrider import rsConversions
+from turban.instruments.microrider.rsConversions import (
+    MicroRiderChannelConfig,
+    PassThroughChannel,
+    PreEmphasisChannel,
+    make_channel_config,
+)
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
@@ -48,8 +48,9 @@ class Channel(object):
     ----------
     name : string
         name of channel
-    config : ChannelConfig
-        channel configuration object (from setupstr)
+    config : MicroRiderChannelConfig
+        channel configuration object (from setupstr), which also provides the
+        conversion into physical units
     deconvolved : bool (False)
         flag to indicate whether this is a deconvolved channel.
 
@@ -75,17 +76,16 @@ class Channel(object):
     """
 
     def __init__(
-        self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False
+        self, channel_config: MicroRiderChannelConfig, deconvolved: bool = False
     ):
         self.name: str = channel_config.name
-        self.config: ChannelConfigBaseModel = channel_config
+        self.config: MicroRiderChannelConfig = channel_config
         self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
             np.array([])
         )
         self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
             np.array([])
         )
-        self.converter = rsConversions.get_converter(channel_config)(channel_config)
         self.converted_into_units: bool = False
         self.deconvolved: bool = deconvolved
 
@@ -106,7 +106,7 @@ class Channel(object):
             Empty channel, with the configuration copied, and the deconvolved flag set.
         """
         name = new_name or self.name
-        config = self.config.clone()
+        config = self.config.model_copy()
         return Channel(config, deconvolved=deconvolved)
 
     def correct_sign(self) -> None:
@@ -146,7 +146,7 @@ class Channel(object):
         """
         if not self.converted_into_units:
             self._data = self.data
-            self.data = self.converter(self._data)
+            self.data = self.config.convert(self._data)
             self.converted_into_units = True
         else:
             raise ValueError(
@@ -195,13 +195,20 @@ class ChannelMatrix(object):
     ----------
     microrider_config : dict[str, str|int|float|list[int]]
         dictionary holding the MR configuration
+    channel_cfgs : list[dict[str, Any]] | None
+        user-supplied channel settings that override those of the setup
+        string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     """
 
-    def __init__(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> None:
+    def __init__(
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.matrix = self._get_matrix(microrider_config)
         self.number_of_elements = np.prod(self.matrix.shape)
-        self.channels = self._create_channels(microrider_config)
+        self.channels = self._create_channels(microrider_config, channel_cfgs or [])
 
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
@@ -226,38 +233,44 @@ class ChannelMatrix(object):
         return np.array(matrix)
 
     def _create_channels(
-        self, microrider_config: rsConfig_parser.MicroRiderConfig
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]],
     ) -> dict[str, Channel]:
         """ """
         channels: dict[str, Channel] = {}
+        overrides: dict[str, dict[str, Any]] = {}
+        for channel_cfg in channel_cfgs:
+            if "name" not in channel_cfg:
+                raise ValueError(f"Channel configuration without name: {channel_cfg}")
+            if channel_cfg["name"] in overrides:
+                raise ValueError(f"Channel {channel_cfg['name']!r} configured twice.")
+            overrides[channel_cfg["name"]] = channel_cfg
+        available = set(microrider_config.get_channel_name_map())
+        unknown = set(overrides) - available
+        if unknown:
+            raise ValueError(
+                f"Configuration given for channels {sorted(unknown)}, which are "
+                f"not in the data file. Available: {sorted(available)}"
+            )
 
         logger.info("Available channels:")
         for n in range(microrider_config.number_of_channels):
             section_name = f"channel{n:02d}"
             section_dict = microrider_config.get_section(section_name)
-            channel_config = self._create_channel_config(section_dict)
+            channel_config = make_channel_config(
+                section_dict, overrides.get(section_dict["name"])
+            )
             channel_name = channel_config.name
             channels[channel_name] = Channel(channel_config)
             logger.info(f"\t{n:2d}: {channel_name}")
         if np.any(self.matrix == 255):
             logger.debug("Created Channel 255...")
-            channel_config = channel_config_factory("ch255", prefix=InstrumentEnum.MicroRider)
-            channel_config.id = 255
-            channel_config.type = ""
+            channel_config = PassThroughChannel(name="ch255", id=255)
             channels["ch255"] = Channel(channel_config)
             n += 1
             logger.info(f"\t{n:2d}: ch255")
         return channels 
-
-    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
-        name = section["name"]
-        channel_config = channel_config_factory(name, prefix=InstrumentEnum.MicroRider)
-        for k_any_case, v in section.items():
-            k = k_any_case.lower()
-            if k == "name":
-                continue
-            channel_config.update(k, v)
-        return channel_config
 
     #
     #  This block below codes for split channels. We seem not to have them.
@@ -448,13 +461,20 @@ class MicroRiderData(object):
 
     config: system configuration, extracted from the setupfile string.
 
+    channel_cfgs : list[dict[str, Any]] | None
+        user-supplied channel settings, see ChannelMatrix.
+
     """
 
-    def __init__(self, path: str, config: rsConfig_parser.MicroRiderConfig) -> None:
+    def __init__(
+        self,
+        path: str,
+        config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.config: rsConfig_parser.MicroRiderConfig = config
         self.header: Header
-        self.channel_matrix: ChannelMatrix = ChannelMatrix(config)
-        self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
+        self.channel_matrix: ChannelMatrix = ChannelMatrix(config, channel_cfgs)
         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
         self._path = path
 
@@ -559,13 +579,12 @@ class MicroRiderData(object):
             idx = np.where(channel_positions == i_channel)[0]
             n_data_per_record = len(idx)
             if n_data_per_record == n_matrix_rows:
-                channel.config.update("sample_rate", self.header.fs_fast)
+                channel.config.sample_rate = self.header.fs_fast
             elif n_data_per_record == 1:
-                channel.config.update("sample_rate", self.header.fs_slow)
+                channel.config.sample_rate = self.header.fs_slow
             else:
-                channel.config.update(
-                    "sample_rate", 0
-                )  # we don't need to know this for this channel anyway.
+                # we don't need to know this for this channel anyway.
+                channel.config.sample_rate = 0
             # correct the sign of the data if necessary
             channel.data = data_snr[:, idx].flatten()
             channel.correct_sign()
@@ -599,7 +618,7 @@ class MicroRiderData(object):
         a new channel).
         """
         for n, ch in self.channel_matrix.channels.copy().items():
-            regex_preemph = self._regex_deconvolve_preemph_name.match(n)
+            regex_preemph = PreEmphasisChannel.name_regex.fullmatch(n)
             regex = self._regex_deconvolve_name.match(n)
             if regex_preemph:
                 # These channels need first to be deconvolved.
@@ -646,12 +665,9 @@ class MicroRiderData(object):
             co_channel_fast = co_channel
         X = co_channel_fast.data  # not converted yet, so OK.
         X_dX = ch_fast.data
-        if hasattr(ch_fast.config, "diff_gain"):
-            diff_gain = ch_fast.config.diff_gain  # <- is required to be present
-        else:
-            raise AttributeError(
-                "diff_gain is not an attribute for this configuration object."
-            )
+        if not isinstance(ch_fast.config, PreEmphasisChannel):
+            raise TypeError(f"{channel_name} is not configured as pre-emphasised.")
+        diff_gain = ch_fast.config.diff_gain
         fs = self.header.fs_fast
 
         new_channel_name = f"{co_channel_name}_hires"
@@ -698,13 +714,18 @@ class MicroRiderData(object):
             )
 
 
-def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[]) -> MicroRiderData:
+def read_p_file(
+    filename: str, channel_cfgs: list[dict[str, Any]] | None = None
+) -> MicroRiderData:
     """Function to read a single .p file.
 
     Parameters
     ----------
     filename : str
          Name of .p file to read
+    channel_cfgs : list[dict[str, Any]] | None
+         user-supplied channel settings that override those of the setup
+         string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     Returns
     -------
@@ -722,9 +743,7 @@ def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[])
         # read embedded setupstring (leaves the fp in the correct place)
         setupstring = header_parser.read_setupstring(fd, header_data)
         microrider_config.parse(setupstring)
-        for channel_config in channel_configs:
-            microrider_config.update_config(channel_config)
-        data = MicroRiderData(full_path, microrider_config)
+        data = MicroRiderData(full_path, microrider_config, channel_cfgs)
         data.add_header_data(header_data, n_records)
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
 

@@ -7,6 +7,16 @@ import pytest
 from scipy.io import loadmat
 
 from turban.instruments.microrider import rsIO
+from pydantic import ValidationError
+
+from turban.instruments.microrider.rsConversions import (
+    make_channel_config,
+    MicroRiderChannelConfig,
+    PassThroughChannel,
+    PolyChannel,
+    PreEmphasisChannel,
+    ShearChannel,
+)
 from turban.utils.filepaths import microrider_data_directory
 
 logger = logging.getLogger()
@@ -91,3 +101,92 @@ def test_parameters(data_0413, params):
     vp, vm = extract_data(*params, *data_0413)
     d = np.isclose(vp, vm, rtol=RTOL, atol=ATOL)
     assert np.all(d)
+
+
+_SHEAR_SECTION = dict(
+    id=8, name="sh1", type="shear", adc_fs=4.096, adc_bits=16, diff_gain=0.94, sens=0.07
+)
+
+
+def test_make_channel_config_selects_class_by_type():
+    cfg = make_channel_config(_SHEAR_SECTION)
+    assert isinstance(cfg, ShearChannel)
+    v = np.array([100, -200, 300], dtype=np.int16)
+    expected = (4.096 / 2**16 * v) / (0.94 * 0.07 * 2 * np.sqrt(2))
+    assert np.allclose(cfg.convert(v), expected)
+
+
+def test_make_channel_config_collects_poly_coefs():
+    cfg = make_channel_config(dict(name="P", type="poly", coef0=-1.0, coef1=0.01))
+    assert isinstance(cfg, PolyChannel)
+    assert cfg.coefs == [-1.0, 0.01]
+
+
+def test_make_channel_config_unknown_type_passes_through():
+    cfg = make_channel_config(dict(name="O2", type="o2_43f"))
+    assert type(cfg) is PassThroughChannel
+    assert cfg.convert(np.array([1, 2], dtype=np.int16)).tolist() == [1.0, 2.0]
+
+
+def test_make_channel_config_incomplete_calibration_passes_through(caplog):
+    section = {k: v for k, v in _SHEAR_SECTION.items() if k != "sens"}
+    with caplog.at_level("WARNING"):
+        cfg = make_channel_config(section)
+    assert type(cfg) is PassThroughChannel
+    assert "sh1" in caplog.text
+
+
+@pytest.mark.parametrize("name,type_", [("T1_dT1", "therm"), ("P_dP", "poly")])
+def test_make_channel_config_preemphasis_channel(name, type_):
+    cfg = make_channel_config(dict(name=name, type=type_, diff_gain=1.03))
+    assert type(cfg) is PreEmphasisChannel
+    assert cfg.diff_gain == 1.03
+
+
+def test_make_channel_config_preemphasis_channel_requires_diff_gain():
+    with pytest.raises(ValidationError, match="diff_gain"):
+        make_channel_config(dict(name="T1_dT1", type="therm"))
+
+
+def test_numeric_sn_is_accepted():
+    cfg = make_channel_config({**_SHEAR_SECTION, "SN": 487})
+    assert isinstance(cfg, ShearChannel)
+    assert cfg.sn == "487"
+
+
+def test_numbers_rejected_for_other_str_fields():
+    with pytest.raises(ValidationError, match="cal_date"):
+        ShearChannel(**_SHEAR_SECTION, cal_date=2017.1)
+
+
+def test_make_channel_config_poly_without_coefs_passes_through():
+    cfg = make_channel_config(dict(name="PV", type="poly"))
+    assert type(cfg) is PassThroughChannel
+
+
+def test_make_channel_config_ignores_unused_setup_keys():
+    cfg = make_channel_config(dict(name="Gnd", type="gnd", coef0=0.0))
+    assert type(cfg).__name__ == "GndChannel"
+
+
+def test_make_channel_config_override():
+    cfg = make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sens": 0.08})
+    assert isinstance(cfg, ShearChannel)
+    assert cfg.sens == 0.08
+    assert cfg.adc_fs == 4.096  # from the setup string
+
+
+def test_make_channel_config_override_completes_calibration():
+    section = {k: v for k, v in _SHEAR_SECTION.items() if k != "sens"}
+    cfg = make_channel_config(section, {"name": "sh1", "sens": 0.08})
+    assert isinstance(cfg, ShearChannel)
+
+
+def test_make_channel_config_override_unknown_field_fails():
+    with pytest.raises(ValidationError, match="sense"):
+        make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sense": 0.08})
+
+
+def test_make_channel_config_override_invalid_value_fails():
+    with pytest.raises(ValidationError, match="sens"):
+        make_channel_config(_SHEAR_SECTION, {"name": "sh1", "sens": "abc"})
