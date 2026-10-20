@@ -245,6 +245,9 @@ def inertial_range_fit(
     The default value for A corresponds to Kolomgorov's constant for 1-dimensional
     spectra C1=0.53.
     """
+    # omit zero wavenumber (silence RuntimeWarning)
+    psi = psi[..., 1:]
+    waveno = waveno[:, 1:]
     ln_epsilon = 1.5 * (
         np.log(psi) - np.log(a_kolmogorov) - np.log(waveno[newaxis, ...]) / 3
     )
