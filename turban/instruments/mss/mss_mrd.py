@@ -312,9 +312,9 @@ def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
         level0_dataset.attrs["latitude"] = gps[0][2]
         level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
     else:
-        logger.warning("No GPS data available, setting longitude/latitude to 0.")
-        level0_dataset.attrs["longitude"] = 0
-        level0_dataset.attrs["latitude"] = 0
+        logger.warning("No GPS data available.")
+        level0_dataset.attrs["longitude"] = None
+        level0_dataset.attrs["latitude"] = None
         level0_dataset.attrs["date_gps"] = None
     # Add the header to the dataset
     # try:
@@ -414,7 +414,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
                 level1_units["TIME"] = tstr
                 level1["TIME"] = level0["t"]
 
-        # Derive salinity, conservative temperature and density
+        # Derive practical salinity and density
         cond_sensorname = mss_config.sensornames_ctd["cond"]
         temp_sensorname = mss_config.sensornames_ctd["temp"]
         press_sensorname = mss_config.sensornames_ctd["press"]
@@ -424,16 +424,11 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         level1_dataset["PSAL"] = SP
         level1_dataset["PSAL"].attrs["units"] = "1"
 
-        SA = gsw.SA_from_SP(
-            SP, level0[press_sensorname], level0.longitude, level0.latitude
-        )
-        level1_dataset["SA"] = SA
-        level1_dataset["SA"].attrs["units"] = "g kg-1"
-        # Calculating conservative temperature
-        CT = gsw.CT_from_t(SA, level0[temp_sensorname], level0[press_sensorname])
-        level1_dataset["CT"] = CT
-        level1_dataset["CT"].attrs["units"] = "degC"
-        dens = gsw.rho(SA, CT, level0[press_sensorname])
+        # Density from reference salinity, which (unlike absolute salinity)
+        # does not depend on the GPS position parsed from the MRD header
+        SR = gsw.SR_from_SP(SP)
+        CT = gsw.CT_from_t(SR, level0[temp_sensorname], level0[press_sensorname])
+        dens = gsw.rho(SR, CT, level0[press_sensorname])
         level1_dataset["DENS"] = dens
         level1_dataset["DENS"].attrs["units"] = "kg m-3"
         # Calculating sinking velocity
@@ -465,10 +460,11 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         level1_dataset["PSPD_REL"] = (["index"], vsink)
         level1_dataset["PSPD_REL"].attrs["units"] = "m s-1"
 
-        # copy some variables, TODO: discuss variablenames
-        for sensor in [press_sensorname, temp_sensorname, cond_sensorname]:
-            level1_dataset[sensor] = level0[sensor]
-            level1_dataset[sensor].attrs["units"] = level0[sensor].attrs["units"]
+        # copy all non-shear channels (CTD, chlorophyll, vibration, tilt, ...)
+        for sensor in level0.data_vars:
+            if "SHE" not in sensor:
+                level1_dataset[sensor] = level0[sensor]
+                level1_dataset[sensor].attrs["units"] = level0[sensor].attrs["units"]
 
         # Loop over all shear sensors and calculate shear
         shearsensors = []

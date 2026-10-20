@@ -61,7 +61,17 @@ def mrd_to_level1(
             cfg=cast(UTempConfig, proc_cfg),
         )
 
-    for varname in ["SA", "CT", "Press", "DENS"]:
-        level1.add_aux_data(data_level1[varname].values, varname)
+    temp_sensorname = mss_cfg.sensornames_ctd["temp"]
+    press_sensorname = mss_cfg.sensornames_ctd["press"]
+    level1.add_aux_data(data_level1["PSAL"].values, "SP")
+    level1.add_aux_data(data_level1[temp_sensorname].values, "TEMP")
+    level1.add_aux_data(data_level1[press_sensorname].values, "Press")
+    level1.add_aux_data(data_level1["DENS"].values, "DENS")
+
+    # all remaining non-shear MSS channels (e.g. chlorophyll, vibration, pitch, roll)
+    for varname in data_level0.data_vars:
+        if "SHE" in varname or varname in [temp_sensorname, press_sensorname]:
+            continue
+        level1.add_aux_data(data_level1[varname].values, str(varname))
 
     return level1
