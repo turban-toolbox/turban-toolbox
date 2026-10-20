@@ -28,11 +28,11 @@ jobs:
 
       - name: Install dependencies
         if: ${{ !matrix.minimum-deps }}
-        run: uv sync --all-groups
+        run: uv sync --all-groups --all-extras
 
       - name: Install minimum dependencies
         if: ${{ matrix.minimum-deps }}
-        run: uv sync --all-groups --resolution=lowest-direct
+        run: uv sync --all-groups --all-extras --resolution=lowest-direct
 
       - name: Cache test data
         uses: actions/cache@v4

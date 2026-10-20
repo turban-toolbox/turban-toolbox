@@ -35,8 +35,13 @@ classifiers = [
   'Programming Language :: Python :: 3 :: Only',
 ]
 
+[project.optional-dependencies]
+mss = ["pytz", "dateparser"]
+microrider = ["arrow>=1.4.0"]
+
 [dependency-groups]
 dev = [
+    "turban-toolbox[mss,microrider]",
     "black>=25.11.0",
     "ipython>=8.18.1",
     "mypy>=1.19.1",
@@ -48,8 +53,6 @@ dev = [
     "pymdown-extensions>=10.8",
     "mkdocstrings[python]>=0.24",
 ]
-mss = ["pytz", "dateparser"]
-microrider = ["arrow>=1.4.0"]
 
 [project.scripts]
 turban_download_datafiles="turban.utils.cli:download_datafiles"

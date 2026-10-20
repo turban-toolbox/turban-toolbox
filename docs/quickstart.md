@@ -4,19 +4,13 @@ Currently, only shear processing is fully functional. The high-level API can be 
 
 ### Setup
 
-Clone the repository:
+Activate your Python environment of choice. Then, install TURBAN from PyPI with the instrument-specific extras as needed:
 
 ```bash
-git clone https://github.com/turban-toolbox/turban-toolbox.git
-cd turban-toolbox
+python -m pip install "turban-toolbox[mss,microrider]"
 ```
 
-Activate your Python environment of choice. Then, install TURBAN with dependency groups as needed. Requires pip >= 24.1 for `--groups` support:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e . --group mss --group microrider
-```
+For an editable install from the git repository, see the [developer's guide](devguide.md).
 
 Example data, also needed for the unit tests, can be downloaded using:
 ```bash
