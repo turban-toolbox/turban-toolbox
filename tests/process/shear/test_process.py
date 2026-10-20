@@ -85,7 +85,7 @@ def test_goodman_config():
     fig.savefig("out/tests/process/shear/goodman.png")
 
 
-def test_baltic_benchmark():
+def test_baltic_benchmark(tmp_path):
 
     aux_vars = ["time", "press", "temp", "cond"]
     arr = dict(
@@ -151,6 +151,20 @@ def test_baltic_benchmark():
     assert "time" in ds3_turban.coords
     assert "waveno" in ds3_turban.coords
     assert "freq" in ds3_turban.coords
+
+    # aux data are exported only with level 1 and 3
+    for level, level_below in [("level2", "level1"), ("level4", "level3")]:
+        aux = set(getattr(p, level)._aux_data)
+        assert aux and aux <= set(data_tree[level_below].data_vars)
+        assert not aux & set(data_tree[level].data_vars)
+
+    # round trip through netcdf restores shared aux data
+    fname = tmp_path / "baltic.nc"
+    data_tree.to_netcdf(fname)
+    p2 = ShearProcessing.from_xarray(xr.open_datatree(fname))
+    assert p2.level2._aux_data is p2.level1._aux_data
+    assert p2.level4._aux_data is p2.level3._aux_data
+    xr.testing.assert_identical(p2.to_xarray(), data_tree)
 
     _plot_level4(ds4, ds4_turban)  # TODO
 
