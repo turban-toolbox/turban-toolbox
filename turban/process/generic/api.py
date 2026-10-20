@@ -116,13 +116,15 @@ class TimeseriesLevel:
         return ds
 
     @classmethod
-    def from_xarray(cls, ds: xr.Dataset):
+    def from_xarray(cls, ds: xr.Dataset, **kwargs):
         """Instantiate this level from an xarray Dataset.
 
         Parameters
         ----------
         ds : xr.Dataset
             Dataset containing array fields and config global attributes.
+        **kwargs
+            Additional keyword arguments passed to the class constructor.
 
         Returns
         -------
@@ -138,7 +140,7 @@ class TimeseriesLevel:
 
         data["cfg"] = hints["cfg"].from_xarray(ds)
 
-        return cls(**data)
+        return cls(**data, **kwargs)
 
     def get_attr(self, name):
         """Retrieve an attribute by name.
@@ -166,12 +168,48 @@ class AuxiliaryData(TimeseriesLevel):
     _aux_data: AuxDataTypehintLevel12 | AuxDataTypehintLevel34 | None = None
 
     def __post_init__(self):
-        """Initialise ``_aux_data`` to an empty dict if it was not provided."""
-        if self._aux_data is None:
+        """Initialise ``_aux_data`` to an empty dict if it was not provided.
+
+        If aux data are shared with the level below, any aux data passed in are
+        merged into the level below and not stored on this level.
+        """
+        owner = self._aux_owner
+        if owner is not self:
+            if self._aux_data is not None and self._aux_data is not owner.aux_data:
+                for name, v in self._aux_data.items():
+                    owner.aux_data.setdefault(name, v)
+            self._aux_data = None
+        elif self._aux_data is None:
             self._aux_data = {}
+
+    @property
+    def _shares_aux_with_level_below(self) -> bool:
+        """True if aux data are not stored on this level but on ``level_below``.
+
+        This is the case for levels 2 and 4, if the level below exists.
+        """
+        level_below = getattr(self, "level_below", None)
+        return self._level in (Level.L2, Level.L4) and isinstance(
+            level_below, AuxiliaryData
+        )
+
+    @property
+    def _aux_owner(self) -> "AuxiliaryData":
+        """The level object that actually stores the aux data of this level."""
+        if self._shares_aux_with_level_below:
+            return cast(AuxiliaryData, getattr(self, "level_below"))._aux_owner
+        return self
+
+    @property
+    def aux_data(self) -> AuxDataTypehintLevel12 | AuxDataTypehintLevel34:
+        """Auxiliary data of this level (possibly stored on the level below)."""
+        return cast(dict, self._aux_owner._aux_data)
 
     def arrays_as_xr_dicts(self):
         """Separate array fields including auxiliary data into data-variable and coordinate dicts.
+
+        Auxiliary data shared with the level below are not included, as they are
+        exported with the level below.
 
         Returns
         -------
@@ -181,33 +219,37 @@ class AuxiliaryData(TimeseriesLevel):
             Fields listed in ``_coords``.
         """
         data_vars, coords = super().arrays_as_xr_dicts()
+        if self._shares_aux_with_level_below:
+            return data_vars, coords
         if self._level <= 2:
-            data = cast(AuxDataTypehintLevel12, self._aux_data)
+            data = cast(AuxDataTypehintLevel12, self.aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
             )
         else:
-            data = cast(AuxDataTypehintLevel34, self._aux_data)
+            data = cast(AuxDataTypehintLevel34, self.aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr) in data.items()}
             )
         return data_vars, coords
 
     @classmethod
-    def from_xarray(cls, ds: xr.Dataset):
+    def from_xarray(cls, ds: xr.Dataset, **kwargs):
         """Instantiate from an xarray Dataset, loading auxiliary variables.
 
         Parameters
         ----------
         ds : xr.Dataset
             Dataset; variables not recognised as core fields are added as auxiliary data.
+        **kwargs
+            Additional keyword arguments passed to the class constructor.
 
         Returns
         -------
         AuxiliaryData
             New instance with core and auxiliary data populated.
         """
-        new = super().from_xarray(ds)
+        new = super().from_xarray(ds, **kwargs)
         for name in ds:
             if not hasattr(new, name):
                 if len(ds[name].shape) == 1:
@@ -223,7 +265,7 @@ class AuxiliaryData(TimeseriesLevel):
 
     def _variable_present(self, name):
         """Returns True if variable called `name` already present somewhere"""
-        if name in self._aux_data:
+        if name in self.aux_data:
             logger.warning(f"Variable`{name}` already exists in aux data, skipping")
         elif name in get_type_hints_recursive(type(self)):
             logger.warning(
@@ -253,6 +295,13 @@ class AuxiliaryData(TimeseriesLevel):
 
         Otherwise, use the full API.
         """
+        owner = self._aux_owner
+        if owner is not self:
+            # aux data are stored on the level below
+            return owner.add_aux_data(
+                data, name=name, agg_method=agg_method, name_out=name_out
+            )
+
         if data is None:
             self._aux_data = {}
 
@@ -291,6 +340,8 @@ class AuxiliaryData(TimeseriesLevel):
 @dataclass(kw_only=True)
 class HasLevelBelow(TimeseriesLevel):
     level_below: TimeseriesLevel | None = None
+    # class used to read ``level_below`` from xarray
+    _level_below_class: ClassVar[type[TimeseriesLevel]]
 
     @classmethod
     @abstractmethod
@@ -313,6 +364,41 @@ class HasLevelBelow(TimeseriesLevel):
             New instance initialised from ``data``.
         """
         return cls(**cls._from_level_below_kwarg(data))
+
+    @classmethod
+    def from_xarray(cls, ds: xr.Dataset | xr.DataTree, **kwargs):
+        """Instantiate this level from an xarray Dataset or DataTree node.
+
+        If ``ds`` is a DataTree node (e.g. ``tree["L4"]``), the level below is also
+        read from its sibling node (e.g. ``tree["L3"]``) if that exists. Auxiliary
+        data of levels 2 and 4 are then taken from the level below.
+
+        Parameters
+        ----------
+        ds : xr.Dataset or xr.DataTree
+            Dataset or DataTree node of this level.
+        **kwargs
+            Additional keyword arguments passed to the class constructor.
+
+        Returns
+        -------
+        HasLevelBelow
+            New instance populated from the dataset.
+        """
+        if isinstance(ds, xr.DataTree):
+            parent = ds.parent
+            name_below = Level(cls._level - 1).name
+            if (
+                "level_below" not in kwargs
+                and parent is not None
+                and name_below in parent.children
+            ):
+                node_below = parent[name_below]
+                if not issubclass(cls._level_below_class, HasLevelBelow):
+                    node_below = node_below.to_dataset()
+                kwargs["level_below"] = cls._level_below_class.from_xarray(node_below)
+            ds = ds.to_dataset()
+        return super().from_xarray(ds, **kwargs)
 
     @property
     def cfg(self) -> SegmentConfig:
@@ -348,6 +434,7 @@ class Level2(HasLevelBelow, AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
     _level: ClassVar[Level] = Level.L2
+    _level_below_class: ClassVar[type[TimeseriesLevel]] = Level1
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level1) -> dict:
@@ -364,10 +451,12 @@ class Level2(HasLevelBelow, AuxiliaryData):
             Keyword arguments to pass to the Level2 constructor.
         """
         return dict(
+            level_below=data,
             time=data.time,
+            cfg=data.cfg,
             senspeed=data.senspeed,
             section_number=data.section_number,
-            _aux_data=data._aux_data,
+            _aux_data=data.aux_data,
         )
 
 
@@ -381,6 +470,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
     _coords = ["time", "freq"]
 
     _level: ClassVar[Level] = Level.L3
+    _level_below_class: ClassVar[type[TimeseriesLevel]] = Level2
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level2) -> dict:
@@ -397,9 +487,11 @@ class Level3(HasLevelBelow, AuxiliaryData):
             Keyword arguments to pass to the Level3 constructor.
         """
         return dict(
+            level_below=data,
             time=data.time,
+            cfg=data.cfg,
             _aux_data=cls.agg(
-                data=cast(AuxDataTypehintLevel12, data._aux_data),
+                data=cast(AuxDataTypehintLevel12, data.aux_data),
                 data_len=len(data.time),
                 chunk_length=data.cfg.chunk_length,
                 chunk_overlap=data.cfg.chunk_overlap,
@@ -443,6 +535,7 @@ class Level4(HasLevelBelow, AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
     _level: ClassVar[Level] = Level.L4
+    _level_below_class: ClassVar[type[TimeseriesLevel]] = Level3
 
     @classmethod
     def _from_level_below_kwarg(cls, data: Level3) -> dict:
@@ -459,9 +552,11 @@ class Level4(HasLevelBelow, AuxiliaryData):
             Keyword arguments to pass to the Level4 constructor.
         """
         return dict(
+            level_below=data,
             time=data.time,
+            cfg=data.cfg,
             section_number=data.section_number,
-            _aux_data=data._aux_data,
+            _aux_data=data.aux_data,
         )
 
 
@@ -571,7 +666,7 @@ class Processing(ABC):
         for data in [self.level1, self.level2, self.level3, self.level4]:
             if data is not None:
                 out = data.to_xarray()
-                out_data[f"level{data._level}"] = xr.DataTree(out)
+                out_data[data._level.name] = xr.DataTree(out)
 
         data_tree = xr.DataTree(children=out_data)
         return data_tree
@@ -580,7 +675,7 @@ class Processing(ABC):
     def from_xarray(cls, data_tree: xr.DataTree):
         """Instantiate pipeline from lowest available level"""
         for level, class_ in cls._level_mapping.items():
-            level_str = f"level{level:d}"
+            level_str = Level(level).name
             if level_str in data_tree:
                 logger.debug(f"Start processing from level {level}")
                 data = class_.from_xarray(data_tree[level_str].to_dataset())
