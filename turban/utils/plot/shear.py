@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
 from typing import Any, cast, TypeAlias
+from functools import partial
 
 from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
@@ -97,12 +98,12 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     return out
 
 
-def plot(*data: Any, subset: SubsetSpec | None = None):
+def plot(*data: Any, subset: SubsetSpec | None = None, average=False):
     """Make all possible plots from any number of supplied data."""
     plot_map = {
         Level.L1: plot_level1,
         Level.L2: plot_level2,
-        Level.L3: plot_level3,
+        Level.L3: partial(plot_level3, average=average),
         Level.L4: plot_level4,
     }
     level_data_items = [level for item in data for level in _to_levels(item)]
@@ -315,7 +316,7 @@ def plot_level2(*data: Any, subset: SubsetSpec | None = None):
     return fig, axs
 
 
-def plot_level3(*data: Any, subset: SubsetSpec | None = None):
+def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
     """Plot shear spectra and time series with optional model spectrum overlay.
 
     Parameters
@@ -342,14 +343,22 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
         raise ValueError("plot_level3 requires Level 3 data")
 
     ds3 = _clip(_to_dataset(data_l3), subset)
-    ds4 = _clip(_to_dataset(data_l4), subset) if data_l4 is not None else None
+    if average:
+        ds3 = ds3.mean("time", keepdims=True)
+    if data_l4 is None:
+        ds4 = None
+    else:
+        ds4 = _clip(_to_dataset(data_l4), subset)
+        if average:
+            ds4 = ds4.mean("time", keepdims=True)
+
     nshear = len(ds3.nshear)
 
     aux_keys = set((getattr(data_l3, "_aux_data", {}) or {}).keys())
     aux_vars = [
         var for var in ds3.data_vars if var in aux_keys and "time" in ds3[var].dims
     ]
-    ts_vars = ["senspeed", *aux_vars]
+    ts_vars = [] if average else ["senspeed", *aux_vars]
 
     n_ts = len(ts_vars)
     fig = plt.figure(figsize=(4 * nshear, 3 + 2.2 * (1 + n_ts)))
@@ -390,7 +399,8 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
         ds3[var].plot(ax=ax, color="k", linewidth=1)
         ax.grid(True, alpha=0.3)
 
-    ts_axes[-1].set_xlabel("Time")
+    if not average:
+        ts_axes[-1].set_xlabel("Time")
     plot_section_numbers(ts_axes, ds3.time.values, ds3.section_number.values)
 
     axs = [*spectra_axes, *ts_axes]
