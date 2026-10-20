@@ -303,7 +303,7 @@ class ShearLevel4(Level4):
     waveno_cutoff: Float[ndarray, "nshear time"]  # upper limit of eps estimate
     quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
-    molvisc: Float[ndarray, "time"] | float
+    molvisc: Float[ndarray, "time"]
 
     @classmethod
     def _from_level_below_kwarg(
@@ -365,7 +365,8 @@ class ShearLevel4(Level4):
                 num_spec_points=num_spec_points,
                 waveno_cutoff=waveno_cutoff,
                 quality_metric=quality_metric,
-                molvisc=molvisc,
+                # always store as array so that it is exported to xarray
+                molvisc=np.broadcast_to(molvisc, level3.time.shape).astype(float),
                 level_below=level3,
             )
         )
