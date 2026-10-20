@@ -103,7 +103,8 @@ def process_level3(
         section_number, reshape_index=ii, agg_method="max"
     )
 
-    _ = apply_compensation_highpass(psi_f, freq, freq_highpass)
+    # restrict compensation to non-0 frequencies (silences RuntimeWarning)
+    _ = apply_compensation_highpass(psi_f[..., 1:], freq[1:], freq_highpass)
 
     # to waveno domain
     psi_k = psi_f * senspeeda[newaxis, :, newaxis]
