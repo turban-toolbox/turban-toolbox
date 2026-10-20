@@ -490,7 +490,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         else:  # no shear data exists
             level1_dataset["SHEAR"] = (
                 ["n_shear", "index"],
-                numpy.zeros((1, len(level0.Count)), dtype=float) * np.nan,
+                numpy.zeros((1, len(level0.Count)), dtype=float) * numpy.nan,
             )
 
         level1_dataset["utemp"] = (
