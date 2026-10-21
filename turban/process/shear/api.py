@@ -111,7 +111,6 @@ class ShearLevel2(Level2[ShearLevel1]):
                 senspeed=level1.senspeed,
                 section_number=level1.section_number,
                 num_despike_iter=num_despike_iter,
-                level_below=level1,
             )
         )
         return kwarg
@@ -223,7 +222,6 @@ class ShearLevel3(Level3[ShearLevel2]):
                 section_number=section_number,
                 spike_fraction=spike_fraction,
                 max_despike_iter=max_despike_iter,
-                level_below=data,
             )
         )
         return kwarg
@@ -367,7 +365,6 @@ class ShearLevel4(Level4[ShearLevel3]):
                 quality_metric=quality_metric,
                 # always store as array so that it is exported to xarray
                 molvisc=np.broadcast_to(molvisc, level3.time.shape).astype(float),
-                level_below=level3,
             )
         )
         return kwarg

@@ -75,7 +75,6 @@ class UTempLevel2(Level2):
                 dtempdt=utemp_cleaned,
                 senspeed=level1.senspeed,
                 # num_despike_iter=num_despike_iter,
-                level_below=level1,
                 cfg=cfg,
             )
         )
@@ -147,7 +146,6 @@ class UTempLevel3(Level3):
                 freq=freq,
                 senspeed=senspeed_avg,
                 section_number=section_number_slow,
-                level_below=level2,
                 cfg=cfg,
             )
         )
@@ -177,7 +175,6 @@ class UTempLevel4(Level4):
             dict(
                 chi=chi,
                 eps=eps,
-                level_below=level3,
                 cfg=cfg,
             )
         )

@@ -301,12 +301,17 @@ class HasLevelBelow[L: TimeseriesLevel](TimeseriesLevel, ABC):
     @classmethod
     @abstractmethod
     def _from_level_below_kwarg(cls, data: L) -> dict:
-        """Provides dictionary `kwarg` that can be passed into class constructor as cls(**kwarg)."""
+        """Provides dictionary `kwarg` that can be passed into class constructor as cls(**kwarg).
+
+        `level_below` and `cfg` need not be included, they are set by `from_level_below`.
+        """
         raise NotImplementedError
 
     @classmethod
     def from_level_below(cls, data: L) -> Self:
         """Construct this level from the level-below data object.
+
+        ``level_below`` is always set to ``data``, and ``cfg`` is shared with it.
 
         Parameters
         ----------
@@ -318,7 +323,9 @@ class HasLevelBelow[L: TimeseriesLevel](TimeseriesLevel, ABC):
         HasLevelBelow
             New instance initialised from ``data``.
         """
-        return cls(**cls._from_level_below_kwarg(data))
+        kwarg = cls._from_level_below_kwarg(data)
+        kwarg.update(level_below=data, cfg=data.cfg)
+        return cls(**kwarg)
 
     @property
     def cfg(self) -> SegmentConfig:
@@ -373,7 +380,8 @@ class Level2[L: Level1](HasLevelBelow[L], AuxiliaryData):
             time=data.time,
             senspeed=data.senspeed,
             section_number=data.section_number,
-            _aux_data=data._aux_data,
+            # copy so that adding aux data here does not modify the level below
+            _aux_data=dict(cast(dict, data._aux_data)),
         )
 
 
@@ -392,6 +400,9 @@ class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
     def _from_level_below_kwarg(cls, data: L) -> dict:
         """Build constructor kwargs for Level3 from Level2 data, aggregating aux data.
 
+        Fast variables are aggregated to chunks; `freq` is the frequency vector of
+        the FFT segments and `waveno` is obtained from it via the chunk-mean `senspeed`.
+
         Parameters
         ----------
         data : Level2
@@ -402,8 +413,20 @@ class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
         dict
             Keyword arguments to pass to the Level3 constructor.
         """
+        cfg = data.cfg
+        ii = get_chunking_index(
+            data.section_number, (cfg.chunk_length, cfg.chunk_overlap)
+        )
+        senspeed = agg_fast_to_slow(data.senspeed, reshape_index=ii)
+        freq = np.fft.rfftfreq(cfg.segment_length, d=1 / cfg.sampfreq)
         return dict(
-            time=data.time,
+            time=agg_fast_to_slow(data.time, reshape_index=ii, agg_method="take_mid"),
+            freq=freq,
+            waveno=freq[newaxis, :] / senspeed[:, newaxis],
+            senspeed=senspeed,
+            section_number=agg_fast_to_slow(
+                data.section_number, reshape_index=ii, agg_method="max"
+            ),
             _aux_data=cls.agg(
                 data=cast(AuxDataTypehintLevel12, data._aux_data),
                 data_len=len(data.time),
@@ -467,7 +490,8 @@ class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
         return dict(
             time=data.time,
             section_number=data.section_number,
-            _aux_data=data._aux_data,
+            # copy so that adding aux data here does not modify the level below
+            _aux_data=dict(cast(dict, data._aux_data)),
         )
 
 
@@ -497,21 +521,24 @@ class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
 #         return fast
 
 
-class Processing(ABC):
-    """Propagates a given start level up to level 4."""
+class Processing:
+    """Propagates a given start level up to level 4.
+    
+    Every subclass must define its own ``_level_mapping``."""
 
-    @property
-    @abstractmethod
-    def _level_mapping(self) -> dict[Level, type[TimeseriesLevel]]:
-        """Mapping from level number to the corresponding level class.
+    # Mapping from level number to the corresponding level class
+    _level_mapping: ClassVar[dict[Level, type[TimeseriesLevel]]] = {
+        Level.L1: Level1,
+        Level.L2: Level2,
+        Level.L3: Level3,
+        Level.L4: Level4,
+    }
 
-        Returns
-        -------
-        dict[Level, type[TimeseriesLevel]]
-            Dict of ``{Level: TimeseriesLevel subclass}`` for levels 1–4.
-        """
-        # Slightly clumsy way of requiring a class attribute called _level_mapping
-        return {Level.L1: Level1, Level.L2: Level2, Level.L3: Level3, Level.L4: Level4}
+    def __init_subclass__(cls, **kwargs):
+        """Require every subclass to define its own ``_level_mapping``."""
+        super().__init_subclass__(**kwargs)
+        if "_level_mapping" not in cls.__dict__:
+            raise TypeError(f"{cls.__name__} must define its own `_level_mapping`")
 
     def __init__(
         self,
