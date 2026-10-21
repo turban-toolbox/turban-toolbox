@@ -36,8 +36,12 @@ from turban import ShearProcessing, plot
 # Process a level 1 dataset all the way to level 4
 p = ShearProcessing.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc", level=1)
 
-# export level 4 to an xarray.Dataset
+# export level 4 only to an xarray.Dataset
 ds = p.level4.to_xarray()
+
+# or export the whole pipeline (levels 1-4) to an xarray.DataTree
+# (see the manual for netCDF export/import)
+data_tree = p.to_xarray()
 
 # or plot e.g. like this:
 plot(p)

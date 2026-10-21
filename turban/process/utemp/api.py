@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import ClassVar, Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
@@ -41,6 +41,8 @@ class UTempLevel2(Level2):
     dtempdt: Float[ndarray, "ntemp time"]
     # num_despike_iter: Int[ndarray, "n_shear time"]
 
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel1
+
     @classmethod
     def _from_level_below_kwarg(
         cls,
@@ -75,7 +77,6 @@ class UTempLevel2(Level2):
                 dtempdt=utemp_cleaned,
                 senspeed=level1.senspeed,
                 # num_despike_iter=num_despike_iter,
-                level_below=level1,
                 cfg=cfg,
             )
         )
@@ -87,6 +88,8 @@ class UTempLevel3(Level3):
     psi_k: Float[ndarray, "ntemp time freq"]
     psi_noise: Float[ndarray, "ntemp freq"]
     psi_f: Float[ndarray, "ntemp time freq"]
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel2
 
     @classmethod
     def _from_level_below_kwarg(
@@ -147,7 +150,6 @@ class UTempLevel3(Level3):
                 freq=freq,
                 senspeed=senspeed_avg,
                 section_number=section_number_slow,
-                level_below=level2,
                 cfg=cfg,
             )
         )
@@ -158,6 +160,8 @@ class UTempLevel3(Level3):
 class UTempLevel4(Level4):
     chi: Float[ndarray, "ntemp time"]
     eps: Float[ndarray, "ntemp time"]
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel3
 
     @classmethod
     def _from_level_below_kwarg(
@@ -177,7 +181,6 @@ class UTempLevel4(Level4):
             dict(
                 chi=chi,
                 eps=eps,
-                level_below=level3,
                 cfg=cfg,
             )
         )
@@ -187,8 +190,8 @@ class UTempLevel4(Level4):
 class UTempProcessing(Processing):
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
-        Level.L1: UTempLevel1,
-        Level.L2: UTempLevel2,
-        Level.L3: UTempLevel3,
-        Level.L4: UTempLevel4,
+        Level.level1: UTempLevel1,
+        Level.level2: UTempLevel2,
+        Level.level3: UTempLevel3,
+        Level.level4: UTempLevel4,
     }
