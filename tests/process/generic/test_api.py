@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
+import xarray as xr
 
 from turban.process.generic.api import (
     Level1,
@@ -141,10 +144,16 @@ def test_processing_chain_from_level1():
     assert "pres_mean" in p.level4.aux_data
 
     data_tree = p.to_xarray()
-    assert set(data_tree.children) == {"level1", "level2", "level3", "level4"}
-    # aux data are only stored at level 1 and 3
-    assert "pres" in data_tree["level1"] and "pres" not in data_tree["level2"]
-    assert "pres_mean" in data_tree["level3"] and "pres_mean" not in data_tree["level4"]
+    outdir = Path("out/tests/process/generic")
+    outdir.mkdir(parents=True, exist_ok=True)
+    fname = outdir / "test_processing_chain_from_level1.nc"
+    p.to_netcdf(str(fname))
+    # check both the DataTree and the raw netCDF file (read without turban parsing)
+    for tree in (data_tree, xr.load_datatree(fname)):
+        assert set(tree.children) == {"level1", "level2", "level3", "level4"}
+        # aux data are only stored at level 1 and 3
+        assert "pres" in tree["level1"] and "pres" not in tree["level2"]
+        assert "pres_mean" in tree["level3"] and "pres_mean" not in tree["level4"]
 
     # roundtrip parses the whole chain of levels
     p2 = Processing.from_xarray(data_tree)
