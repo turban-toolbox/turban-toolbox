@@ -33,6 +33,12 @@ logger = get_logger(__name__)
 
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
+    """Shear Level 1: shear converted to physical units.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only, see
+    ``ShearProcessing`` for the whole pipeline.
+    """
+
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     cfg: ShearConfig
@@ -65,6 +71,13 @@ class ShearLevel1(Level1):
 
 @dataclass(kw_only=True)
 class ShearLevel2(Level2[ShearLevel1]):
+    """Shear Level 2: despiked shear, derived from ``ShearLevel1``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only (including auxiliary
+    data taken over from Level 1), without ``level_below``. See ``ShearProcessing``
+    for the whole pipeline.
+    """
+
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     num_despike_iter: Int[ndarray, "nshear time"]
@@ -145,6 +158,12 @@ class ShearLevel2(Level2[ShearLevel1]):
 
 @dataclass(kw_only=True)
 class ShearLevel3(Level3[ShearLevel2]):
+    """Shear Level 3: chunk-wise shear wavenumber spectra, derived from ``ShearLevel2``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only, without
+    ``level_below``. See ``ShearProcessing`` for the whole pipeline.
+    """
+
     psi_k_sh: Float[ndarray, "nshear time waveno"]
     psi_f_sh: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
@@ -295,6 +314,13 @@ class ShearLevel3(Level3[ShearLevel2]):
 
 @dataclass(kw_only=True)
 class ShearLevel4(Level4[ShearLevel3]):
+    """Shear Level 4: dissipation rates and quality metrics, derived from ``ShearLevel3``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only (including auxiliary
+    data taken over from Level 3), without ``level_below``. See ``ShearProcessing``
+    for the whole pipeline.
+    """
+
     eps: Float[ndarray, "nshear time"]
     eps_source_flag: Int[ndarray, "nshear time"]
     log_diss_var: Float[ndarray, "nshear time"]
@@ -408,6 +434,12 @@ class ShearLevel4(Level4[ShearLevel3]):
 
 
 class ShearProcessing(Processing):
+    """Shear processing pipeline from any start level up to ``ShearLevel4``.
+
+    ``to_xarray``/``from_xarray`` (DataTree with nodes ``level1`` ... ``level4``)
+    and ``to_netcdf``/``from_netcdf`` handle all levels including the
+    ``level_below`` hierarchy.
+    """
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
         Level.level1: ShearLevel1,

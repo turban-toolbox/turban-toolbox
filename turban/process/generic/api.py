@@ -102,6 +102,9 @@ class TimeseriesLevel:
     def to_xarray(self) -> xr.Dataset:
         """Export this level to an xarray Dataset.
 
+        Only this level is exported, not ``level_below``. To export the whole
+        pipeline, use ``Processing.to_xarray``.
+
         Returns
         -------
         xr.Dataset
@@ -586,7 +589,11 @@ class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
 
 class Processing:
     """Propagates a given start level up to level 4.
-    
+
+    ``to_xarray``/``from_xarray`` (DataTree) and ``to_netcdf``/``from_netcdf``
+    handle the whole pipeline including the ``level_below`` hierarchy, unlike the
+    corresponding methods on individual levels.
+
     Every subclass must define its own ``_level_mapping``."""
 
     # Mapping from level number to the corresponding level class
