@@ -137,15 +137,19 @@ def test_processing_chain_from_level1():
     # all levels share the config of level 1
     for level in (p.level2, p.level3, p.level4):
         assert level.cfg is level1.cfg
-    # aux data are aggregated at level 3 and carried through to level 4
-    assert "pres_mean" in p.level4._aux_data
+    # aux data are aggregated at level 3 and read through by level 4
+    assert "pres_mean" in p.level4.aux_data
 
     data_tree = p.to_xarray()
     assert set(data_tree.children) == {"level1", "level2", "level3", "level4"}
+    # aux data are only stored at level 1 and 3
+    assert "pres" in data_tree["level1"] and "pres" not in data_tree["level2"]
+    assert "pres_mean" in data_tree["level3"] and "pres_mean" not in data_tree["level4"]
 
-    # roundtrip restarts from the lowest level in the tree
+    # roundtrip parses the whole chain of levels
     p2 = Processing.from_xarray(data_tree)
     assert isinstance(p2.level1, Level1)
+    assert p2.level4.aux_data["pres_mean"] is p2.level3.aux_data["pres_mean"]
     np.testing.assert_array_equal(p2.level4.time, p.level4.time)
 
 

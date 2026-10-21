@@ -21,12 +21,14 @@ logger = get_logger(__name__)
 
 
 class Level(IntEnum):
-    """Processing level number (see the four processing levels in the manual)."""
+    """Processing level number (see the four processing levels in the manual).
 
-    L1 = 1
-    L2 = 2
-    L3 = 3
-    L4 = 4
+    Member names are used as node names when exporting to an xarray DataTree."""
+
+    level1 = 1
+    level2 = 2
+    level3 = 3
+    level4 = 4
 
 
 # For Level1/2
@@ -97,7 +99,7 @@ class TimeseriesLevel:
         coords = {k: v for k, v in dct.items() if k in self._coords}
         return data_vars, coords
 
-    def to_xarray(self):
+    def to_xarray(self) -> xr.Dataset:
         """Export this level to an xarray Dataset.
 
         Returns
@@ -116,29 +118,52 @@ class TimeseriesLevel:
         return ds
 
     @classmethod
-    def from_xarray(cls, ds: xr.Dataset):
-        """Instantiate this level from an xarray Dataset.
+    def from_xarray(cls, ds: xr.Dataset | xr.DataTree) -> Self:
+        """Instantiate this level from an xarray Dataset or DataTree.
 
         Parameters
         ----------
-        ds : xr.Dataset
-            Dataset containing array fields and config global attributes.
+        ds : xr.Dataset or xr.DataTree
+            Either a Dataset holding only this level, or a DataTree with nodes
+            ``level1`` ... ``level4`` (as written by ``Processing.to_xarray``),
+            in which case only the node of this level is parsed (``level_below``
+            is not reconstructed).
 
         Returns
         -------
         TimeseriesLevel
             New instance populated from the dataset.
         """
+        if isinstance(ds, xr.DataTree):
+            return cls._from_datatree(ds)
+        else:
+            kwarg = cls._from_xarray_kwarg(ds)
+            kwarg["cfg"] = get_type_hints_recursive(cls)["cfg"].from_xarray(ds)
+            return cls(**kwarg)
+
+    @classmethod
+    def from_netcdf(cls, fname: str) -> Self:
+        """Instantiate this level from a netCDF file written by ``Processing.to_netcdf``.
+
+        See ``from_xarray`` for DataTree input.
+        """
+        return cls.from_xarray(xr.load_datatree(fname))
+
+    @classmethod
+    def _from_xarray_kwarg(cls, ds: xr.Dataset) -> dict:
+        """Provides constructor kwargs (without `cfg`) parsed from a Dataset."""
         data = {}
         hints = get_type_hints_recursive(cls)
         for name, arr in dict(**ds.data_vars, **ds.coords).items():
             if name in hints:
                 logger.debug(f"Adding `{name}` to data")
                 data[name] = arr.values
+        return data
 
-        data["cfg"] = hints["cfg"].from_xarray(ds)
-
-        return cls(**data)
+    @classmethod
+    def _from_datatree(cls, tree: xr.DataTree) -> Self:
+        """Instantiate this level from its node in a DataTree."""
+        return cls.from_xarray(tree[cls._level.name].to_dataset())
 
     def get_attr(self, name):
         """Retrieve an attribute by name.
@@ -170,6 +195,19 @@ class AuxiliaryData(TimeseriesLevel):
         if self._aux_data is None:
             self._aux_data = {}
 
+    @property
+    def aux_data(self) -> AuxDataTypehintLevel12 | AuxDataTypehintLevel34:
+        """All auxiliary data available on this level.
+
+        For levels taking over auxiliary data from the level below, this is the
+        auxiliary data of the level below, updated with those added on this level.
+        Entries are references, so data of the level below are not copied.
+        """
+        below = getattr(self, "level_below", None)
+        if self._level in (2, 4) and isinstance(below, AuxiliaryData):
+            return cast(dict, below.aux_data) | cast(dict, self._aux_data)
+        return cast(dict, self._aux_data)
+
     def arrays_as_xr_dicts(self):
         """Separate array fields including auxiliary data into data-variable and coordinate dicts.
 
@@ -182,48 +220,66 @@ class AuxiliaryData(TimeseriesLevel):
         """
         data_vars, coords = super().arrays_as_xr_dicts()
         if self._level <= 2:
-            data = cast(AuxDataTypehintLevel12, self._aux_data)
+            data = cast(AuxDataTypehintLevel12, self.aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr, _) in data.items()}
             )
         else:
-            data = cast(AuxDataTypehintLevel34, self._aux_data)
+            data = cast(AuxDataTypehintLevel34, self.aux_data)
             data_vars.update(
                 {varname: (dims, arr) for varname, (dims, arr) in data.items()}
             )
         return data_vars, coords
 
     @classmethod
-    def from_xarray(cls, ds: xr.Dataset):
-        """Instantiate from an xarray Dataset, loading auxiliary variables.
+    def _from_xarray_kwarg(cls, ds: xr.Dataset) -> dict:
+        """Provides constructor kwargs, including auxiliary data.
 
-        Parameters
-        ----------
-        ds : xr.Dataset
-            Dataset; variables not recognised as core fields are added as auxiliary data.
-
-        Returns
-        -------
-        AuxiliaryData
-            New instance with core and auxiliary data populated.
+        All data variables not recognised as core fields become auxiliary data.
         """
-        new = super().from_xarray(ds)
-        for name in ds:
-            if not hasattr(new, name):
-                if len(ds[name].shape) == 1:
-                    new.add_aux_data(ds[name].values, name=name)
-                else:
-                    logger.warning(
-                        (
-                            f"Skipping potential auxiliary variable `{name}` defined on "
-                            f"dataset as it has {len(ds[name].shape)} dimensions"
-                        )
-                    )
+        kwarg = super()._from_xarray_kwarg(ds)
+        kwarg["_aux_data"] = cls._aux_from_xarray(ds)
+        return kwarg
+
+    @classmethod
+    def _aux_from_xarray(
+        cls, ds: xr.Dataset
+    ) -> AuxDataTypehintLevel12 | AuxDataTypehintLevel34:
+        """Auxiliary data: all data variables not recognised as core fields."""
+        hints = get_type_hints_recursive(cls)
+        aux = {}
+        for name, arr in ds.data_vars.items():
+            if name in hints:
+                continue
+            logger.debug(f"Adding `{name}` to auxiliary data")
+            if cls._level <= 2:
+                aux[name] = (list(arr.dims), arr.values, {"mean": None})
+            else:
+                aux[name] = (list(arr.dims), arr.values)
+        return aux
+
+    @classmethod
+    def _from_datatree(cls, tree: xr.DataTree) -> Self:
+        """Instantiate this level from its node in a DataTree.
+
+        Level2/4 additionally take the auxiliary data stored in the level1/3 node
+        into their own `_aux_data`, without reconstructing `level_below`.
+        """
+        new = super()._from_datatree(tree)
+        if cls._level in (2, 4):
+            below_cls = cast(
+                type[AuxiliaryData], cast(type[HasLevelBelow], cls).level_below_cls
+            )
+            if below_cls._level.name in tree.children:
+                aux_below = below_cls._aux_from_xarray(
+                    tree[below_cls._level.name].to_dataset()
+                )
+                new._aux_data = cast(dict, aux_below) | cast(dict, new._aux_data)
         return new
 
     def _variable_present(self, name):
         """Returns True if variable called `name` already present somewhere"""
-        if name in self._aux_data:
+        if name in self.aux_data:
             logger.warning(f"Variable`{name}` already exists in aux data, skipping")
         elif name in get_type_hints_recursive(type(self)):
             logger.warning(
@@ -297,6 +353,8 @@ class HasLevelBelow[L: TimeseriesLevel](TimeseriesLevel, ABC):
     """
 
     level_below: L | None = None
+    # class of the level below, used when parsing a DataTree
+    level_below_cls: ClassVar[type[TimeseriesLevel]]
 
     @classmethod
     @abstractmethod
@@ -349,7 +407,7 @@ class Level1(AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[Level] = Level.L1
+    _level: ClassVar[Level] = Level.level1
 
     # TODO should consider using pydantic or similar for runtime checking of user input
     # (e.g., positive platform speed, etc.)
@@ -360,7 +418,8 @@ class Level2[L: Level1](HasLevelBelow[L], AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[Level] = Level.L2
+    _level: ClassVar[Level] = Level.level2
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = Level1
 
     @classmethod
     def _from_level_below_kwarg(cls, data: L) -> dict:
@@ -380,8 +439,9 @@ class Level2[L: Level1](HasLevelBelow[L], AuxiliaryData):
             time=data.time,
             senspeed=data.senspeed,
             section_number=data.section_number,
-            # copy so that adding aux data here does not modify the level below
-            _aux_data=dict(cast(dict, data._aux_data)),
+            # aux data of the level below are read through `aux_data`, only
+            # aux data added on this level are stored here
+            _aux_data={},
         )
 
 
@@ -394,7 +454,8 @@ class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
 
     _coords = ["time", "freq"]
 
-    _level: ClassVar[Level] = Level.L3
+    _level: ClassVar[Level] = Level.level3
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = Level2
 
     @classmethod
     def _from_level_below_kwarg(cls, data: L) -> dict:
@@ -428,7 +489,7 @@ class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
                 data.section_number, reshape_index=ii, agg_method="max"
             ),
             _aux_data=cls.agg(
-                data=cast(AuxDataTypehintLevel12, data._aux_data),
+                data=cast(AuxDataTypehintLevel12, data.aux_data),
                 data_len=len(data.time),
                 chunk_length=data.cfg.chunk_length,
                 chunk_overlap=data.cfg.chunk_overlap,
@@ -471,7 +532,8 @@ class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
 class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
-    _level: ClassVar[Level] = Level.L4
+    _level: ClassVar[Level] = Level.level4
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = Level3
 
     @classmethod
     def _from_level_below_kwarg(cls, data: L) -> dict:
@@ -490,8 +552,9 @@ class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
         return dict(
             time=data.time,
             section_number=data.section_number,
-            # copy so that adding aux data here does not modify the level below
-            _aux_data=dict(cast(dict, data._aux_data)),
+            # aux data of the level below are read through `aux_data`, only
+            # aux data added on this level are stored here
+            _aux_data={},
         )
 
 
@@ -528,10 +591,10 @@ class Processing:
 
     # Mapping from level number to the corresponding level class
     _level_mapping: ClassVar[dict[Level, type[TimeseriesLevel]]] = {
-        Level.L1: Level1,
-        Level.L2: Level2,
-        Level.L3: Level3,
-        Level.L4: Level4,
+        Level.level1: Level1,
+        Level.level2: Level2,
+        Level.level3: Level3,
+        Level.level4: Level4,
     }
 
     def __init_subclass__(cls, **kwargs):
@@ -598,30 +661,53 @@ class Processing:
         else:
             return self.level2.time.shape[-1]
 
-    def to_xarray(self):
-        """Export"""
+    def to_xarray(self) -> xr.DataTree:
+        """Export all available levels to a DataTree with nodes ``level1`` ... ``level4``.
+
+        Auxiliary data shared with the level below (Level2 from Level1, Level4
+        from Level3) are only stored on the lower level.
+        """
+        # level whose auxiliary data are not stored on the given level
+        aux_source = {Level.level2: self.level1, Level.level4: self.level3}
         out_data = {}
         for data in [self.level1, self.level2, self.level3, self.level4]:
             if data is not None:
                 out = data.to_xarray()
-                out_data[f"level{data._level}"] = xr.DataTree(out)
+                source = aux_source.get(data._level)
+                if source is not None:
+                    out = out.drop_vars(list(source.aux_data), errors="ignore")
+                out_data[data._level.name] = xr.DataTree(out)
 
         data_tree = xr.DataTree(children=out_data)
         return data_tree
 
     @classmethod
-    def from_xarray(cls, data_tree: xr.DataTree):
-        """Instantiate pipeline from lowest available level"""
+    def from_xarray(cls, data_tree: xr.DataTree) -> Self:
+        """Instantiate pipeline from a DataTree.
+
+        Every available level is parsed from its own node and linked to the level
+        below, so that Level2/4 read auxiliary data through Level1/3.
+        """
+        data = None
         for level, class_ in cls._level_mapping.items():
-            level_str = f"level{level:d}"
-            if level_str in data_tree:
-                logger.debug(f"Start processing from level {level}")
-                data = class_.from_xarray(data_tree[level_str].to_dataset())
-                break
-        else:
+            if level.name in data_tree.children:
+                new = class_.from_xarray(data_tree[level.name].to_dataset())
+                if data is not None:
+                    cast(HasLevelBelow, new).level_below = data
+                data = new
+        if data is None:
             raise ValueError(f"Could not find any data.")
 
         return cls(data)
+
+    def to_netcdf(self, fname: str):
+        """Write all available levels to a netCDF file, see ``to_xarray``."""
+        self.to_xarray().to_netcdf(fname)
+
+    @classmethod
+    def from_netcdf(cls, fname: str) -> Self:
+        """Instantiate pipeline from a netCDF file, see ``from_xarray``."""
+        return cls.from_xarray(xr.load_datatree(fname))
 
 
 # def _split_dict_by(dct: dict, keys: list[str]) -> tuple[dict, dict]:

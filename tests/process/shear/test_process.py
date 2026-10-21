@@ -154,7 +154,7 @@ def test_baltic_benchmark(tmp_path):
 
     # aux data are exported only with level 1 and 3
     for level, level_below in [("level2", "level1"), ("level4", "level3")]:
-        aux = set(getattr(p, level)._aux_data)
+        aux = set(getattr(p, level_below).aux_data)
         assert aux and aux <= set(data_tree[level_below].data_vars)
         assert not aux & set(data_tree[level].data_vars)
 
@@ -162,11 +162,14 @@ def test_baltic_benchmark(tmp_path):
     fname = tmp_path / "baltic.nc"
     data_tree.to_netcdf(fname)
     p2 = ShearProcessing.from_xarray(xr.open_datatree(fname))
-    assert p2.level2._aux_data is p2.level1._aux_data
-    assert p2.level4._aux_data is p2.level3._aux_data
+    for level, level_below in [(p2.level2, p2.level1), (p2.level4, p2.level3)]:
+        assert level.aux_data
+        for name, entry in level.aux_data.items():
+            assert entry is level_below.aux_data[name]
     xr.testing.assert_identical(p2.to_xarray(), data_tree)
 
-    _plot_level4(ds4, ds4_turban)  # TODO
+    # full level 4 dataset, as aux data (e.g. `press`) are not stored in the level4 node
+    _plot_level4(ds4, p.level4.to_xarray())  # TODO
 
 
 def _plot_level4(ds4, level4):

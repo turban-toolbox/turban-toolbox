@@ -72,12 +72,12 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
     elif isinstance(data, xr.DataTree):
         out = []
         for level, class_ in (
-            (Level.L1, ShearLevel1),
-            (Level.L2, ShearLevel2),
-            (Level.L3, ShearLevel3),
-            (Level.L4, ShearLevel4),
+            (Level.level1, ShearLevel1),
+            (Level.level2, ShearLevel2),
+            (Level.level3, ShearLevel3),
+            (Level.level4, ShearLevel4),
         ):
-            level_name = f"level{level}"
+            level_name = level.name
             if level_name in data:
                 ds = data[level_name].to_dataset()
                 out.append(class_.from_xarray(ds))
@@ -100,10 +100,10 @@ def _to_levels(data: Any) -> tuple[ShearLevelType, ...]:
 def plot(*data: Any, subset: SubsetSpec | None = None):
     """Make all possible plots from any number of supplied data."""
     plot_map = {
-        Level.L1: plot_level1,
-        Level.L2: plot_level2,
-        Level.L3: plot_level3,
-        Level.L4: plot_level4,
+        Level.level1: plot_level1,
+        Level.level2: plot_level2,
+        Level.level3: plot_level3,
+        Level.level4: plot_level4,
     }
     level_data_items = [level for item in data for level in _to_levels(item)]
     level_data_levels = [item._level for item in level_data_items]
@@ -221,7 +221,7 @@ def plot_level1(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(Level.L1)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.level1)), subset)
 
     data_vars = set(ds.data_vars) - {"section_number", "shear", "senspeed"}
     n_panels = len(data_vars)
@@ -276,9 +276,9 @@ def plot_level2(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(Level.L2)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.level2)), subset)
     valid_section = ds["section_number"] != 0
-    data_l1 = levels.get(Level.L1, None)
+    data_l1 = levels.get(Level.level1, None)
     ds1 = None
     if data_l1 is not None:
         ds1 = _clip(_to_dataset(data_l1), subset)
@@ -335,8 +335,8 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None):
         if Level 4 data is provided.
     """
     levels = _parse_level_inputs(*data)
-    data_l3 = levels.get(Level.L3)
-    data_l4 = levels.get(Level.L4, None)
+    data_l3 = levels.get(Level.level3)
+    data_l4 = levels.get(Level.level4, None)
 
     if data_l3 is None:
         raise ValueError("plot_level3 requires Level 3 data")
@@ -420,7 +420,7 @@ def plot_level4(*data: Any, subset: SubsetSpec | None = None):
     """
     levels = _parse_level_inputs(*data)
 
-    ds = _clip(_to_dataset(levels.get(Level.L4)), subset)
+    ds = _clip(_to_dataset(levels.get(Level.level4)), subset)
     nshear = len(ds.nshear)
 
     # Create figure with panels for eps and quality metrics

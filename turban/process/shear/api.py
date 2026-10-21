@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import ClassVar, Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
@@ -69,6 +69,8 @@ class ShearLevel2(Level2[ShearLevel1]):
     section_number: Int[ndarray, "time"]
     num_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel1
 
     @classmethod
     def _from_level_below_kwarg(
@@ -150,6 +152,8 @@ class ShearLevel3(Level3[ShearLevel2]):
     max_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
 
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel2
+
     @classmethod
     def _from_level_below_kwarg(
         cls,
@@ -160,10 +164,10 @@ class ShearLevel3(Level3[ShearLevel2]):
         vib: Float[ndarray, "nvib time"] | None
         if data.cfg.vibration_channels:
             vibdata = []
-            if data._aux_data is not None:
+            if data.aux_data is not None:
                 for channel in data.cfg.vibration_channels:
-                    if channel in data._aux_data:
-                        vibdata.append(data._aux_data[channel][1])
+                    if channel in data.aux_data:
+                        vibdata.append(data.aux_data[channel][1])
                     else:
                         logger.error(
                             f"Requested vibration removal, but channel {channel} missing from aux data"
@@ -303,6 +307,8 @@ class ShearLevel4(Level4[ShearLevel3]):
     cfg: ShearConfig
     molvisc: Float[ndarray, "time"]
 
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel3
+
     @classmethod
     def _from_level_below_kwarg(
         cls,
@@ -404,10 +410,10 @@ class ShearLevel4(Level4[ShearLevel3]):
 class ShearProcessing(Processing):
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
-        Level.L1: ShearLevel1,
-        Level.L2: ShearLevel2,
-        Level.L3: ShearLevel3,
-        Level.L4: ShearLevel4,
+        Level.level1: ShearLevel1,
+        Level.level2: ShearLevel2,
+        Level.level3: ShearLevel3,
+        Level.level4: ShearLevel4,
     }
 
     @classmethod
