@@ -3,7 +3,7 @@
 from enum import IntEnum
 from functools import wraps
 from inspect import isclass
-from typing import get_type_hints, ClassVar, cast
+from typing import get_type_hints, ClassVar, Self, cast
 from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
@@ -289,22 +289,28 @@ class AuxiliaryData(TimeseriesLevel):
 
 
 @dataclass(kw_only=True)
-class HasLevelBelow(TimeseriesLevel):
-    level_below: TimeseriesLevel | None = None
+class HasLevelBelow[L: TimeseriesLevel](TimeseriesLevel, ABC):
+    """Base class for levels derived from a level below of type `L`.
+
+    Subclasses specify the level below via the type parameter,
+    e.g. `class Level2(HasLevelBelow[Level1], ...)`.
+    """
+
+    level_below: L | None = None
 
     @classmethod
     @abstractmethod
-    def _from_level_below_kwarg(cls, data: TimeseriesLevel | None) -> dict:
+    def _from_level_below_kwarg(cls, data: L) -> dict:
         """Provides dictionary `kwarg` that can be passed into class constructor as cls(**kwarg)."""
-        return {}
+        raise NotImplementedError
 
     @classmethod
-    def from_level_below(cls, data: TimeseriesLevel | None):
+    def from_level_below(cls, data: L) -> Self:
         """Construct this level from the level-below data object.
 
         Parameters
         ----------
-        data : TimeseriesLevel or None
+        data : L
             Data from the level below.
 
         Returns
@@ -343,14 +349,14 @@ class Level1(AuxiliaryData):
 
 
 @dataclass(kw_only=True)
-class Level2(HasLevelBelow, AuxiliaryData):
+class Level2[L: Level1](HasLevelBelow[L], AuxiliaryData):
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
     _level: ClassVar[Level] = Level.L2
 
     @classmethod
-    def _from_level_below_kwarg(cls, data: Level1) -> dict:
+    def _from_level_below_kwarg(cls, data: L) -> dict:
         """Build constructor kwargs for Level2 from Level1 data.
 
         Parameters
@@ -372,7 +378,7 @@ class Level2(HasLevelBelow, AuxiliaryData):
 
 
 @dataclass(kw_only=True)
-class Level3(HasLevelBelow, AuxiliaryData):
+class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
     waveno: Float[ndarray, "time waveno"]
     freq: Float[ndarray, "waveno"]
     senspeed: Float[ndarray, "time"]
@@ -383,7 +389,7 @@ class Level3(HasLevelBelow, AuxiliaryData):
     _level: ClassVar[Level] = Level.L3
 
     @classmethod
-    def _from_level_below_kwarg(cls, data: Level2) -> dict:
+    def _from_level_below_kwarg(cls, data: L) -> dict:
         """Build constructor kwargs for Level3 from Level2 data, aggregating aux data.
 
         Parameters
@@ -439,13 +445,13 @@ class Level3(HasLevelBelow, AuxiliaryData):
 
 
 @dataclass(kw_only=True)
-class Level4(HasLevelBelow, AuxiliaryData):
+class Level4[L: Level3](HasLevelBelow[L], AuxiliaryData):
     section_number: Int[ndarray, "time"]
 
     _level: ClassVar[Level] = Level.L4
 
     @classmethod
-    def _from_level_below_kwarg(cls, data: Level3) -> dict:
+    def _from_level_below_kwarg(cls, data: L) -> dict:
         """Build constructor kwargs for Level4 from Level3 data.
 
         Parameters

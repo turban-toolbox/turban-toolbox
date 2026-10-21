@@ -64,7 +64,7 @@ class ShearLevel1(Level1):
 
 
 @dataclass(kw_only=True)
-class ShearLevel2(Level2):
+class ShearLevel2(Level2[ShearLevel1]):
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     num_despike_iter: Int[ndarray, "nshear time"]
@@ -143,7 +143,7 @@ class ShearLevel2(Level2):
 
 
 @dataclass(kw_only=True)
-class ShearLevel3(Level3):
+class ShearLevel3(Level3[ShearLevel2]):
     psi_k_sh: Float[ndarray, "nshear time waveno"]
     psi_f_sh: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
@@ -292,7 +292,7 @@ class ShearLevel3(Level3):
 
 
 @dataclass(kw_only=True)
-class ShearLevel4(Level4):
+class ShearLevel4(Level4[ShearLevel3]):
     eps: Float[ndarray, "nshear time"]
     eps_source_flag: Int[ndarray, "nshear time"]
     log_diss_var: Float[ndarray, "nshear time"]
