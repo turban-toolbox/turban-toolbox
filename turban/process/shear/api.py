@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import ClassVar, Literal, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
@@ -33,6 +33,12 @@ logger = get_logger(__name__)
 
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
+    """Shear Level 1: shear converted to physical units.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only, see
+    ``ShearProcessing`` for the whole pipeline.
+    """
+
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     cfg: ShearConfig
@@ -64,11 +70,20 @@ class ShearLevel1(Level1):
 
 
 @dataclass(kw_only=True)
-class ShearLevel2(Level2):
+class ShearLevel2(Level2[ShearLevel1]):
+    """Shear Level 2: despiked shear, derived from ``ShearLevel1``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only (including auxiliary
+    data taken over from Level 1), without ``level_below``. See ``ShearProcessing``
+    for the whole pipeline.
+    """
+
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     num_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel1
 
     @classmethod
     def _from_level_below_kwarg(
@@ -111,7 +126,6 @@ class ShearLevel2(Level2):
                 senspeed=level1.senspeed,
                 section_number=level1.section_number,
                 num_despike_iter=num_despike_iter,
-                level_below=level1,
             )
         )
         return kwarg
@@ -143,13 +157,21 @@ class ShearLevel2(Level2):
 
 
 @dataclass(kw_only=True)
-class ShearLevel3(Level3):
+class ShearLevel3(Level3[ShearLevel2]):
+    """Shear Level 3: chunk-wise shear wavenumber spectra, derived from ``ShearLevel2``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only, without
+    ``level_below``. See ``ShearProcessing`` for the whole pipeline.
+    """
+
     psi_k_sh: Float[ndarray, "nshear time waveno"]
     psi_f_sh: Float[ndarray, "nshear time waveno"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel2
 
     @classmethod
     def _from_level_below_kwarg(
@@ -161,10 +183,10 @@ class ShearLevel3(Level3):
         vib: Float[ndarray, "nvib time"] | None
         if data.cfg.vibration_channels:
             vibdata = []
-            if data._aux_data is not None:
+            if data.aux_data is not None:
                 for channel in data.cfg.vibration_channels:
-                    if channel in data._aux_data:
-                        vibdata.append(data._aux_data[channel][1])
+                    if channel in data.aux_data:
+                        vibdata.append(data.aux_data[channel][1])
                     else:
                         logger.error(
                             f"Requested vibration removal, but channel {channel} missing from aux data"
@@ -223,7 +245,6 @@ class ShearLevel3(Level3):
                 section_number=section_number,
                 spike_fraction=spike_fraction,
                 max_despike_iter=max_despike_iter,
-                level_below=data,
             )
         )
         return kwarg
@@ -292,18 +313,28 @@ class ShearLevel3(Level3):
 
 
 @dataclass(kw_only=True)
-class ShearLevel4(Level4):
+class ShearLevel4(Level4[ShearLevel3]):
+    """Shear Level 4: dissipation rates and quality metrics, derived from ``ShearLevel3``.
+
+    ``to_xarray``/``from_xarray`` export/parse this level only (including auxiliary
+    data taken over from Level 3), without ``level_below``. See ``ShearProcessing``
+    for the whole pipeline.
+    """
+
     eps: Float[ndarray, "nshear time"]
     eps_source_flag: Int[ndarray, "nshear time"]
     log_diss_var: Float[ndarray, "nshear time"]
     log_diss_mad: Float[ndarray, "nshear time"]
     kolm_length: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
+    fom: Float[ndarray, "nshear time"]  # figure of merit, FM in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
     waveno_cutoff: Float[ndarray, "nshear time"]  # upper limit of eps estimate
     quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
-    molvisc: Float[ndarray, "time"] | float
+    molvisc: Float[ndarray, "time"]
+
+    level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel3
 
     @classmethod
     def _from_level_below_kwarg(
@@ -362,11 +393,12 @@ class ShearLevel4(Level4):
                 log_diss_mad=log_diss_mad,
                 kolm_length=kolm_length,
                 resolved_var_frac=resolved_var_frac,
+                fom=fom,
                 num_spec_points=num_spec_points,
                 waveno_cutoff=waveno_cutoff,
                 quality_metric=quality_metric,
-                molvisc=molvisc,
-                level_below=level3,
+                # always store as array so that it is exported to xarray
+                molvisc=np.broadcast_to(molvisc, level3.time.shape).astype(float),
             )
         )
         return kwarg
@@ -377,7 +409,7 @@ class ShearLevel4(Level4):
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
             logger.warning("log_diss_var not available from atomix netcdf file.")
             level3 = ShearLevel3.from_atomix_netcdf(fname)
-            _, log_diss_mad, _ = figure_of_merit(
+            fom, log_diss_mad, _ = figure_of_merit(
                 waveno=level3.waveno,
                 waveno_cutoff=ds["KMAX"].values,
                 eps=ds["EPSI"].values,
@@ -394,6 +426,7 @@ class ShearLevel4(Level4):
                 quality_metric=ds["EPSI_FLAGS"].values.astype(int),
                 molvisc=ds["KVISC"].values,
                 resolved_var_frac=ds["VAR_RESOLVED"].values,
+                fom=ds["FOM"].values if "FOM" in ds else fom,
                 num_spec_points=ds["N_S"].values.astype(int),
                 waveno_cutoff=ds["KMAX"].values,
                 kolm_length=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
@@ -404,12 +437,18 @@ class ShearLevel4(Level4):
 
 
 class ShearProcessing(Processing):
+    """Shear processing pipeline from any start level up to ``ShearLevel4``.
+
+    ``to_xarray``/``from_xarray`` (DataTree with nodes ``level1`` ... ``level4``)
+    and ``to_netcdf``/``from_netcdf`` handle all levels including the
+    ``level_below`` hierarchy.
+    """
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
-        Level.L1: ShearLevel1,
-        Level.L2: ShearLevel2,
-        Level.L3: ShearLevel3,
-        Level.L4: ShearLevel4,
+        Level.level1: ShearLevel1,
+        Level.level2: ShearLevel2,
+        Level.level3: ShearLevel3,
+        Level.level4: ShearLevel4,
     }
 
     @classmethod

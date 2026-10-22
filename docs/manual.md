@@ -4,15 +4,40 @@ This manual assumes that you have read your data into python. For converting com
 
 ## Exporting and importing data
 
-TURBAN can export to and import from xarray datasets using its `.to_xarray()` and `.from_xarray()` methods available on `Processing` as well as `Level1/2/3/4` objects. 
-TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases.
+TURBAN can export to and import from xarray using `.to_xarray()` and `.from_xarray()`, available on both levels (e.g. `ShearLevel1` through `ShearLevel4`) and pipelines (e.g. `ShearProcessing`). They differ in scope:
 
-The following would do a roundtrip in TURBAN:
+- **Levels** export to, and parse from, a single `xr.Dataset` holding only that level. `level_below` is neither exported nor reconstructed. Auxiliary data that Level 2/4 take over from Level 1/3 are included in the export, so the dataset is complete by itself.
+- **Pipelines** export to, and parse from, an `xr.DataTree` with nodes `level1` through `level4`, i.e. the whole pipeline including the `level_below` hierarchy. Auxiliary data shared between levels are stored only once (in the `level1` and `level3` nodes). `.to_netcdf()` and `.from_netcdf()` do the same with netCDF files.
+
+A level can also be parsed from such a DataTree, or a netCDF file written by `Processing.to_netcdf()`. This reads only that level's node (plus the auxiliary data it takes over from the level below), and `level_below` is again not reconstructed.
+
+ -TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases. 
+ 
+The following round-trips a single level:
 ```python
 from turban import ShearLevel3
 l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")  # import from benchmark file 
 ds = l3.to_xarray()  # TURBAN-compliant xarray dataset
 l3_reimport = ShearLevel3.from_xarray(ds)  # equal to l3
+assert l3_reimport.level_below is None  # levels below are not part of the dataset
+```
+
+and the following round-trips an entire pipeline:
+```python
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from turban import ShearProcessing, ShearLevel4
+
+p = ShearProcessing.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc", level=1)
+data_tree = p.to_xarray()  # xr.DataTree with nodes level1 ... level4
+p_reimport = ShearProcessing.from_xarray(data_tree)  # entire level_below hierarchy
+assert p_reimport.level4.level_below is p_reimport.level3
+
+with TemporaryDirectory() as tmpdir:
+    fname = str(Path(tmpdir) / "baltic.nc")
+    p.to_netcdf(fname)
+    p_reimport = ShearProcessing.from_netcdf(fname)  # same as above
+    l4 = ShearLevel4.from_netcdf(fname)  # only the level4 node, without level_below
 ```
 ## Shear processing
 
@@ -66,7 +91,7 @@ level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
 
 ### Figure of merit and its ingredients
 
-ATOMIX defines as a poor figure of merit (FOM), i.e. $\mathrm{FOM} = \mathrm{MAD} / (\sigma_{\ln\Psi} T_M) > 1.4$, where the threshold of 1.4 is empirical. `ShearLevel4` stores the ingredients needed to recompute the FOM (`waveno_cutoff`, `log_diss_mad`, `num_spec_points`), including `log_psi_var` from `ShearLevel3`:
+ATOMIX defines as a poor figure of merit (FOM), i.e. $\mathrm{FOM} = \mathrm{MAD} / (\sigma_{\ln\Psi} T_M) > 1.4$, where the threshold of 1.4 is empirical. `ShearLevel4` stores the FOM as `fom` (and exports it with `to_xarray()`), as well as the ingredients needed to recompute it (`waveno_cutoff`, `log_diss_mad`, `num_spec_points`), including `log_psi_var` from `ShearLevel3`:
 
 ```python
 import numpy as np
@@ -86,6 +111,7 @@ fom, log_diss_mad, num_spec_points = figure_of_merit(
 )
 # T_M in the ATOMIX paper
 tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  
+assert np.allclose(fom, l4.fom, equal_nan=True)
 ```
 
 
