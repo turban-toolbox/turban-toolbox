@@ -327,6 +327,7 @@ class ShearLevel4(Level4[ShearLevel3]):
     log_diss_mad: Float[ndarray, "nshear time"]
     kolm_length: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
+    fom: Float[ndarray, "nshear time"]  # figure of merit, FM in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
     waveno_cutoff: Float[ndarray, "nshear time"]  # upper limit of eps estimate
     quality_metric: Int[ndarray, "nshear time"]
@@ -392,6 +393,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 log_diss_mad=log_diss_mad,
                 kolm_length=kolm_length,
                 resolved_var_frac=resolved_var_frac,
+                fom=fom,
                 num_spec_points=num_spec_points,
                 waveno_cutoff=waveno_cutoff,
                 quality_metric=quality_metric,
@@ -407,7 +409,7 @@ class ShearLevel4(Level4[ShearLevel3]):
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
             logger.warning("log_diss_var not available from atomix netcdf file.")
             level3 = ShearLevel3.from_atomix_netcdf(fname)
-            _, log_diss_mad, _ = figure_of_merit(
+            fom, log_diss_mad, _ = figure_of_merit(
                 waveno=level3.waveno,
                 waveno_cutoff=ds["KMAX"].values,
                 eps=ds["EPSI"].values,
@@ -424,6 +426,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 quality_metric=ds["EPSI_FLAGS"].values.astype(int),
                 molvisc=ds["KVISC"].values,
                 resolved_var_frac=ds["VAR_RESOLVED"].values,
+                fom=ds["FOM"].values if "FOM" in ds else fom,
                 num_spec_points=ds["N_S"].values.astype(int),
                 waveno_cutoff=ds["KMAX"].values,
                 kolm_length=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
