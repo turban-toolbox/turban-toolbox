@@ -9,7 +9,7 @@ from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
 from turban.instruments.microrider import rsCommon as common
-from turban.instruments.generic import channels
+from turban.instruments.microrider import channels
 
 logger = logging.getLogger(__name__)
 

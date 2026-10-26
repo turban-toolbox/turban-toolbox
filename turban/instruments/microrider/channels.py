@@ -19,7 +19,6 @@ def microrider_channel_config_factory(name: str) -> ChannelConfigBaseModel:
     return channel_config_factory(name, InstrumentEnum.MicroRider)
 
 
-
 @register_channel_config(InstrumentEnum.MicroRider, ["Gnd_2", "ch255"])
 class ChannelConfig(ChannelConfigBaseModel):
     pass
@@ -122,13 +121,3 @@ class ChannelConfigU_EM(ChannelConfigBaseModel):
     bias: float = Field(default=DefaultFloat)
     sn: str = Field(default=DefaultStr)
     cal_date: str = Field(default=DefaultStr)
-
-
-def channel_config_factory(name: str, prefix: str) -> ChannelConfigBaseModel:
-    key = f"{prefix}{name}"
-    if key not in _CHANNEL_CONFIG_REGISTRY:
-        raise ValueError(f"{key} is not a valid channel name.")
-    return _CHANNEL_CONFIG_REGISTRY[key](name=name)
-
-def microrider_channel_config_factory(name: str) -> ChannelConfigBaseModel:
-    return channel_config_factory(name, InstrumentEnum.MicroRider)

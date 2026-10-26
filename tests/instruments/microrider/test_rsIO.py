@@ -9,8 +9,7 @@ import zipfile
 import numpy as np
 from scipy.io import loadmat
 
-from turban.instruments.generic import channels
-from turban.instruments.microrider import rsIO, rsConfig_parser
+from turban.instruments.microrider import channels, rsIO, rsConfig_parser
 from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
@@ -128,7 +127,7 @@ def microrider_config_data(request):
 @pytest.mark.parametrize("microrider_config_data", ["058", "0413"], indirect=True)
 def test_channel_matrix(microrider_config_data):
     channel_matrix = rsIO.ChannelMatrix(microrider_config_data["microrider_config"])
-    assert channel_matrix.number_of_elements == 72
+    assert channel_matrix.record_size == 72
 
 
 def test_channel_config():

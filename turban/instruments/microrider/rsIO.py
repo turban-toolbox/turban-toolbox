@@ -17,7 +17,6 @@ from turban.instruments.generic.channels import (
     ChannelConfigBaseModel,
     channel_config_factory,
 )
-import turban.instruments.microrider.channels
 from turban.instruments.microrider import rsConversions
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
@@ -68,31 +67,6 @@ class Channel(object):
         self.config: ChannelConfigBaseModel = channel_config
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
 
-    def correct_sign(self, data: np_typing.NDArray[np.float64]) -> np_typing.NDArray[np.float64]:
-        """Corrects sign of data (if configuration dictates)
-
-        Some channels record in unsigned integers. If required they need to be
-        signed, where the msb is used as sign.
-
-        """
-        types_to_skip = "sbt sbc jac_c jac_t o2_43f".split()
-        cfg = self.config
-        if cfg.id == 255:
-            return  # nothing to do for ch255
-        if cfg.type in types_to_skip:
-            return
-        if cfg.sign == "unsigned":
-            logger.info("Correcting sign")
-            self.data = self.data.astype(
-                np.dtype(f">u{HeaderEnum.WordSize}")
-            )  # as unsigned
-        else:
-            idx = np.where(self.data >= 2**31)[0]
-            if len(idx):
-                self.data[idx] -= 2**32
-                logger.info("Correcting sign of 32 bit channel.")
-                logger.debug("Does this ever happen?")
-                raise ValueError("FIX ME")
 
     def convert_to_units(self) -> None:
         """Converts channel into unit bearing data
@@ -188,6 +162,8 @@ class ChannelMatrix(object):
             k = k_any_case.lower()
             if k == "name":
                 continue
+            if k == "id":
+                assert isinstance(v, int)
             channel_config.update(k, v)
         return channel_config
 
@@ -467,26 +443,6 @@ class MicroRiderData(object):
             channel.data = data_snr[:, idx].flatten()
             channel.correct_sign()
 
-    def combine_split_channels(self) -> None:
-        """Combines even and odd channels into one
-
-        All channels that are labelled *_E and *_O are combined into one, using 32 bit ints.
-
-        Note: This method has not thorougly been tested because the test data don't have any
-              split channels. It was tested modifying the data file, which has been reverted
-              back again.
-        """
-        channels = self.channel_matrix.channels
-        even_channels = [ch for ch in channels.keys() if ch.endswith("_E")]
-        for ch_even in even_channels:
-            ch_odd = ch_even.replace("_E", "_O")
-            ch = ch_even.replace("_E", "")
-            if not ch_odd in channels.keys():
-                logger.warning(f"Found channel {ch_even}, but did not find {ch_odd}")
-                continue  # No odd channel found.
-            self.channel_matrix.channels[ch] = channels[ch_even] + channels[ch_odd]
-            self.channel_matrix.channels.pop(ch_even)
-            self.channel_matrix.channels.pop(ch_odd)
 
     def convert_channels(self) -> None:
         """Converts all channels
@@ -625,10 +581,15 @@ def read_p_file(filename: str,
         # read embedded setupstring (leaves the fp in the correct place)
         setupstring = header_parser.read_setupstring(fd, header_data)
         microrider_config.parse(setupstring)
+        # Overwrite any user-defined channel configs
         for channel_config in channel_configs:
             microrider_config.update_config(channel_config)
+        # Create the channel matrix
+        channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config)
 
-        # read the data and cast it in a numpy array
+        # Now we are ready to read in the data, which could
+        # technically be done in small parts too.
+        # Read the data and cast it in a numpy array
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
         bytes_data = fd.read()
     
@@ -636,15 +597,14 @@ def read_p_file(filename: str,
         -1, header_data.data_record_size
     )
 
-    channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config)
-    n = channel_matrix.record_size
     # Make sure we end up with int16, as we may get '>i2'
+    n = channel_matrix.record_size
     data_snr = (
         bindata[:, header_data.record_header_size :].reshape(-1, n).astype(np.int16)
     )
+    
     data = {}
     for name, channel in channel_matrix.channels.items():
         indices = channel_matrix.get_record_indices(name)
-        data[name] = channnel.correct_sign(data_snr[:, indices].flatten())
-        breakpoint()
+        data[name] = data_snr[:, indices].flatten()
     return data

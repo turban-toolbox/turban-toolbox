@@ -202,17 +202,17 @@ By default `MicroriderProbe` reads sensor parameters (e.g. shear probe sensitivi
 from the setup string embedded in the `.p` file. You can override individual parameters by
 passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
 
-Use `channel_config_factory` to obtain a pre-populated config object for a named channel,
+Use `microrider_channel_config_factory` to obtain a pre-populated config object for a named channel,
 then call `update` to override specific fields:
 
 ```python 
-from turban.instruments.microrider.rsCommon import channel_config_factory
+from turban.instruments.microrider.channels import microrider_channel_config_factory
 from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
 
-sh1 = channel_config_factory("sh1")
+sh1 = microrider_channel_config_factory("sh1")
 sh1.update("sens", 0.0700)  # V / (rad s⁻¹)
 
-sh2 = channel_config_factory("sh2")
+sh2 = microrider_channel_config_factory("sh2")
 sh2.update("sens", 0.0970)
 
 microrider_config = MicroriderConfig(
