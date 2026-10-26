@@ -66,6 +66,7 @@ class MicroriderProbe(Instrument):
         """
         channel_configs = self.cfg.channel_cfgs
         microrider_data = rsIO.read_p_file(filename, channel_configs)
+        breakpoint()
         self.sensor_speed_plugin.set_microrider_data(microrider_data)
         time = microrider_data.header.t_fast + microrider_data.header.timestamp
         senspeed = self.sensor_speed_plugin.get_sensor_speed(time)

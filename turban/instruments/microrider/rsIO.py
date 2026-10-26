@@ -46,16 +46,8 @@ class Channel(object):
 
     Parameters
     ----------
-    name : string
-        name of channel
     config : ChannelConfig
         channel configuration object (from setupstr)
-    deconvolved : bool (False)
-        flag to indicate whether this is a deconvolved channel.
-
-    This class holds the data of each channel:
-    when read     : the raw data are in .data (._data is None)
-    when converted: the converted data are in .data and the raw data in ._data.
 
     The following methods are provided:
 
@@ -68,48 +60,15 @@ class Channel(object):
     convert_to_units(): applies to associated conversion algortithm (determined
            from the config dictionary) to the raw data.
 
-    join(): joins even and odd channels. Warning not fully tested. This method
-           can be called by through the + operator: ch = chE+chO
-
-
     """
 
     def __init__(
-        self, channel_config: ChannelConfigBaseModel, deconvolved: bool = False
-    ):
+        self, channel_config: ChannelConfigBaseModel) -> None:
         self.name: str = channel_config.name
         self.config: ChannelConfigBaseModel = channel_config
-        self.data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
-            np.array([])
-        )
-        self._data: np.typing.NDArray[np.float64] | np.typing.NDArray[np.int16] = (
-            np.array([])
-        )
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
-        self.converted_into_units: bool = False
-        self.deconvolved: bool = deconvolved
 
-    def __add__(self, rhs: "Channel") -> "Channel":
-        return self.join(self, rhs)
-
-    def copy(self, new_name: str = "", deconvolved: bool = True) -> "Channel":
-        """Copies configuration into a new channel with optionally a new name
-
-        Parameters
-        ----------
-        new_name : string (None)
-            gives this name to the new channel. If None, it keeps the original name.
-
-        Returns
-        -------
-        Channel object
-            Empty channel, with the configuration copied, and the deconvolved flag set.
-        """
-        name = new_name or self.name
-        config = self.config.clone()
-        return Channel(config, deconvolved=deconvolved)
-
-    def correct_sign(self) -> None:
+    def correct_sign(self, data: np_typing.NDArray[np.float64]) -> np_typing.NDArray[np.float64]:
         """Corrects sign of data (if configuration dictates)
 
         Some channels record in unsigned integers. If required they need to be
@@ -153,40 +112,6 @@ class Channel(object):
                 "Refusing to convert to units for a parameter already converted."
             )
 
-    def join(self, even_channel: "Channel", odd_channel: "Channel") -> "Channel":
-        """Joins even and odd channel
-
-        Parameters
-        ---------
-        even_channel : Channel
-            Channel with the even signal (16 bit integer)
-        odd_channel : Channel
-            Channel with the odd signal (16 bit integer)
-
-        Returns
-        -------
-        Channel
-            Channel with combined channel (32 bit)
-
-        Note: Not fully tested.
-        """
-        chE = even_channel.data.astype(
-            np.dtype(f">u{HeaderEnum.WordSize}")
-        )  # as unsigned.
-        chO = odd_channel.data.astype(
-            np.dtype(f">u{HeaderEnum.WordSize}")
-        )  # as unsigned
-        chEO = np.zeros(
-            chE.shape, dtype=f">u{HeaderEnum.WordSize*2}"
-        )  # unsigned, but 32 bit
-        chEO[...] = (
-            chO * 2**16 + chE
-        )  # because chO is 16 bit we cannot shift 16 bits...
-        even_channel.config.name = even_channel.name.replace("_E", "")
-        channel = Channel(even_channel.config)
-        channel.data = chEO
-        return channel
-
 
 class ChannelMatrix(object):
     """Data class to store the sensor matrix
@@ -200,8 +125,16 @@ class ChannelMatrix(object):
 
     def __init__(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> None:
         self.matrix = self._get_matrix(microrider_config)
-        self.number_of_elements = np.prod(self.matrix.shape)
+        self.record_size = np.prod(self.matrix.shape)
         self.channels = self._create_channels(microrider_config)
+
+    def get_record_indices(self, channel_name: str) -> np_typing.NDArray[np.int64]:
+        n_matrix_rows, _ = self.matrix.shape
+        channel_positions = self.matrix.flatten()
+        channel = self.channels[channel_name]
+        indices = np.where(channel_positions == channel.config.id)[0]
+        return indices
+        
 
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
@@ -222,7 +155,6 @@ class ChannelMatrix(object):
         for row in matrix:
             _s = " ".join([f"{i:3d}" for i in list(row)])
             logger.info(f"| {_s} |")
-        return_value = np.array(matrix)
         return np.array(matrix)
 
     def _create_channels(
@@ -259,42 +191,7 @@ class ChannelMatrix(object):
             channel_config.update(k, v)
         return channel_config
 
-    #
-    #  This block below codes for split channels. We seem not to have them.
-    #  So we cannot test this. See also combine_split_channels() method
-    #
-
-    # for k, v in self.config.cfg.items():
-    #     # a channel has an id, name and type
-    #     try:
-    #         channel_id = v['id']
-    #         channel_name = v['name']
-    #         channel_type = v['type']
-    #     except KeyError:
-    #         continue
-    #     if type(channel_id) == int:
-    #         channels[channel_name] = Channel(channel_name, v)
-    #         logger.info(f'     channel : {channel_id:02d} = {channel_name}')
-    #     else:
-    #         # accommodate for "3,4" "3 4" and "3, 4" and even ";" as separator
-    #         s = channel_id.replace(",", " ")
-    #         flds = s.split()
-    #         channel_id_even, channel_id_odd = [int(i) for i in flds]
-    #         config_even = v.copy()
-    #         config_even['id'] = channel_id_even
-    #         config_odd = v.copy()
-    #         config_odd['id'] = channel_id_odd
-    #         channels[channel_name+"_E"] = Channel(channel_name, config_even)
-    #         channels[channel_name+"_O"] = Channel(channel_name, config_odd)
-    #         logger.info(f'even channel : {channel_id_even:02d} = {channel_name}')
-    #         logger.info(f' odd channel : {channel_id_odd:02d} = {channel_name}')
-    # # From the original code:
-    # # The special characeter is not listed as a channel. Insert it manually if it exists within the channel matrix.
-    # if np.any(self.channel_matrix.matrix==255):
-    #     channels["ch255"] = Channel("ch255", dict(id=255))
-    # return channels
-
-
+    
 class HeaderParser:
     def parse(self, fd: io.BufferedReader) -> ByteHeader:
         """Parses header block of a data record. It is assumed that the block is HeaderEnum.HeaderSize large.
@@ -533,7 +430,7 @@ class MicroRiderData(object):
         datestr = date.strftime("%Y-%m-%d")
         timestr = date.strftime("%H-%M-%S")
         return timestamp, datestr, timestr
-
+    
     def add_channel_data(self, data_snr: np_typing.NDArray[np.int16]) -> None:
         """Adds the channel data, from array with dtype i2/u2
 
@@ -698,7 +595,9 @@ class MicroRiderData(object):
             )
 
 
-def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[]) -> MicroRiderData:
+        
+def read_p_file(filename: str,
+                channel_configs: list[ChannelConfigBaseModel]=[]) -> dict[str,np_typing.NDArray[np.int16]]:
     """Function to read a single .p file.
 
     Parameters
@@ -714,6 +613,10 @@ def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[])
     header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
     full_path = os.path.realpath(filename)
+    
+    # Data to be interpreted as signed integers, header data as unsigned integers.
+    dt_data = np.dtype(f">i{HeaderEnum.WordSize}")
+    dt_hdr = np.dtype(f">u{HeaderEnum.WordSize}")
 
     with open(filename, "rb") as fd:
         header_parser = HeaderParser()
@@ -724,29 +627,24 @@ def read_p_file(filename: str, channel_configs: list[ChannelConfigBaseModel]=[])
         microrider_config.parse(setupstring)
         for channel_config in channel_configs:
             microrider_config.update_config(channel_config)
-        data = MicroRiderData(full_path, microrider_config)
-        data.add_header_data(header_data, n_records)
-        fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
-
-        # Data to be interpreted as signed integers, header data as unsigned integers.
-        dt_data = np.dtype(f">i{HeaderEnum.WordSize}")
-        dt_hdr = np.dtype(f">u{HeaderEnum.WordSize}")
 
         # read the data and cast it in a numpy array
+        fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
         bytes_data = fd.read()
-        bindata = np.frombuffer(bytes_data, dtype=dt_data).reshape(
-            -1, header_data.data_record_size
-        )
-        # Extract header and data
-    data_hdr = bindata[:, : header_data.record_header_size].astype(
-        dt_hdr
-    )  # recast as unsigned
-    n = data.channel_matrix.number_of_elements
+    
+    bindata = np.frombuffer(bytes_data, dtype=dt_data).reshape(
+        -1, header_data.data_record_size
+    )
+
+    channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config)
+    n = channel_matrix.record_size
     # Make sure we end up with int16, as we may get '>i2'
     data_snr = (
         bindata[:, header_data.record_header_size :].reshape(-1, n).astype(np.int16)
     )
-    data.add_channel_data(data_snr)
-    # data.combine_split_channels() # <- we don't have split channels. Cannot test.
-    data.convert_channels()
+    data = {}
+    for name, channel in channel_matrix.channels.items():
+        indices = channel_matrix.get_record_indices(name)
+        data[name] = channnel.correct_sign(data_snr[:, indices].flatten())
+        breakpoint()
     return data
