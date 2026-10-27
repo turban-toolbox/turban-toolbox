@@ -66,9 +66,9 @@ class Channel(object):
         self.name: str = channel_config.name
         self.config: ChannelConfigBaseModel = channel_config
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
+        self.converted = False
 
-
-    def convert_to_units(self) -> None:
+    def convert_to_units(self, records: np_typing.NDArray[np.int16]) -> np_typing.NDArray[np.float64]:
         """Converts channel into unit bearing data
 
         The attribute .data is copied to ._data (raw data) and
@@ -77,15 +77,22 @@ class Channel(object):
 
         Sets the converted_into_units flag.
         """
-        if not self.converted_into_units:
-            self._data = self.data
-            self.data = self.converter(self._data)
-            self.converted_into_units = True
+        if not self.converted:
+            self.converted = True
+            data = self.converter(records)
         else:
             raise ValueError(
                 "Refusing to convert to units for a parameter already converted."
             )
+        return data
 
+    def deconvolve(self,
+                   records: np_typing.NDArray[np.int16],
+                   co_channel: np_typing.NDArray[np.float64]) -> np_typing.NDArray[np.float64]:
+        pass
+
+    def reset(self) -> None:
+        self.converted = False
 
 class ChannelMatrix(object):
     """Data class to store the sensor matrix
@@ -97,19 +104,176 @@ class ChannelMatrix(object):
 
     """
 
-    def __init__(self, microrider_config: rsConfig_parser.MicroRiderConfig) -> None:
+    def __init__(self,
+                 microrider_config: rsConfig_parser.MicroRiderConfig,
+                 header_bytes: ByteHeader,
+                 n_records: int) -> None:
+        self.header_data = header_bytes
+        self.header = self.set_header_data(header_bytes, n_records)
         self.matrix = self._get_matrix(microrider_config)
         self.record_size = np.prod(self.matrix.shape)
+        self.fs_fast = header_data.frequency_clock / (header_data.fast_cols + header_data.slow_cols)
+        self.fs_slow = self.fs_fast / self.matrix.shape[0]
         self.channels = self._create_channels(microrider_config)
+        self._set_sample_rates()
+        self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
+        self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
+        
+    def set_header_data(self, byte_header: ByteHeader, n_records: int) -> Header:
+        """
 
+        Parameters
+        ----------
+        byte_header : ByteHeader
+            ByteHeader dataclass
+        """
+        n_cols = byte_header.fast_cols + byte_header.slow_cols
+        matrix_count = (
+            n_records * byte_header.data_size // (byte_header.n_rows * n_cols)
+        )
+        fs_fast = byte_header.frequency_clock / n_cols
+        fs_slow = byte_header.frequency_clock / n_cols / byte_header.n_rows
+        header_version = byte_header.header_version
+        t_slow = np.arange(matrix_count) / fs_slow
+        t_fast = np.arange(matrix_count * byte_header.n_rows) / fs_fast
+        timestamp, datestring, timestring = self.get_file_timestamp(byte_header)
+
+        header = Header(
+            full_path=os.path.realpath(self._path),
+            n_cols=n_cols,
+            n_records=n_records,
+            fs_fast=fs_fast,
+            fs_slow=fs_slow,
+            header_version=header_version,
+            matrix_count=matrix_count,
+            t_fast=t_fast,
+            t_slow=t_slow,
+            timestamp=timestamp,
+            date=datestring,
+            time=timestring,
+        )
+        return header
+    
+    def get_file_timestamp(self, byte_header: ByteHeader) -> tuple[float, str, str]:
+        """Gets time stamp of the file
+
+        Parameters
+        ----------
+        byte_header : ByteHeader
+            ByteHeader dataclass with the header parameters
+
+        Returns
+        -------
+        (float, str, str):
+            timestamp, date string, time string
+
+        The methods return time stamp (seconds since 1970), date string
+        and time string
+
+        """
+        date = arrow.get(
+            byte_header.year,
+            byte_header.month,
+            byte_header.day,
+            byte_header.hour,
+            byte_header.minute,
+            byte_header.second,
+            byte_header.millisecond,
+        )
+        timestamp = date.timestamp()
+        datestr = date.strftime("%Y-%m-%d")
+        timestr = date.strftime("%H-%M-%S")
+        return timestamp, datestr, timestr
+        
     def get_record_indices(self, channel_name: str) -> np_typing.NDArray[np.int64]:
         n_matrix_rows, _ = self.matrix.shape
         channel_positions = self.matrix.flatten()
         channel = self.channels[channel_name]
         indices = np.where(channel_positions == channel.config.id)[0]
         return indices
-        
 
+    def bytes_to_records(self, data_bytes: bytes) -> np_typing.NDArray[np.int16]:
+        endianness = self.header_data.endianness
+        dtype_data = np.dtype(f"{endianness}i{HeaderEnum.WordSize}")
+        bindata = np.frombuffer(data_bytes, dtype=dtype_data).reshape(
+            -1, self.header_data.data_record_size
+        )
+        # Make sure we end up with int16, as we may get '>i2'
+        data = bindata[:, self.header_data.record_header_size :].reshape(
+            -1, self.record_size
+        ).astype(np.int16).T
+        return data
+        
+    def convert_channels(self, data_bytes: bytes) -> dict[str,np_typing.NDArray[np.float64]]:
+        """
+        """
+        data = self.bytes_to_records(data_bytes)
+        data_dict: dict[str, np_typing.NDArray[np.float64]] = {}
+
+        # First any channels that require deconvolution
+        for name, channel in self.channels.items():
+            regex_preemph = self._regex_deconvolve_preemph_name.match(name)
+            if regex_preemph: # preemphasis channel
+                logger.info(f"Converting via convolution {name}")
+                indices = self.get_record_indices(name)
+                records = data[indices, :].flatten()
+                if channel.config.sample_rate == self.fs_slow:
+                    XdX = self._interpolate_records(records)
+                else:
+                    XdX = records.astype(np.float64)
+                # get co-channel data
+                co_channel_name = self.get_co_channel_name(name)
+                indices = self.get_record_indices(co_channel_name)
+                records_co_channel = data[indices, :].flatten()
+                if self.channels[co_channel_name].config.sample_rate == self.fs_slow:
+                    X = self._interpolate_records(records)
+                else:
+                    X = records.astype(np.float64)
+                if hasattr(channel, "diff_gain"):
+                    diff_gain = channel.config.diff_gain  # <- is required to be present
+                else:
+                    raise AttributeError(
+                        "diff_gain is not an attribute for this configuration object."
+                    )
+                # The deconvolved data are written to the
+                # co_channel_name. The preemphasis data are dropped.
+                data_dict[co_channel_name] = rsConversions.Deconvolve(
+                    X_dX, X, self.fs_fast, diff_gain
+                ).X_hires
+        
+        # Then do all normal channels (no deconvolution step required).
+        for name, channel in self.channels.items():
+            regex = self._regex_deconvolve_name.match(name)
+            if not regex: # normal channel
+                indices = self.get_record_indices(name)
+                records = data[indices, :].flatten()
+                logger.info(f"Converting {name}")
+                data_dict[name] = channel.convert_to_units(records)
+
+        # Reset the converted flag for re-use of channels.
+        for channel in self.channels.values():
+            channel.reset()
+        return data_dict
+
+
+
+    def get_co_channel_name(self, name: str) -> str:
+        # Note: we rely on whether there is a co channel or not has been decided upon before.
+        co_channel_name, _ = name.split("_")
+        return co_channel_name
+
+    def _interpolate_records(self, records: np_typing.NDArray[np.int16]) -> np_typing.NDArray[np.float64]:
+        ifun = si_interp1d(
+            self.t_slow, records, kind="cubic", fill_value="extrapolate"
+        )
+        return ifun(self.t_fast).astype(np.float64)
+    
+    def _set_sample_rates(self) -> None:
+        n_rows = self.matrix.shape[0]
+        for name, channel in self.channels.items():
+            n_samples_per_matrix = len(self.get_record_indices(name))
+            channel.config.update("sample_rate", self.fs_fast * n_samples_per_matrix / n_rows)
+            
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
     ) -> np_typing.NDArray[np.int64]:
@@ -163,7 +327,10 @@ class ChannelMatrix(object):
             if k == "name":
                 continue
             if k == "id":
-                assert isinstance(v, int)
+                if not isinstance(v, int):
+                    raise NotImplementedError(
+                        "Split channels are not implemented. Exiting."
+                    )
             channel_config.update(k, v)
         return channel_config
 
@@ -186,10 +353,13 @@ class HeaderParser:
         match self.__get(HeaderEnum.Endianness, block=block, fmt="<H"):
             case 0:
                 get = partial(self.__get, block=block, fmt="<H")
+                endianness="<"
             case 1 | 256:  # little endian
                 get = partial(self.__get, block=block, fmt="<H")
+                endianness="<"
             case 2 | 512:  # big endian
                 get = partial(self.__get, block=block, fmt=">H")
+                endianness=">"
             case _:
                 raise ValueError(
                     "Failed to determine the endianness of this block of data."
@@ -222,6 +392,7 @@ class HeaderParser:
             slow_cols=get(29),
             n_rows=get(30),
             data_size=(get(18) - get(17)) // HeaderEnum.WordSize,
+            endianness=endianness,
         )
         return byte_header
 
@@ -553,7 +724,7 @@ class MicroRiderData(object):
 
         
 def read_p_file(filename: str,
-                channel_configs: list[ChannelConfigBaseModel]=[]) -> dict[str,np_typing.NDArray[np.int16]]:
+                channel_configs: list[ChannelConfigBaseModel]=[]) -> dict[str,np_typing.NDArray[np.float64]]:
     """Function to read a single .p file.
 
     Parameters
@@ -569,10 +740,6 @@ def read_p_file(filename: str,
     header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
     full_path = os.path.realpath(filename)
-    
-    # Data to be interpreted as signed integers, header data as unsigned integers.
-    dt_data = np.dtype(f">i{HeaderEnum.WordSize}")
-    dt_hdr = np.dtype(f">u{HeaderEnum.WordSize}")
 
     with open(filename, "rb") as fd:
         header_parser = HeaderParser()
@@ -585,26 +752,16 @@ def read_p_file(filename: str,
         for channel_config in channel_configs:
             microrider_config.update_config(channel_config)
         # Create the channel matrix
-        channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config)
+        channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config,
+                                                      header_data,
+                                                      n_records)
 
         # Now we are ready to read in the data, which could
         # technically be done in small parts too.
         # Read the data and cast it in a numpy array
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
-        bytes_data = fd.read()
-    
-    bindata = np.frombuffer(bytes_data, dtype=dt_data).reshape(
-        -1, header_data.data_record_size
-    )
+        data_bytes = fd.read()
 
-    # Make sure we end up with int16, as we may get '>i2'
-    n = channel_matrix.record_size
-    data_snr = (
-        bindata[:, header_data.record_header_size :].reshape(-1, n).astype(np.int16)
-    )
-    
-    data = {}
-    for name, channel in channel_matrix.channels.items():
-        indices = channel_matrix.get_record_indices(name)
-        data[name] = data_snr[:, indices].flatten()
-    return data
+    data_dict = channel_matrix.convert_channels(data_bytes)
+    breakpoint()
+    return data_dict

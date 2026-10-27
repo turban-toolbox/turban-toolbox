@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from numpy.typing import NDArray
 from numpy import float64
+from typing import Literal
 
 @dataclass(kw_only=True)
 class ByteHeader:
@@ -29,7 +30,7 @@ class ByteHeader:
     slow_cols: int
     n_rows: int
     data_size: int
-
+    endianness: Literal["<", ">"]
 
 @dataclass(kw_only=True)
 class Header:
