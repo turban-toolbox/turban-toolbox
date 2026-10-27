@@ -22,6 +22,7 @@ from turban.process.shear.api import (
 )
 from turban.process.shear.api import ShearProcessing
 from turban.utils.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
+from turban.utils.seawater import viscosity_kinematic
 
 
 @pytest.mark.parametrize("level", [1, 2, 3, 4])
@@ -115,6 +116,12 @@ def test_baltic_benchmark():
             arr["cond"],
             {"max": "cond"},
         ),
+        # same as in turban.instruments.mss.api.mrd_to_level1
+        "molvisc": (
+            ["time"],
+            viscosity_kinematic(arr["temp"][0, :]),
+            {"mean": "molvisc"},
+        ),
     }
 
     p = ShearProcessing.from_atomix_netcdf(
@@ -132,6 +139,11 @@ def test_baltic_benchmark():
     assert isinstance(level2, ShearLevel2)
     assert isinstance(level3, ShearLevel3)
     assert isinstance(level4, ShearLevel4)
+
+    # level 4 uses the aggregated molvisc aux variable instead of cfg.molvisc_fallback
+    assert isinstance(level4.molvisc, np.ndarray)
+    assert level4.molvisc.shape == level3.time.shape
+    assert not np.allclose(level4.molvisc, p.cfg.molvisc_fallback)
 
     ds1 = xr.load_dataset(atomix_benchmark_baltic_fpath, group="L1_converted")
     ds2 = xr.load_dataset(atomix_benchmark_baltic_fpath, group="L2_cleaned")

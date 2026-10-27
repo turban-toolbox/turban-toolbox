@@ -313,10 +313,15 @@ class ShearLevel4(Level4):
         kwarg = super()._from_level_below_kwarg(data)
         level3 = data
 
-        # try getting molvisc from level3, if not, use fallback value
         # so linters understand we have a dict after __post_init__
         aux_data = cast(dict, level3._aux_data)
-        molvisc = aux_data.get("molvisc", level3.cfg.molvisc_fallback)
+        # try getting molvisc from level3, if not, use fallback value
+        molvisc = (
+            # level 3 aux data entries are (dims, arr)
+            aux_data["molvisc"][1]
+            if "molvisc" in aux_data
+            else level3.cfg.molvisc_fallback
+        )
 
         (
             eps,
