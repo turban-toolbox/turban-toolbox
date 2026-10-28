@@ -114,6 +114,53 @@ def test_check_for_bad_blocks_0413():
     assert number_of_records == 483
 
 
+@pytest.fixture
+def corrupted_0413(tmp_path):
+    """Returns a function that writes a modified copy of data_0413.p and returns its path"""
+    fn = os.path.join(datadir, "data_0413.p")
+    with open(fn, "rb") as fp:
+        header_data = rsIO.HeaderParser().parse(fp)
+        fp.seek(0)
+        content = fp.read()
+    # Record 0 is the setup string, followed by the data records.
+    first_data_record = rsIO.HeaderEnum.HeaderSize + header_data.setupfile_size
+    record_size = rsIO.HeaderEnum.HeaderSize + header_data.data_size * rsIO.HeaderEnum.WordSize
+
+    def write(modify):
+        path = tmp_path / "corrupted.p"
+        path.write_bytes(modify(content, first_data_record, record_size))
+        return path
+
+    return write
+
+
+@pytest.mark.parametrize(
+    "modify",
+    [
+        # cut off in the middle of the data block of the last record
+        lambda c, start, size: c[:-100],
+        # cut off in the middle of the header of the last record
+        lambda c, start, size: c[: -size + 50],
+    ],
+    ids=["in_data", "in_header"],
+)
+def test_check_for_bad_blocks_truncated(corrupted_0413, modify):
+    path = corrupted_0413(modify)
+    with open(path, "rb") as fp:
+        with pytest.raises(rsIO.uriderException, match="File seems truncated."):
+            rsIO.HeaderParser().check_for_bad_blocks(fp)
+
+
+def test_check_for_bad_blocks_missing_record(corrupted_0413):
+    # remove the 5th data record
+    path = corrupted_0413(
+        lambda c, start, size: c[: start + 4 * size] + c[start + 5 * size :]
+    )
+    with open(path, "rb") as fp:
+        with pytest.raises(rsIO.uriderException, match="Missing record"):
+            rsIO.HeaderParser().check_for_bad_blocks(fp)
+
+
 #
 # Test the ChannelMatrix class
 #
@@ -201,7 +248,7 @@ def test_microriderdata_header(microrider_data):
     assert len(header_info.t_fast) == expected["length_t_fast"]
     assert np.abs(header_info.t_slow.max() - expected["t_slow_max"]) < 0.01
     assert len(header_info.t_slow) == expected["length_t_slow"]
-
+    
 
 
 
@@ -227,16 +274,31 @@ odas_names = dict(T1="T1_fast", T2="T2_fast", P="P_fast")
 @pytest.mark.parametrize("microrider_channel_data", ["058", "0413"], indirect=True)
 def test_channel_data(microrider_channel_data):
     data, mdata = microrider_channel_data
+    channels_to_test = ['T1', 'T2', 'P', 'Gnd', 'Ax', 'Ay', 'sh1', 'sh2', 'PV', 'V_Bat', 'Incl_Y', 'Incl_X', 'Incl_T', 'EMC_Cur', 'U_EM']
     # The DAT_058 reference was made with U_EM coefficients a=-24.4605, b=151.341,
     # where the setup string has a=-24.46052, b=151.3413 (diff up to 1.6e-6 m/s).
-    for name, v in data.items():
+    for name in channels_to_test:
+        v = data[name]
         v_ref = mdata[odas_names.get(name, name)]
         if name == "U_EM":
             atol=2e-6 # see comment above.
         else:
             atol=2e-12 # close to machine precision
-        #assert np.allclose(v, v_ref, rtol=1e-5, atol=2e-6), name
-        assert np.allclose(v, v_ref, rtol=1e-5, atol=atol), name
+        assert v.shape == v_ref.shape, name
+        assert np.allclose(v, v_ref, rtol=0, atol=atol), name
+
+
+def test_user_channel_config_058():
+    # Supply the U_EM coefficients with which the DAT_058 reference was made, so
+    # that the user-supplied config overrides the one in the setup string.
+    fn = os.path.join(datadir, "DAT_058.P")
+    mfn = os.path.join(datadir, "DAT_058.mat")
+    u_em_config = channels.ChannelConfigU_EM(name="U_EM", a=-24.4605, b=151.341)
+    data = rsIO.read_p_file(fn, channel_configs=[u_em_config])
+    mdata = load_odas_reference_data(mfn)
+    assert data["U_EM"].shape == mdata["U_EM"].shape
+    # rtol=0: a relative tolerance would hide the 1.6e-6 m/s difference without the override.
+    assert np.allclose(data["U_EM"], mdata["U_EM"], rtol=0, atol=2e-12)
     
 
     

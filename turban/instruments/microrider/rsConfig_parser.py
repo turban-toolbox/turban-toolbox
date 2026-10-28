@@ -110,13 +110,12 @@ class MicroRiderConfig:
             else:
                 if channel_name == channel_config.name:
                     for field_name in channel_config._set_properties:
-                        if field_name == channel_config.name:
+                        if field_name == "name":
                             continue
                         # set any set fields.
                         cfg[field_name] = getattr(channel_config, field_name)
                     updated = True
         if not updated:
-            breakpoint()
             logger.warning(f"A user-supplied sensor configuration ({channel_config.name}) was supplied, but no match was found.")
             
     @property
