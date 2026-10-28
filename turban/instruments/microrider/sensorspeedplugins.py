@@ -21,7 +21,6 @@ class PluginError(Exception):
 class SensorSpeedABC(ABC):
 
     def __init__(self) -> None:
-        self._microrider_data: rsIO.MicroRiderData
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
 
     @abstractmethod
@@ -55,16 +54,6 @@ class SensorSpeedABC(ABC):
         """
         pass
 
-    def set_microrider_data(self, microrider_data: rsIO.MicroRiderData) -> None:
-        """Attach a MicroRiderData object for use by the plugin.
-
-        Parameters
-        ----------
-        microrider_data : rsIO.MicroRiderData
-            Data object returned by `rsIO.read_p_file`, providing access to
-            channel data and header information.
-        """
-        self.microrider_data = microrider_data
 
 
 # Create a registry of SensorSpeedPlugin classes:

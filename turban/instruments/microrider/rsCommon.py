@@ -31,9 +31,10 @@ class ByteHeader:
     n_rows: int
     data_size: int
     endianness: Literal["<", ">"]
+    filename: str
 
 @dataclass(kw_only=True)
-class Header:
+class HeaderInfo:
     full_path: str
     n_cols: int
     n_records: int
