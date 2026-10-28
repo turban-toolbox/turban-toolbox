@@ -9,7 +9,7 @@ import zipfile
 import numpy as np
 from scipy.io import loadmat
 
-from turban.instruments.microrider import rsIO, rsConfig_parser, rsCommon
+from turban.instruments.microrider import channels, rsIO, rsConfig_parser
 from turban.utils.filepaths import microrider_data_directory
 
 datadir = microrider_data_directory
@@ -43,6 +43,16 @@ def download_and_extract_zip(url, output_filename, extract_path):
     except zipfile.BadZipFile:
         print("Error: Invalid zip file")
 
+def load_odas_reference_data(mat_path):
+    # ODAS reference output
+    mdata = loadmat(
+        mat_path,
+        squeeze_me=True,
+        mat_dtype=False,
+        chars_as_strings=True,
+        simplify_cells=True,
+    )
+    return mdata
 
 def test_presence_of_test_data():
     fns = os.listdir(datadir)
@@ -104,34 +114,60 @@ def test_check_for_bad_blocks_0413():
     assert number_of_records == 483
 
 
+@pytest.fixture
+def corrupted_0413(tmp_path):
+    """Returns a function that writes a modified copy of data_0413.p and returns its path"""
+    fn = os.path.join(datadir, "data_0413.p")
+    with open(fn, "rb") as fp:
+        header_data = rsIO.HeaderParser().parse(fp)
+        fp.seek(0)
+        content = fp.read()
+    # Record 0 is the setup string, followed by the data records.
+    first_data_record = rsIO.HeaderEnum.HeaderSize + header_data.setupfile_size
+    record_size = rsIO.HeaderEnum.HeaderSize + header_data.data_size * rsIO.HeaderEnum.WordSize
+
+    def write(modify):
+        path = tmp_path / "corrupted.p"
+        path.write_bytes(modify(content, first_data_record, record_size))
+        return path
+
+    return write
+
+
+@pytest.mark.parametrize(
+    "modify",
+    [
+        # cut off in the middle of the data block of the last record
+        lambda c, start, size: c[:-100],
+        # cut off in the middle of the header of the last record
+        lambda c, start, size: c[: -size + 50],
+    ],
+    ids=["in_data", "in_header"],
+)
+def test_check_for_bad_blocks_truncated(corrupted_0413, modify):
+    path = corrupted_0413(modify)
+    with open(path, "rb") as fp:
+        with pytest.raises(rsIO.uriderException, match="File seems truncated."):
+            rsIO.HeaderParser().check_for_bad_blocks(fp)
+
+
+def test_check_for_bad_blocks_missing_record(corrupted_0413):
+    # remove the 5th data record
+    path = corrupted_0413(
+        lambda c, start, size: c[: start + 4 * size] + c[start + 5 * size :]
+    )
+    with open(path, "rb") as fp:
+        with pytest.raises(rsIO.uriderException, match="Missing record"):
+            rsIO.HeaderParser().check_for_bad_blocks(fp)
+
+
 #
 # Test the ChannelMatrix class
 #
 
 
-@pytest.fixture
-def microrider_config_data(request):
-    variable = request.param
-    match variable:
-        case "058":
-            fn = os.path.join(datadir, "setupstring_058.txt")
-        case "0413":
-            fn = os.path.join(datadir, "setupstring_0413.txt")
-    with open(fn, "r") as fp:
-        setupstring = "\n".join(fp.readlines())
-    microrider_config = rsConfig_parser.MicroRiderConfig()
-    microrider_config.parse(setupstring)
-    return dict(microrider_config=microrider_config, hash_value=None)
-
-
-@pytest.mark.parametrize("microrider_config_data", ["058", "0413"], indirect=True)
-def test_channel_matrix(microrider_config_data):
-    channel_matrix = rsIO.ChannelMatrix(microrider_config_data["microrider_config"])
-    assert channel_matrix.number_of_elements == 72
-
-
 def test_channel_config():
-    channel_config = rsCommon.ChannelConfig(name="ch255", id=255, type="")
+    channel_config = channels.ChannelConfig(name="ch255", id=255, type="")
     assert channel_config.name == "ch255"
     assert channel_config.id == 255
     assert channel_config.type == ""
@@ -144,7 +180,7 @@ def test_channel_config():
 
 
 def test_channel_config_is_set():
-    channel_config = rsCommon.ChannelConfigThermistor(name="T1", id=12, type="therm")
+    channel_config = channels.ChannelConfigThermistor(name="T1", id=12, type="therm")
     assert channel_config.is_set("name")
     assert not channel_config.is_set("a")
     with pytest.raises(
@@ -158,8 +194,6 @@ def test_channel_config_is_set():
 #
 # Test MicroRiderData class
 #
-
-
 @pytest.fixture
 def microrider_data(request):
     variable = request.param
@@ -190,28 +224,81 @@ def microrider_data(request):
     microrider_config = rsConfig_parser.MicroRiderConfig()
     microrider_config.parse(setupstring)
     full_path = os.path.realpath(fn)
-    data = rsIO.MicroRiderData(full_path, microrider_config)
     header_parser = rsIO.HeaderParser()
     with open(fn, "rb") as fd:
         header_data = header_parser.parse(fd)
         n_records = header_parser.check_for_bad_blocks(fd)
-        data.add_header_data(header_data, n_records)
+        header_info = header_parser.get_header_info(header_data, n_records)
     return dict(
         microrider_config=microrider_config,
         full_path=full_path,
-        data=data,
+        header_info = header_info,
+        header_data = header_data,
         expected=expected,
     )
-
 
 @pytest.mark.parametrize("microrider_data", ["058", "0413"], indirect=True)
 def test_microriderdata_header(microrider_data):
     microrider_config = microrider_data["microrider_config"]
-    data = microrider_data["data"]
+    header_info = microrider_data["header_info"]
     expected = microrider_data["expected"]
     assert (
-        np.abs(data.header.t_fast.max() - expected["t_fast_max"]) < 0.01
+        np.abs(header_info.t_fast.max() - expected["t_fast_max"]) < 0.01
     )  # matlab/octave only stores 2 decimal positions
-    assert len(data.header.t_fast) == expected["length_t_fast"]
-    assert np.abs(data.header.t_slow.max() - expected["t_slow_max"]) < 0.01
-    assert len(data.header.t_slow) == expected["length_t_slow"]
+    assert len(header_info.t_fast) == expected["length_t_fast"]
+    assert np.abs(header_info.t_slow.max() - expected["t_slow_max"]) < 0.01
+    assert len(header_info.t_slow) == expected["length_t_slow"]
+    
+
+
+
+
+
+@pytest.fixture
+def microrider_channel_data(request):
+    variable = request.param
+    match variable:
+        case "058":
+            fn = os.path.join(datadir, "DAT_058.P")
+            mfn = os.path.join(datadir, "DAT_058.mat")
+        case "0413":
+            fn = os.path.join(datadir, "data_0413.p")
+            mfn = os.path.join(datadir, "data_0413.mat")
+    data = rsIO.read_p_file(fn)
+    mdata = load_odas_reference_data(mfn)
+    return (data, mdata)
+
+# ODAS stores the deconvolved channels on the fast time base under these names
+odas_names = dict(T1="T1_fast", T2="T2_fast", P="P_fast")
+
+@pytest.mark.parametrize("microrider_channel_data", ["058", "0413"], indirect=True)
+def test_channel_data(microrider_channel_data):
+    data, mdata = microrider_channel_data
+    channels_to_test = ['T1', 'T2', 'P', 'Gnd', 'Ax', 'Ay', 'sh1', 'sh2', 'PV', 'V_Bat', 'Incl_Y', 'Incl_X', 'Incl_T', 'EMC_Cur', 'U_EM']
+    # The DAT_058 reference was made with U_EM coefficients a=-24.4605, b=151.341,
+    # where the setup string has a=-24.46052, b=151.3413 (diff up to 1.6e-6 m/s).
+    for name in channels_to_test:
+        v = data[name]
+        v_ref = mdata[odas_names.get(name, name)]
+        if name == "U_EM":
+            atol=2e-6 # see comment above.
+        else:
+            atol=2e-12 # close to machine precision
+        assert v.shape == v_ref.shape, name
+        assert np.allclose(v, v_ref, rtol=0, atol=atol), name
+
+
+def test_user_channel_config_058():
+    # Supply the U_EM coefficients with which the DAT_058 reference was made, so
+    # that the user-supplied config overrides the one in the setup string.
+    fn = os.path.join(datadir, "DAT_058.P")
+    mfn = os.path.join(datadir, "DAT_058.mat")
+    u_em_config = channels.ChannelConfigU_EM(name="U_EM", a=-24.4605, b=151.341)
+    data = rsIO.read_p_file(fn, channel_configs=[u_em_config])
+    mdata = load_odas_reference_data(mfn)
+    assert data["U_EM"].shape == mdata["U_EM"].shape
+    # rtol=0: a relative tolerance would hide the 1.6e-6 m/s difference without the override.
+    assert np.allclose(data["U_EM"], mdata["U_EM"], rtol=0, atol=2e-12)
+    
+
+    
