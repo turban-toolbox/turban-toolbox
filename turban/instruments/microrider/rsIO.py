@@ -9,7 +9,7 @@ from typing import Any, Self
 
 import arrow
 import numpy as np
-from scipy.interpolate import interp1d as si_interp1d
+from scipy.interpolate import CubicSpline as si_CubicSpline
 
 from turban.instruments.generic.api import InstrumentEnum
 from turban.instruments.generic.channels import (
@@ -152,18 +152,17 @@ class ChannelMatrix(object):
                 logger.info(f"Converting via convolution {name}")
                 indices = self.get_record_indices(name)
                 records = data[:, indices].ravel()
-                if channel.config.sample_rate == self.header_info.fs_slow:
-                    X_dX = self._interpolate_records(records)
-                else:
-                    X_dX = records.astype(np.float64)
+                # Decode both channels at their native sample rates. As in
+                # ODAS, the deconvolution runs at the rate of the
+                # preemphasis channel; a slower co-channel is interpolated
+                # inside Deconvolve.
+                X_dX = channel.converter.decode(records)
                 # get co-channel data
                 co_channel_name = self.get_co_channel_name(name)
+                co_channel = self.channels[co_channel_name]
                 indices = self.get_record_indices(co_channel_name)
                 records_co_channel = data[:, indices].ravel()
-                if self.channels[co_channel_name].config.sample_rate == self.header_info.fs_slow:
-                    X = self._interpolate_records(records_co_channel)
-                else:
-                    X = records_co_channel.astype(np.float64)
+                X = co_channel.converter.decode(records_co_channel)
                 if hasattr(channel.config, "diff_gain"):
                     diff_gain = channel.config.diff_gain  # <- is required to be present
                 else:
@@ -173,11 +172,12 @@ class ChannelMatrix(object):
                 # The deconvolved data are written to the
                 # co_channel_name. The preemphasis data are dropped.
                 X_hires = rsConversions.Deconvolve(
-                    X_dX, X, self.header_info.fs_fast, diff_gain
+                    X_dX, X, channel.config.sample_rate, diff_gain
                 ).X_hires
-                co_channel = self.channels[co_channel_name]
                 # Set skip_decode flat to True because we don't want implicit decoding.
-                data_dict[co_channel_name] = co_channel.convert_to_units(X_hires, skip_decode=True)
+                X_hires = co_channel.convert_to_units(X_hires, skip_decode=True)
+                # Unit-bearing data are put onto the fast time base, as in ODAS.
+                data_dict[co_channel_name] = self._interpolate_to_fast(X_hires)
         
         # Then do all normal channels (no deconvolution step required).
         for name, channel in self.channels.items():
@@ -201,11 +201,14 @@ class ChannelMatrix(object):
         co_channel_name, _ = name.split("_")
         return co_channel_name
 
-    def _interpolate_records(self, records: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
-        ifun = si_interp1d(
-            self.header_info.t_slow, records, kind="cubic", fill_value="extrapolate"
-        )
-        return ifun(self.header_info.t_fast).astype(np.float64)
+    def _interpolate_to_fast(self, v: np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+        """Interpolates v onto the fast time base (ODAS interp1_if_req: spline, extrapolated)"""
+        t_fast = self.header_info.t_fast
+        if v.shape[0] == t_fast.shape[0]:
+            return v
+        t = np.arange(v.shape[0]) / (self.header_info.fs_fast * v.shape[0] / t_fast.shape[0])
+        ifun = si_CubicSpline(t, v, bc_type="not-a-knot", extrapolate=True)
+        return np.asarray(ifun(t_fast), dtype=np.float64)
     
     def _set_sample_rates(self) -> None:
         n_rows = self.matrix.shape[0]
