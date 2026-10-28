@@ -43,6 +43,16 @@ def download_and_extract_zip(url, output_filename, extract_path):
     except zipfile.BadZipFile:
         print("Error: Invalid zip file")
 
+def load_odas_reference_data(mat_path):
+    # ODAS reference output
+    mdata = loadmat(
+        mat_path,
+        squeeze_me=True,
+        mat_dtype=False,
+        chars_as_strings=True,
+        simplify_cells=True,
+    )
+    return mdata
 
 def test_presence_of_test_data():
     fns = os.listdir(datadir)
@@ -107,27 +117,6 @@ def test_check_for_bad_blocks_0413():
 #
 # Test the ChannelMatrix class
 #
-
-
-@pytest.fixture
-def microrider_config_data(request):
-    variable = request.param
-    match variable:
-        case "058":
-            fn = os.path.join(datadir, "setupstring_058.txt")
-        case "0413":
-            fn = os.path.join(datadir, "setupstring_0413.txt")
-    with open(fn, "r") as fp:
-        setupstring = "\n".join(fp.readlines())
-    microrider_config = rsConfig_parser.MicroRiderConfig()
-    microrider_config.parse(setupstring)
-    return dict(microrider_config=microrider_config, hash_value=None)
-
-
-@pytest.mark.parametrize("microrider_config_data", ["058", "0413"], indirect=True)
-def test_channel_matrix(microrider_config_data):
-    channel_matrix = rsIO.ChannelMatrix(microrider_config_data["microrider_config"])
-    assert channel_matrix.record_size == 72
 
 
 def test_channel_config():
@@ -212,3 +201,42 @@ def test_microriderdata_header(microrider_data):
     assert len(header_info.t_fast) == expected["length_t_fast"]
     assert np.abs(header_info.t_slow.max() - expected["t_slow_max"]) < 0.01
     assert len(header_info.t_slow) == expected["length_t_slow"]
+
+
+
+
+
+
+@pytest.fixture
+def microrider_channel_data(request):
+    variable = request.param
+    match variable:
+        case "058":
+            fn = os.path.join(datadir, "DAT_058.P")
+            mfn = os.path.join(datadir, "DAT_058.mat")
+        case "0413":
+            fn = os.path.join(datadir, "data_0413.p")
+            mfn = os.path.join(datadir, "data_0413.mat")
+    data = rsIO.read_p_file(fn)
+    mdata = load_odas_reference_data(mfn)
+    return (data, mdata)
+
+# ODAS stores the deconvolved channels on the fast time base under these names
+odas_names = dict(T1="T1_fast", T2="T2_fast", P="P_fast")
+
+@pytest.mark.parametrize("microrider_channel_data", ["058", "0413"], indirect=True)
+def test_channel_data(microrider_channel_data):
+    data, mdata = microrider_channel_data
+    # The DAT_058 reference was made with U_EM coefficients a=-24.4605, b=151.341,
+    # where the setup string has a=-24.46052, b=151.3413 (diff up to 1.6e-6 m/s).
+    for name, v in data.items():
+        v_ref = mdata[odas_names.get(name, name)]
+        if name == "U_EM":
+            atol=2e-6 # see comment above.
+        else:
+            atol=2e-12 # close to machine precision
+        #assert np.allclose(v, v_ref, rtol=1e-5, atol=2e-6), name
+        assert np.allclose(v, v_ref, rtol=1e-5, atol=atol), name
+    
+
+    
