@@ -136,7 +136,7 @@ class ChannelMatrix(object):
         # Make sure we end up with int16, as we may get '>i2'
         matrix_size = np.prod(self.matrix.shape)
         data = bindata[:, self.header_data.record_header_size :].reshape(
-            -1, matrix_size).astype(np.int16).T
+            -1, matrix_size).astype(np.int16)
         return data
         
     def convert_channels(self, data_bytes: bytes) -> dict[str,np.typing.NDArray[np.float64]]:
@@ -151,7 +151,7 @@ class ChannelMatrix(object):
             if regex_preemph: # preemphasis channel
                 logger.info(f"Converting via convolution {name}")
                 indices = self.get_record_indices(name)
-                records = data[indices, :].flatten()
+                records = data[:, indices].ravel()
                 if channel.config.sample_rate == self.header_info.fs_slow:
                     X_dX = self._interpolate_records(records)
                 else:
@@ -159,7 +159,7 @@ class ChannelMatrix(object):
                 # get co-channel data
                 co_channel_name = self.get_co_channel_name(name)
                 indices = self.get_record_indices(co_channel_name)
-                records_co_channel = data[indices, :].flatten()
+                records_co_channel = data[:, indices].ravel()
                 if self.channels[co_channel_name].config.sample_rate == self.header_info.fs_slow:
                     X = self._interpolate_records(records_co_channel)
                 else:
@@ -185,7 +185,7 @@ class ChannelMatrix(object):
             regex_preemph = self._regex_deconvolve_preemph_name.match(name)
             if not regex and not regex_preemph: # normal channel
                 indices = self.get_record_indices(name)
-                records = data[indices, :].flatten()
+                records = data[:, indices].ravel()
                 logger.info(f"Converting {name}")
                 data_dict[name] = channel.convert_to_units(records)
 
