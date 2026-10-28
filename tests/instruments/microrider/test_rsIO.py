@@ -158,8 +158,6 @@ def test_channel_config_is_set():
 #
 # Test MicroRiderData class
 #
-
-
 @pytest.fixture
 def microrider_data(request):
     variable = request.param
@@ -190,28 +188,27 @@ def microrider_data(request):
     microrider_config = rsConfig_parser.MicroRiderConfig()
     microrider_config.parse(setupstring)
     full_path = os.path.realpath(fn)
-    data = rsIO.MicroRiderData(full_path, microrider_config)
     header_parser = rsIO.HeaderParser()
     with open(fn, "rb") as fd:
         header_data = header_parser.parse(fd)
         n_records = header_parser.check_for_bad_blocks(fd)
-        data.add_header_data(header_data, n_records)
+        header_info = header_parser.get_header_info(header_data, n_records)
     return dict(
         microrider_config=microrider_config,
         full_path=full_path,
-        data=data,
+        header_info = header_info,
+        header_data = header_data,
         expected=expected,
     )
-
 
 @pytest.mark.parametrize("microrider_data", ["058", "0413"], indirect=True)
 def test_microriderdata_header(microrider_data):
     microrider_config = microrider_data["microrider_config"]
-    data = microrider_data["data"]
+    header_info = microrider_data["header_info"]
     expected = microrider_data["expected"]
     assert (
-        np.abs(data.header.t_fast.max() - expected["t_fast_max"]) < 0.01
+        np.abs(header_info.t_fast.max() - expected["t_fast_max"]) < 0.01
     )  # matlab/octave only stores 2 decimal positions
-    assert len(data.header.t_fast) == expected["length_t_fast"]
-    assert np.abs(data.header.t_slow.max() - expected["t_slow_max"]) < 0.01
-    assert len(data.header.t_slow) == expected["length_t_slow"]
+    assert len(header_info.t_fast) == expected["length_t_fast"]
+    assert np.abs(header_info.t_slow.max() - expected["t_slow_max"]) < 0.01
+    assert len(header_info.t_slow) == expected["length_t_slow"]
