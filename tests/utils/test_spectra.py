@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from turban.utils.util import get_chunking_index
 from turban.utils.spectra import remove_vibration_goodman, spectrum
+from turban import ShearConfig, ShearLevel1, ShearProcessing
 
 from turban.utils.filepaths import atomix_benchmark_faroe_fpath
 
@@ -166,3 +167,62 @@ def test_remove_vibration_goodman_synthetic(phase_deg):
     # fig.tight_layout()
     # fig.savefig("out/tests/utils/goodman_synthetic.png")
     # plt.close(fig)
+
+
+def _make_vib_level1(vibration_channels, chunk_length=8 * 512):
+    """Synthetic level 1: random shear contaminated by two vibration channels, both
+    added as aux data."""
+    rng = np.random.default_rng(42)
+    sampfreq = 512.0
+    n_samples = 40 * 512
+    t = np.arange(n_samples) / sampfreq
+
+    vib1 = np.sin(2 * np.pi * 5 * t)
+    vib2 = np.sin(2 * np.pi * 43 * t)
+    shear = rng.normal(size=(2, n_samples)) + 0.5 * vib1 + 0.2 * vib2  # (nshear, time)
+
+    cfg = ShearConfig(
+        sampfreq=sampfreq,
+        segment_length=512,
+        segment_overlap=256,
+        chunk_length=chunk_length,
+        chunk_overlap=chunk_length // 2,
+        vibration_channels=vibration_channels,
+    )
+    level1 = ShearLevel1(
+        time=t,
+        senspeed=0.6 * np.ones(n_samples),
+        shear=shear,
+        section_number=np.ones(n_samples, dtype=int),
+        cfg=cfg,
+    )
+    # both channels are always available; only those in cfg are used
+    level1.add_aux_data(vib1, name="vib1", agg_method="mean")
+    level1.add_aux_data(vib2, name="vib2", agg_method="mean")
+    return level1
+
+
+@pytest.mark.parametrize(
+    "vibration_channels, expected",
+    [
+        ([], 0),
+        (["vib1"], 1),
+        (["vib1", "vib2"], 2),
+    ],
+)
+def test_number_signals_vibration_removal(vibration_channels, expected):
+    """N_V (Eqs. 16-17 in the ATOMIX paper) equals the number of vibration channels
+    requested through cfg.vibration_channels and enters the spectral uncertainty."""
+    level1 = _make_vib_level1(vibration_channels)
+    level3 = ShearProcessing(level1).level3
+
+    assert level3.number_signals_vibration_removal == expected
+    n_f = level1.cfg.number_fft_windows_per_chunk
+    assert level3.log_psi_var == pytest.approx(5 / 4 * (n_f - expected) ** (-7 / 9))
+
+
+def test_vibration_channel_missing():
+    level1 = _make_vib_level1(["vib1", "vib_missing"])
+    with pytest.raises(KeyError, match="vib_missing"):
+        ShearProcessing(level1)
+

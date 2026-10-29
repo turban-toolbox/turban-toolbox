@@ -1,4 +1,5 @@
 from netCDF4 import Dataset
+from pydantic import field_validator
 from turban.process.generic.config import SegmentConfig
 
 
@@ -19,6 +20,13 @@ class ShearConfig(SegmentConfig):
     molvisc_fallback: float = 1.6e-6  # used for level4 when not available from level3
     # tuple of variable names in auxiliary level 2 data used for vibration removal
     vibration_channels: tuple[str, ...] = tuple()
+
+    @field_validator("vibration_channels", mode="before")
+    @classmethod
+    def _str_to_tuple(cls, v):
+        # netCDF returns a single-element string attribute as a plain str,
+        # so need to manually recreate a single-element tuple
+        return (v,) if isinstance(v, str) else v
 
     @staticmethod
     def _attrs_from_atomix_netcdf(fname):
