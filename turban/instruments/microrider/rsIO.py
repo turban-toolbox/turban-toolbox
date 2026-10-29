@@ -483,11 +483,11 @@ class HeaderParser:
             byte_header.hour,
             byte_header.minute,
             byte_header.second,
-            byte_header.millisecond,
+            byte_header.millisecond*1000, # this field is for microseconds.
         )
         timestamp = date.timestamp()
         datestr = date.strftime("%Y-%m-%d")
-        timestr = date.strftime("%H-%M-%S")
+        timestr = date.strftime("%H:%M:%S.%f")
         return timestamp, datestr, timestr
 
 

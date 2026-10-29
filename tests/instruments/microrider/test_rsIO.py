@@ -200,25 +200,13 @@ def microrider_data(request):
     match variable:
         case "058":
             fn = os.path.join(datadir, "DAT_058.P")
+            mfn = os.path.join(datadir, "DAT_058.mat")
             fns = os.path.join(datadir, "setupstring_058.txt")
-            # The values below from the odas library
-            expected = dict(
-                length_t_fast=5935616,
-                t_fast_max=11592.255,
-                length_t_slow=741952,
-                t_slow_max=11592.242,
-            )
-
         case "0413":
             fn = os.path.join(datadir, "data_0413.p")
+            mfn = os.path.join(datadir, "data_0413.mat")
             fns = os.path.join(datadir, "setupstring_0413.txt")
-            # The values below from the odas library
-            expected = dict(
-                length_t_fast=247296,
-                length_t_slow=30912,
-                t_slow_max=482.95,
-                t_fast_max=482.97,
-            )
+    mdata = load_odas_reference_data(mfn)
     with open(fns, "r") as fp:
         setupstring = "\n".join(fp.readlines())
     microrider_config = rsConfig_parser.MicroRiderConfig()
@@ -234,24 +222,37 @@ def microrider_data(request):
         full_path=full_path,
         header_info = header_info,
         header_data = header_data,
-        expected=expected,
+        mdata = mdata
     )
+
+
+def parse_datetime_string(s, separator):
+    try:
+        fields = s.split(separator)
+        value = f"{int(fields[0])} {int(fields[1])} {float(fields[2]):.3f}"
+    except:
+        value = ""
+    return value
 
 @pytest.mark.parametrize("microrider_data", ["058", "0413"], indirect=True)
 def test_microriderdata_header(microrider_data):
     microrider_config = microrider_data["microrider_config"]
     header_info = microrider_data["header_info"]
-    expected = microrider_data["expected"]
+    mdata = microrider_data["mdata"]
     assert (
-        np.abs(header_info.t_fast.max() - expected["t_fast_max"]) < 0.01
+        np.abs(header_info.t_fast.max() - mdata["t_fast"].max()) < 0.01
     )  # matlab/octave only stores 2 decimal positions
-    assert len(header_info.t_fast) == expected["length_t_fast"]
-    assert np.abs(header_info.t_slow.max() - expected["t_slow_max"]) < 0.01
-    assert len(header_info.t_slow) == expected["length_t_slow"]
-    
-
-
-
+    assert len(header_info.t_fast) == len(mdata["t_fast"])
+    assert np.abs(header_info.t_slow.max() - mdata["t_slow"].max() ) < 0.01
+    assert len(header_info.t_slow) == len(mdata["t_slow"])
+    assert (parse_datetime_string(header_info.time, ":") == parse_datetime_string(mdata["time"], ":")
+            and 
+            parse_datetime_string(mdata["time"], ":")
+            )
+    assert (parse_datetime_string(header_info.date, "-") == parse_datetime_string(mdata["date"], "-")
+            and 
+            parse_datetime_string(mdata["date"], "-")
+            )
 
 
 @pytest.fixture
