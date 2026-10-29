@@ -69,12 +69,20 @@ def test_level0_to_level1_missing(mss_conf_and_level0, missing):
         assert level1.sizes["time"] == nrecords - 2
         np.testing.assert_allclose(np.unique(dt), [1, 3])
         assert not np.isnan(press).any()
+        assert "inserted" not in level1
     else:
         assert level1.sizes["time"] == nrecords
         np.testing.assert_allclose(dt, 1)
+        assert np.flatnonzero(level1["inserted"].values).tolist() == [1000, 1001]
         if missing == "nan":
             assert np.isnan(press).sum() == 2
             assert np.isnan(press[1000:1002]).all()
+            # derived quantities are computed before masking, so the filters do
+            # not spread NaN beyond the inserted records
+            for name in ["PSPD_REL", "SHEAR"]:
+                isnan = np.isnan(level1[name].values).reshape(-1, nrecords)
+                assert np.flatnonzero(isnan.any(axis=0)).tolist() == [1000, 1001]
+                assert isnan[:, 1000:1002].all()
         else:
             assert not np.isnan(press).any()
             np.testing.assert_allclose(
