@@ -189,12 +189,20 @@ class ShearLevel3(Level3[ShearLevel2]):
                     if channel in data.aux_data:
                         vibdata.append(data.aux_data[channel][1])
                     else:
-                        logger.error(
+                        raise KeyError(
                             f"Requested vibration removal, but channel {channel} missing from aux data"
                         )
             vib = np.stack(vibdata) if vibdata else None
         else:
             vib = None
+
+        # Goodman removal needs N_f > N_V, preferably by more than 3
+        if vib is not None and data.cfg.number_fft_windows_per_chunk - len(vib) <= 3:
+            logger.warning(
+                f"Only {data.cfg.number_fft_windows_per_chunk} FFT segments per chunk "
+                f"for {len(vib)} vibration signals; spectra may be unreliable."
+                "(Sec. 3.3.4 in the ATOMIX paper)"
+            )
 
         k, psi_k_sh, psi_f_sh, freq, senspeed, section_number = process_level3(
             shear=data.shear,
@@ -276,10 +284,15 @@ class ShearLevel3(Level3[ShearLevel2]):
         )
 
     @property
-    def number_signals_vibration_removal(self):
-        """N_V in the ATOMIX paper"""
-        logger.warning("Not implemented")
-        return 0
+    def number_signals_vibration_removal(self) -> int:
+        """N_V in the ATOMIX paper: number of vibration (and other) signals used to
+        remove vibration-coherent noise from the shear spectra (Goodman et al. 2006).
+        See Eqs. 16-17 in the ATOMIX paper.
+
+        Equals the number of ``cfg.vibration_channels``, since level 3 cannot be
+        built if any of them is missing from the aux data.
+        """
+        return len(self.cfg.vibration_channels)
 
     @property
     def log_psi_var(self):
