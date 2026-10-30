@@ -23,7 +23,7 @@ class MicroriderConfig(InstrumentConfig):
     sensor_speed_plugin_parameters: dict[str, float | str] = {}
     channel_cfgs: list[ChannelConfigBaseModel] = []
 
-class MicroriderProbe(Instrument):
+class MicroriderInstrument(Instrument):
 
     def __init__(self, cfg: MicroriderConfig) -> None:
         self.cfg: MicroriderConfig = cfg
