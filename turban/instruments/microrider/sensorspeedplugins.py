@@ -57,6 +57,7 @@ class SensorSpeedABC(ABC):
         pass
 
     def set_microstructure_raw_data(self, microstructure_raw_data : MicrostructureRawData) -> None:
+        self.__dict__.pop("_ifun", None) # Rmove _ifun if present in case of new data.
         self.microstructure_raw_data = microstructure_raw_data
         
 
@@ -241,6 +242,7 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         U : Float[np.ndarray, "time"]
             Sensor speed in m/s, one value per element of `t`.
         """
+        self.__dict__.pop("_ifun", None) # Rmove _ifun if present in case of new data.
         self.data["t"] = t
         self.data["U"] = U
 

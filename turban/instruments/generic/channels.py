@@ -13,7 +13,11 @@ class ChannelConfigBaseModel(BaseModel):
     `update`) are tracked by pydantic in `model_fields_set`.
     """
 
-    model_config = ConfigDict(validate_assignment=True, coerce_numbers_to_str=True)
+    model_config = ConfigDict(
+        validate_assignment=True,
+        coerce_numbers_to_str=True,
+        extra="forbid",  # reject misspelt/unknown calibration keys
+    )
 
     name: str = ""
     id: int = 0

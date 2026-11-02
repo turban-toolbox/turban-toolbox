@@ -5,6 +5,8 @@ import pytest
 
 from turban.instruments.microrider.channels import channel_config_factory
 import turban.instruments.microrider.sensorspeedplugins as plugins
+from turban.instruments.microrider import channels, rsIO
+from turban.instruments.microrider.rsCommon import MicrostructureRawData
 from turban.instruments.microrider.api import (
     MicroriderAPIError,
     MicroriderConfig,
@@ -196,6 +198,87 @@ def test_only_missing_plugin_parameters_are_logged(caplog):
     errors = " ".join(r.message for r in caplog.records if r.levelname == "ERROR")
     assert "p_a" in errors and "p_c" in errors
     assert "p_b" not in errors
+
+
+# Configured plugin parameters must reach the plugin. Use values that differ from
+# the registered defaults (constant_speed=1.0, filename="datafile.txt"), otherwise
+# a plugin built with the defaults would pass unnoticed.
+def test_configured_constant_speed_is_used():
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           sensor_speed_plugin="SensorSpeedConstant",
+                           sensor_speed_plugin_parameters={"constant_speed": 2.5})
+    instrument = MicroriderInstrument(cfg=cfg)
+    t = np.linspace(_T0, _T1, 5)
+    np.testing.assert_array_equal(instrument.sensor_speed_plugin.get_sensor_speed(t),
+                                  np.full_like(t, 2.5))
+
+
+def test_configured_data_file_is_used(tmp_path):
+    _t = np.linspace(_T0, _T1)
+    speed_file = tmp_path / "speed.dat"
+    np.savetxt(speed_file, np.array((_t, np.full_like(_t, 2.0))).T)
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           sensor_speed_plugin="SensorSpeedDataFile",
+                           sensor_speed_plugin_parameters={"filename": str(speed_file)})
+    instrument = MicroriderInstrument(cfg=cfg)
+    np.testing.assert_allclose(instrument.sensor_speed_plugin.get_sensor_speed(_t), 2.0)
+
+
+# A plugin that is fed new input must not keep using an interpolator built
+# from the previous input (e.g. when processing several files in a row).
+def test_emc_plugin_follows_new_raw_data(data_path):
+    raw = rsIO.read_p_file(str(data_path))
+    t = raw.header.timestamp + raw.header.t_slow
+    plugin = plugins.SensorSpeedEMC()
+
+    plugin.set_microstructure_raw_data(raw)
+    speed_first = plugin.get_sensor_speed(t)
+
+    # Same file, but with U_EM doubled: the speed must double as well.
+    raw_doubled = MicrostructureRawData(
+        header=raw.header, data={**raw.data, "U_EM": 2 * raw.data["U_EM"]}
+    )
+    plugin.set_microstructure_raw_data(raw_doubled)
+    speed_second = plugin.get_sensor_speed(t)
+
+    np.testing.assert_allclose(speed_second, 2 * speed_first)
+
+
+def test_lookup_table_follows_new_timeseries():
+    t = np.linspace(_T0, _T1)
+    plugin = plugins.SensorSpeedLookupTable()
+
+    plugin.from_timeseries(t, np.full_like(t, 1.0))
+    np.testing.assert_allclose(plugin.get_sensor_speed(t), 1.0)
+
+    plugin.from_timeseries(t, np.full_like(t, 2.0))
+    np.testing.assert_allclose(plugin.get_sensor_speed(t), 2.0)
+
+
+# Channel configs given as plain dicts (as they come from a YAML/JSON config file)
+# must become the channel-specific config class, keeping their calibration values.
+def test_channel_cfgs_from_dict_keep_calibration():
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           channel_cfgs=[{"name": "sh1", "sens": 0.07}])
+    sh1 = cfg.channel_cfgs[0]
+    assert isinstance(sh1, channels.ChannelConfigShear)
+    assert sh1.is_set("sens")
+    assert sh1.sens == 0.07
+
+
+def test_channel_cfgs_from_dict_are_applied(data_path, shear_cfg):
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           channel_cfgs=[{"name": "sh1", "sens": 1e99},
+                                         {"name": "sh2", "sens": 1e99}],
+                           sensor_speed_plugin="SensorSpeedConstant",
+                           sensor_speed_plugin_parameters={"constant_speed": 1.0})
+    level1 = MicroriderInstrument(cfg=cfg).to_shear_level1(str(data_path), cfg=shear_cfg)
+    assert np.abs(level1.shear[0].mean()) < np.float64(1e-99)  # should be very close to 0.
+    assert np.abs(level1.shear[1].mean()) < np.float64(1e-99)
 
 
 # Without a configured sensor speed plugin, to_shear_level1 must raise a clear error.
