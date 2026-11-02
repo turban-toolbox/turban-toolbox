@@ -43,9 +43,6 @@ def _vib_aux_data(fname: str, groups: tuple[str, ...]) -> AuxDataTypehintLevel12
 def _warn_n_vib_mismatch(fname: str, n_vib: int):
     """Warn if ``N_VIB_SENSORS`` in ``L3_spectra`` (if present) differs from the
     number ``n_vib`` of vibration signals found."""
-    with Dataset(fname) as f:
-        if "L3_spectra" not in f.groups:
-            return
     with xr.open_dataset(fname, group="L3_spectra") as ds:
         n_vib_file = (
             int(ds["N_VIB_SENSORS"].values.item())
