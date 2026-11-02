@@ -21,6 +21,7 @@ from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     HeaderInfo,
+    MicrostructureRawData
 )
 
 from turban import logger_manager
@@ -492,250 +493,10 @@ class HeaderParser:
 
 
     
-# class MicroRiderData(object):
-#     """Data class to hold all data collected by the RSI MicroRider.
-
-#     parameters
-#     ----------
-
-#     path : string
-#         full path to .P file
-
-#     config: system configuration, extracted from the setupfile string.
-
-#     """
-
-#     def __init__(self, path: str, config: rsConfig_parser.MicroRiderConfig) -> None:
-#         self.config: rsConfig_parser.MicroRiderConfig = config
-#         self.header: Header
-#         self.channel_matrix: ChannelMatrix = ChannelMatrix(config)
-#         self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
-#         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
-#         self._path = path
-
-#     def __getattr__(self, name: str) -> Channel:
-#         try:
-#             return self.channel_matrix.channels[name]
-#         except KeyError:
-#             raise AttributeError(
-#                 f"'{self.__class__.__name__}' object has no attribute '{name}'"
-#             )
-
-#     def keys(self) -> list[str]:
-#         return list(self.channel_matrix.channels.keys())
-
-#     def add_header_data(self, byte_header: ByteHeader, n_records: int) -> None:
-#         """Adds specific parameters from the byteheader to the data structure
-
-#         Parameters
-#         ----------
-#         byte_header : ByteHeader
-#             ByteHeader dataclass
-#         """
-#         n_cols = byte_header.fast_cols + byte_header.slow_cols
-#         matrix_count = (
-#             n_records * byte_header.data_size // (byte_header.n_rows * n_cols)
-#         )
-#         fs_fast = byte_header.frequency_clock / n_cols
-#         fs_slow = byte_header.frequency_clock / n_cols / byte_header.n_rows
-#         header_version = byte_header.header_version
-#         t_slow = np.arange(matrix_count) / fs_slow
-#         t_fast = np.arange(matrix_count * byte_header.n_rows) / fs_fast
-#         timestamp, datestring, timestring = self.get_file_timestamp(byte_header)
-
-#         self.header = Header(
-#             full_path=os.path.realpath(self._path),
-#             n_cols=n_cols,
-#             n_records=n_records,
-#             fs_fast=fs_fast,
-#             fs_slow=fs_slow,
-#             header_version=header_version,
-#             matrix_count=matrix_count,
-#             t_fast=t_fast,
-#             t_slow=t_slow,
-#             timestamp=timestamp,
-#             date=datestring,
-#             time=timestring,
-#         )
-
-#     def get_file_timestamp(self, byte_header: ByteHeader) -> tuple[float, str, str]:
-#         """Gets time stamp of the file
-
-#         Parameters
-#         ----------
-#         byte_header : ByteHeader
-#             ByteHeader dataclass with the header parameters
-
-#         Returns
-#         -------
-#         (float, str, str):
-#             timestamp, date string, time string
-
-#         The methods return time stamp (seconds since 1970), date string
-#         and time string
-
-#         """
-#         date = arrow.get(
-#             byte_header.year,
-#             byte_header.month,
-#             byte_header.day,
-#             byte_header.hour,
-#             byte_header.minute,
-#             byte_header.second,
-#             byte_header.millisecond,
-#         )
-#         timestamp = date.timestamp()
-#         datestr = date.strftime("%Y-%m-%d")
-#         timestr = date.strftime("%H-%M-%S")
-#         return timestamp, datestr, timestr
-    
-#     def add_channel_data(self, data_snr: np.typing.NDArray[np.int16]) -> None:
-#         """Adds the channel data, from array with dtype i2/u2
-
-#         Parameters
-#         ----------
-
-#         data_snr : array
-#             array with bytes converted to signed and unsigned 16 bit integers.
-
-#         The method adds all the numeric data conveyed in this matrix to the specific
-#         channels. It uses the sensor matrix to determine which part goes to what
-#         channel.
-
-#         Note: this channel adds a keyword to the configuration: depending on the
-#               number of values per record, it adds whether this is a fast or
-#               slow senor if the frequency is 512 or 64, respectively.
-#         """
-#         n_matrix_rows, _ = self.channel_matrix.matrix.shape
-#         channel_positions = self.channel_matrix.matrix.flatten()
-#         for channel_name, channel in self.channel_matrix.channels.items():
-#             logger.debug(f"Channel name : {channel_name}")
-#             i_channel = channel.config.id
-#             idx = np.where(channel_positions == i_channel)[0]
-#             n_data_per_record = len(idx)
-#             if n_data_per_record == n_matrix_rows:
-#                 channel.config.update("sample_rate", self.header.fs_fast)
-#             elif n_data_per_record == 1:
-#                 channel.config.update("sample_rate", self.header.fs_slow)
-#             else:
-#                 channel.config.update(
-#                     "sample_rate", 0
-#                 )  # we don't need to know this for this channel anyway.
-#             # correct the sign of the data if necessary
-#             channel.data = data_snr[:, idx].flatten()
-#             channel.correct_sign()
-
-
-#     def convert_channels(self) -> None:
-#         """Converts all channels
-
-#         Converts all channels to data with physical units. If a channel
-#         needs to be deconvolved first, this is also done (and leads to
-#         a new channel).
-#         """
-#         for n, ch in self.channel_matrix.channels.copy().items():
-#             regex_preemph = self._regex_deconvolve_preemph_name.match(n)
-#             regex = self._regex_deconvolve_name.match(n)
-#             if regex_preemph:
-#                 # These channels need first to be deconvolved.
-#                 logger.info(f"Deconvolving and converting {n}")
-#                 self.deconvolve_and_convert_channel(ch)
-#             elif (
-#                 not regex
-#             ):  # skipping T1 T2 and P, because they are interpolated from the deconvolved versions
-#                 logger.info(f"Converting {n}")
-#                 ch.convert_to_units()
-#             else:
-#                 logger.debug(
-#                     f"Skipping {n} for now, because, they are interpolated from the deconvolved versions???"
-#                 )
-
-#     def deconvolve_and_convert_channel(self, ch: Channel) -> None:
-#         """Treats channels that need deconvolving separately
-
-#         Note: this method creates a new channel, with the name
-#               based on the primary channel (e.g. T1) with "_hires" added.
-
-
-#         """
-#         channel_name = ch.name
-#         co_channel_name, _ = ch.name.split("_")
-#         co_channel = self.channel_matrix.channels[co_channel_name]
-#         # this channel should not be converted yet.
-#         if ch.converted_into_units:
-#             raise ValueError(
-#                 "This preemph channel is converted to units, but should be deconvolved first."
-#             )
-#         if co_channel.converted_into_units:
-#             raise ValueError(
-#                 "The channel (without preemphasis) is converted to units, but should be usedin the deconvolution first."
-#             )
-#         logger.debug(f"Trying to deconvolve {channel_name} ({co_channel_name})")
-#         if not np.isclose(ch.config.sample_rate, self.header.fs_fast):
-#             ch_fast = self.interpolate_onto_fast_channel(ch)
-#         else:
-#             ch_fast = ch
-#         if not np.isclose(co_channel.config.sample_rate, self.header.fs_fast):
-#             co_channel_fast = self.interpolate_onto_fast_channel(co_channel)
-#         else:
-#             co_channel_fast = co_channel
-#         X = co_channel_fast.data  # not converted yet, so OK.
-#         X_dX = ch_fast.data
-#         if hasattr(ch_fast.config, "diff_gain"):
-#             diff_gain = ch_fast.config.diff_gain  # <- is required to be present
-#         else:
-#             raise AttributeError(
-#                 "diff_gain is not an attribute for this configuration object."
-#             )
-#         fs = self.header.fs_fast
-
-#         new_channel_name = f"{co_channel_name}_hires"
-#         new_channel = co_channel.copy(
-#             new_channel_name
-#         )  # copy config from T1, name it T1_res
-#         new_channel.data = rsConversions.Deconvolve(
-#             X_dX.astype(np.float64), X.astype(np.float64), fs, diff_gain
-#         ).X_hires
-#         new_channel.convert_to_units()
-#         self.channel_matrix.channels[new_channel_name] = new_channel
-#         # interpolate co channel.
-#         logger.info(
-#             f"Converting {co_channel_name} by means of interpolation of unit-bearing hires channel"
-#         )
-#         self.interpolate_co_channel(co_channel, new_channel)
-
-#     def interpolate_onto_fast_channel(self, ch: Channel) -> Channel:
-#         logger.debug(f"Interpolating {ch.name} to a fast channel...")
-#         ch_hires = ch.copy("dummy")
-#         ch_hires.config.sample_rate = self.header.fs_fast
-#         ifun = si_interp1d(
-#             self.header.t_slow, ch.data, kind="cubic", fill_value="extrapolate"
-#         )
-#         ch_hires.data = ifun(self.header.t_fast).astype(np.float64)
-#         return ch_hires
-
-#     def interpolate_co_channel(
-#         self, co_channel: Channel, hires_channel: Channel
-#     ) -> None:
-#         if np.isclose(co_channel.config.sample_rate, self.header.fs_slow):
-#             tm_i = self.header.t_slow
-#             ifun = si_interp1d(
-#                 self.header.t_fast,
-#                 hires_channel.data,
-#                 kind="cubic",
-#                 fill_value="extrapolate",
-#             )
-#             co_channel.data = ifun(tm_i).astype(np.float64)
-#             co_channel.converted_into_units = True
-#         else:
-#             raise ValueError(
-#                 "Trying to interpolate to hires from a hires vector. Fix me."
-#             )
-
 
         
 def read_p_file(filename: str,
-                channel_configs: list[ChannelConfigBaseModel]=[]) -> dict[str,np.typing.NDArray[np.float64]]:
+                channel_configs: list[ChannelConfigBaseModel]=[]) -> MicrostructureRawData:
     """Function to read a single .p file.
 
     Parameters
@@ -745,8 +506,8 @@ def read_p_file(filename: str,
 
     Returns
     -------
-    MicroRiderData object
-        Raw data, converted into physical units.
+    MicrostructureRawData object
+        Header and raw data, converted into physical units.
     """
     header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
@@ -774,5 +535,6 @@ def read_p_file(filename: str,
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
         data_bytes = fd.read()
 
-    data_dict = channel_matrix.convert_channels(data_bytes)
-    return data_dict
+    microstructure_data = MicrostructureRawData(header=header_info,
+                                     data=channel_matrix.convert_channels(data_bytes))
+    return microstructure_data

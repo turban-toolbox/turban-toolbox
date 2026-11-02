@@ -48,4 +48,10 @@ class HeaderInfo:
     date: str
     time: str
 
+@dataclass(kw_only=True)
+class MicrostructureRawData:
+    header: HeaderInfo
+    data: dict[str, NDArray[float64]]
+               
+    
     
