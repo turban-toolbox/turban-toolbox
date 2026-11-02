@@ -218,7 +218,9 @@ def test_number_signals_vibration_removal(vibration_channels, expected):
 
     assert level3.number_signals_vibration_removal == expected
     n_f = level1.cfg.number_fft_windows_per_chunk
-    assert level3.log_psi_var == pytest.approx(5 / 4 * (n_f - expected) ** (-7 / 9))
+    assert level3.log_psi_std == pytest.approx(
+        np.sqrt(5 / 4 * (n_f - expected) ** (-7 / 9))
+    )
 
 
 def test_vibration_channel_missing():

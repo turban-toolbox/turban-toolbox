@@ -21,7 +21,7 @@ def process_level4(
     freq_cutoff_corrupt: float | None,
     waveno_spectral_min: float | None,
     data_length: Float[ndarray, "time"],
-    log_psi_var: float,
+    log_psi_std: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # eps estimate
     Int[ndarray, "nshear time"],  # eps_source_flag. 1: spec_int, 2: isr_fit
@@ -86,11 +86,11 @@ def process_level4(
         data_length,
         resolved_var_frac,
         num_spec_points,
-        log_psi_var,
+        log_psi_std,
     )
 
     fom, log_diss_mad, num_spec_points_fom = figure_of_merit(
-        waveno, waveno_cutoff, eps, molvisc, psi, log_psi_var
+        waveno, waveno_cutoff, eps, molvisc, psi, log_psi_std
     )
     num_spec_points_agree = np.equal(num_spec_points, num_spec_points_fom)
     if not np.all(num_spec_points_agree):
@@ -149,7 +149,7 @@ def get_quality_metric(
         # np.where(
         #     eps_source_flag == 1,
         #     eps_dev >= 2.77 * log_diss_std,
-        #     eps_dev >= 4.2 * log_psi_var / np.sqrt(num_spec_points),
+        #     eps_dev >= 4.2 * log_psi_std / np.sqrt(num_spec_points),
         # )
     else:
         logger.warning(
@@ -177,7 +177,7 @@ def get_log_diss_std(
     data_length: Float[ndarray, "time"],
     resolved_var_frac: Float[ndarray, "nshear time"],
     num_spec_points: Int[ndarray, "nshear time"],
-    log_psi_var: float,
+    log_psi_std: float,
 ) -> Float[ndarray, "nshear time"]:  # log(eps) standard deviation
     """Standard deviation of ln(eps), sigma_{ln eps} in the ATOMIX paper.
 
@@ -189,7 +189,7 @@ def get_log_diss_std(
     log_diss_std_spec_int = np.sqrt(5.5 / (1 + (data_length_nondim / 4) ** (7 / 9)))
 
     # Sec. 3.4.4 in the ATOMIX paper
-    log_diss_std_isr_fit = 1.5 * np.sqrt(log_psi_var) / np.sqrt(num_spec_points)
+    log_diss_std_isr_fit = 1.5 * log_psi_std / np.sqrt(num_spec_points)
 
     log_diss_std = np.where(
         eps_source_flag == 1,
@@ -206,7 +206,7 @@ def figure_of_merit(
     eps: Float[ndarray, "nshear time"],
     molvisc: Float[ndarray, "time"] | float,
     psi: Float[ndarray, "nshear time waveno"],
-    log_psi_var: float,
+    log_psi_std: float,
 ) -> tuple[
     Float[ndarray, "nshear time"],  # Figure of Merit
     Float[ndarray, "nshear time"],  # Mean Absolute Deviation of log(psi)
@@ -215,8 +215,9 @@ def figure_of_merit(
     """
     Figure of merit (FOM) as in the ATOMIX paper: mean absolute deviation of the
     observed from the model log-spectrum up to `waveno_cutoff`, normalised by
-    `log_psi_var` and T_M. All inputs are available on `ShearLevel4` and its
-    `level_below`, so the FOM can be recomputed outside of the processing chain.
+    `log_psi_std` and T_M (Sec. 3.4.5.1 in the ATOMIX paper). All inputs are available
+    on `ShearLevel4` and its `level_below`, so the FOM can be recomputed outside of
+    the processing chain.
     """
     if isinstance(molvisc, float):
         molvisc = np.array(molvisc)[newaxis]
@@ -229,7 +230,7 @@ def figure_of_merit(
     num_spec_points = (~np.isnan(summand)).sum(axis=-1)
     log_diss_mad = np.nanmean(summand, axis=-1)
     tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  # T_M in ATOMIX paper
-    fom = log_diss_mad / log_psi_var / tm
+    fom = log_diss_mad / log_psi_std / tm
     return fom, log_diss_mad, num_spec_points
 
 

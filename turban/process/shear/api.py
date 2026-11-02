@@ -295,9 +295,9 @@ class ShearLevel3(Level3[ShearLevel2]):
         return len(self.cfg.vibration_channels)
 
     @property
-    def log_psi_var(self):
-        r"""sigma^2_{ln\Psi} in the ATOMIX paper"""
-        return (
+    def log_psi_std(self):
+        r"""sigma_{ln\Psi} in the ATOMIX paper (Sec. 3.3.5)"""
+        return np.sqrt(
             5
             / 4
             * (
@@ -310,11 +310,11 @@ class ShearLevel3(Level3[ShearLevel2]):
     @property
     def psi_k_sh_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
         """95% confidence interval of power spectrum.
-        Eq. 23 in the ATOMIX paper"""
+        Sec. 3.3.5 in the ATOMIX paper"""
         return np.concatenate(
             (
-                self.psi_k_sh * np.exp(1.96 * self.log_psi_var)[newaxis, ...],
-                self.psi_k_sh * np.exp(-1.96 * self.log_psi_var)[newaxis, ...],
+                self.psi_k_sh * np.exp(1.96 * self.log_psi_std)[newaxis, ...],
+                self.psi_k_sh * np.exp(-1.96 * self.log_psi_std)[newaxis, ...],
             ),
             axis=0,
         )
@@ -389,7 +389,7 @@ class ShearLevel4(Level4[ShearLevel3]):
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
             waveno_spectral_min=level3.cfg.waveno_spectral_min,
             data_length=level3.data_length,
-            log_psi_var=level3.log_psi_var,
+            log_psi_std=level3.log_psi_std,
         )
 
         quality_metric = get_quality_metric(
@@ -434,7 +434,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 eps=ds["EPSI"].values,
                 molvisc=ds["KVISC"].values,
                 psi=level3.psi_k_sh,
-                log_psi_var=level3.log_psi_var,
+                log_psi_std=level3.log_psi_std,
             )
             return cls(
                 eps=ds["EPSI"].values,

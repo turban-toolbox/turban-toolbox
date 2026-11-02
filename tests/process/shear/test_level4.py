@@ -19,7 +19,7 @@ def test_fom_from_level3():
         eps=level4.eps,
         molvisc=level4.molvisc,
         psi=p.level3.psi_k_sh,
-        log_psi_var=p.level3.log_psi_var,
+        log_psi_std=p.level3.log_psi_std,
     )
     np.testing.assert_allclose(level4.fom, fom)
 
