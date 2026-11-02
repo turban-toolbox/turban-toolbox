@@ -337,7 +337,7 @@ class ShearLevel4(Level4[ShearLevel3]):
 
     eps: Float[ndarray, "nshear time"]
     eps_source_flag: Int[ndarray, "nshear time"]
-    log_diss_var: Float[ndarray, "nshear time"]
+    log_diss_std: Float[ndarray, "nshear time"]
     log_diss_mad: Float[ndarray, "nshear time"]
     kolmlen: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
@@ -372,7 +372,7 @@ class ShearLevel4(Level4[ShearLevel3]):
         (
             eps,
             eps_source_flag,
-            log_diss_var,
+            log_diss_std,
             kolmlen,
             resolved_var_frac,
             fom,
@@ -397,7 +397,7 @@ class ShearLevel4(Level4[ShearLevel3]):
             eps_source_flag=eps_source_flag,
             fom=fom,
             spike_fraction=level3.spike_fraction,
-            log_diss_var=log_diss_var,
+            log_diss_std=log_diss_std,
             num_spec_points=num_spec_points,
             num_despike_iter=level3.max_despike_iter,
             resolved_var_frac=resolved_var_frac,
@@ -409,7 +409,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 time=level3.time,
                 eps=eps,
                 eps_source_flag=eps_source_flag,
-                log_diss_var=log_diss_var,
+                log_diss_std=log_diss_std,
                 log_diss_mad=log_diss_mad,
                 kolmlen=kolmlen,
                 resolved_var_frac=resolved_var_frac,
@@ -427,7 +427,6 @@ class ShearLevel4(Level4[ShearLevel3]):
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         # TODO: flag to switch off loading of levels below
         with xr.open_dataset(fname, group="L4_dissipation") as ds:
-            logger.warning("log_diss_var not available from atomix netcdf file.")
             level3 = ShearLevel3.from_atomix_netcdf(fname)
             fom, log_diss_mad, _ = figure_of_merit(
                 waveno=level3.waveno,
@@ -451,7 +450,11 @@ class ShearLevel4(Level4[ShearLevel3]):
                 waveno_cutoff=ds["KMAX"].values,
                 kolmlen=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
                 ** 0.25,
-                log_diss_var=np.nan * np.ones_like(ds["EPSI"].values),
+                log_diss_std=(
+                    ds["EPSI_STD"].values
+                    if "EPSI_STD" in ds
+                    else np.nan * np.ones_like(ds["EPSI"].values)
+                ),
                 log_diss_mad=log_diss_mad,
             )
 
