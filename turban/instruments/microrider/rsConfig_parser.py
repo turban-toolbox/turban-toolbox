@@ -109,7 +109,7 @@ class MicroRiderConfig:
                 continue
             else:
                 if channel_name == channel_config.name:
-                    for field_name in channel_config._set_properties:
+                    for field_name in channel_config.model_fields_set:
                         if field_name == "name":
                             continue
                         # set any set fields.

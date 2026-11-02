@@ -11,11 +11,8 @@ import arrow
 import numpy as np
 from scipy.interpolate import CubicSpline as si_CubicSpline
 
-from turban.instruments.generic.api import InstrumentEnum
-from turban.instruments.generic.channels import (
-    ChannelConfigBaseModel,
-    channel_config_factory,
-)
+from turban.instruments.generic.channels import ChannelConfigBaseModel
+from turban.instruments.microrider.channels import channel_config_factory
 from turban.instruments.microrider import rsConversions
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
@@ -254,7 +251,7 @@ class ChannelMatrix(object):
             logger.info(f"\t{n:2d}: {channel_name}")
         if np.any(self.matrix == 255):
             logger.debug("Created Channel 255...")
-            channel_config = channel_config_factory("ch255", prefix=InstrumentEnum.MicroRider)
+            channel_config = channel_config_factory("ch255")
             channel_config.id = 255
             channel_config.type = ""
             channels["ch255"] = Channel(channel_config)
@@ -264,7 +261,7 @@ class ChannelMatrix(object):
 
     def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
-        channel_config = channel_config_factory(name, prefix=InstrumentEnum.MicroRider)
+        channel_config = channel_config_factory(name)
         for k_any_case, v in section.items():
             k = k_any_case.lower()
             if k == "name":
