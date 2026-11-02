@@ -382,8 +382,8 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
                     200,
                 )
                 eps = ds4["eps"].isel(nshear=i).values
-                kolm_length = ds4["kolm_length"].isel(nshear=i).values
-                molvisc = (eps * kolm_length**4) ** (1 / 3)
+                kolmlen = ds4["kolmlen"].isel(nshear=i).values
+                molvisc = (eps * kolmlen**4) ** (1 / 3)
                 psi = model_spectrum(waveno, eps, molvisc)
 
                 ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls="-")

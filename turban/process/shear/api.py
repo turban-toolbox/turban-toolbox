@@ -339,7 +339,7 @@ class ShearLevel4(Level4[ShearLevel3]):
     eps_source_flag: Int[ndarray, "nshear time"]
     log_diss_var: Float[ndarray, "nshear time"]
     log_diss_mad: Float[ndarray, "nshear time"]
-    kolm_length: Float[ndarray, "nshear time"]
+    kolmlen: Float[ndarray, "nshear time"]
     resolved_var_frac: Float[ndarray, "nshear time"]  # V_f in ATOMIX paper
     fom: Float[ndarray, "nshear time"]  # figure of merit, FM in ATOMIX paper
     num_spec_points: Int[ndarray, "nshear time"]
@@ -373,7 +373,7 @@ class ShearLevel4(Level4[ShearLevel3]):
             eps,
             eps_source_flag,
             log_diss_var,
-            kolm_length,
+            kolmlen,
             resolved_var_frac,
             fom,
             log_diss_mad,
@@ -411,7 +411,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 eps_source_flag=eps_source_flag,
                 log_diss_var=log_diss_var,
                 log_diss_mad=log_diss_mad,
-                kolm_length=kolm_length,
+                kolmlen=kolmlen,
                 resolved_var_frac=resolved_var_frac,
                 fom=fom,
                 num_spec_points=num_spec_points,
@@ -449,7 +449,7 @@ class ShearLevel4(Level4[ShearLevel3]):
                 fom=ds["FOM"].values if "FOM" in ds else fom,
                 num_spec_points=ds["N_S"].values.astype(int),
                 waveno_cutoff=ds["KMAX"].values,
-                kolm_length=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
+                kolmlen=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
                 ** 0.25,
                 log_diss_var=np.nan * np.ones_like(ds["EPSI"].values),
                 log_diss_mad=log_diss_mad,
