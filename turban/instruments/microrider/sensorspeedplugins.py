@@ -199,9 +199,8 @@ class SensorSpeedEMC(SensorSpeedABC):
         try:
             return self._ifun
         except AttributeError:
-            t = self.microrider_data.header.t_slow
-            t += self.microrider_data.header.timestamp
-            U = self.microrider_data.U_EM.data
+            t = self.microstructure_raw_data.header.timestamp + self.microstructure_raw_data.header.t_slow
+            U = self.microstructure_raw_data.data["U_EM"]
             self._ifun = make_interp_spline(t, U, 1)
             return self._ifun
 

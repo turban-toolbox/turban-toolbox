@@ -3,7 +3,7 @@ from numpy.typing import NDArray
 from numpy import float64
 from typing import Literal
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True, slots=True)
 class ByteHeader:
     file_number: int
     record_number: int
@@ -33,7 +33,7 @@ class ByteHeader:
     endianness: Literal["<", ">"]
     filename: str
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True, slots=True)
 class HeaderInfo:
     full_path: str
     n_cols: int
@@ -48,7 +48,7 @@ class HeaderInfo:
     date: str
     time: str
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True, slots=True
 class MicrostructureRawData:
     header: HeaderInfo
     data: dict[str, NDArray[float64]]
