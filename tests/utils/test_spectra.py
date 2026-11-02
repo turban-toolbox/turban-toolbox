@@ -216,15 +216,21 @@ def test_number_signals_vibration_removal(vibration_channels, expected):
     level1 = _make_vib_level1(vibration_channels)
     level3 = ShearProcessing(level1).level3
 
-    assert level3.number_signals_vibration_removal == expected
+    assert level3.cfg.number_signals_vibration_removal == expected
     n_f = level1.cfg.number_fft_windows_per_chunk
-    assert level3.log_psi_std == pytest.approx(
+    assert level3.cfg.log_psi_std == pytest.approx(
         np.sqrt(5 / 4 * (n_f - expected) ** (-7 / 9))
     )
+
+    # 95% confidence interval: bounds at exp(+-1.96 sigma_ln_psi) around psi_k_sh
+    upper, lower = level3.psi_k_sh_confidence_interval
+    np.testing.assert_allclose(
+        upper, level3.psi_k_sh * np.exp(1.96 * level3.cfg.log_psi_std)
+    )
+    np.testing.assert_allclose(upper * lower, level3.psi_k_sh**2)
 
 
 def test_vibration_channel_missing():
     level1 = _make_vib_level1(["vib1", "vib_missing"])
     with pytest.raises(KeyError, match="vib_missing"):
         ShearProcessing(level1)
-

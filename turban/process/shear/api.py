@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from jaxtyping import Float, Int
 from netCDF4 import Dataset
 from turban.process.shear.config import ShearConfig
-from numpy import newaxis, nan, ndarray
+from turban.process.shear import atomix
+from numpy import ndarray
 import numpy as np
-import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow
 from turban.process.shear.level2 import process_level2
@@ -58,16 +58,7 @@ class ShearLevel1(Level1):
         ShearLevel1
             Level 1 instance populated from the file.
         """
-        ds = xr.load_dataset(fname, group="L1_converted")
-        # TODO: handle section_number through level 2
-        ds2 = xr.load_dataset(fname, group="L2_cleaned")
-        return cls(
-            time=ds.TIME.values,
-            senspeed=ds.PSPD_REL.values if "PSPD_REL" in ds else ds2.PSPD_REL.values,
-            shear=ds.SHEAR.values,
-            section_number=ds2["SECTION_NUMBER"].values.astype(int),
-            cfg=cast(ShearConfig, ShearConfig.from_atomix_netcdf(fname)),
-        )
+        return cls(**atomix.level1_kwarg(fname))
 
 
 @dataclass(kw_only=True)
@@ -145,14 +136,8 @@ class ShearLevel2(Level2[ShearLevel1]):
         ShearLevel2
             Level 2 instance populated from the file (with Level1 attached below).
         """
-        ds = xr.load_dataset(fname, group="L2_cleaned")
         return cls(
-            time=ds.TIME.values,
-            shear=ds.SHEAR.values,
-            senspeed=ds.PSPD_REL.values,
-            section_number=ds["SECTION_NUMBER"].values.astype(int),
-            # TODO: this does not seem to be saved in (all?) ATOMIX files
-            num_despike_iter=9999 * np.zeros_like(ds.SHEAR.values, dtype=int),
+            **atomix.level2_kwarg(fname),
             level_below=ShearLevel1.from_atomix_netcdf(fname),
         )
 
@@ -260,63 +245,22 @@ class ShearLevel3(Level3[ShearLevel2]):
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
-        ds = xr.load_dataset(fname, group="L3_spectra")
-        ds = ds.transpose(
-            ...,
-            "N_SHEAR_SENSORS",
-            "TIME_SPECTRA",
-            "WAVENUMBER" if "WAVENUMBER" in ds.dims else "N_WAVENUMBER",
-        )
-
         return cls(
-            time=ds["TIME"].values,
-            psi_k_sh=ds["SH_SPEC"].values,
-            waveno=ds["KCYC"].values,
-            psi_f_sh=ds["SH_SPEC"].values * np.nan,
-            freq=np.nan * np.ones(ds["KCYC"].values.shape[-1]),
-            senspeed=ds["PSPD_REL"].values,
-            section_number=ds["SECTION_NUMBER"].values.astype(int),
-            spike_fraction=np.nan * np.ones_like(ds["SH_SPEC"].values[:, :, 0]),
-            # TODO: this does not seem to be saved in (all?) ATOMIX files
-            max_despike_iter=9999
-            * np.ones_like(ds["SH_SPEC"].values[:, :, 0], dtype=int),
+            **atomix.level3_kwarg(fname),
             level_below=ShearLevel2.from_atomix_netcdf(fname),
         )
 
     @property
-    def number_signals_vibration_removal(self) -> int:
-        """N_V in the ATOMIX paper: number of vibration (and other) signals used to
-        remove vibration-coherent noise from the shear spectra (Goodman et al. 2006).
-        See Eqs. 16-17 in the ATOMIX paper.
-
-        Equals the number of ``cfg.vibration_channels``, since level 3 cannot be
-        built if any of them is missing from the aux data.
-        """
-        return len(self.cfg.vibration_channels)
-
-    @property
-    def log_psi_std(self):
-        r"""sigma_{ln\Psi} in the ATOMIX paper (Sec. 3.3.5)"""
-        return np.sqrt(
-            5
-            / 4
-            * (
-                self.cfg.number_fft_windows_per_chunk
-                - self.number_signals_vibration_removal
-            )
-            ** (-7 / 9)
-        )
-
-    @property
-    def psi_k_sh_confidence_interval(self) -> Float[ndarray, "2 time waveno"]:
-        """95% confidence interval of power spectrum.
+    def psi_k_sh_confidence_interval(
+        self,
+    ) -> Float[ndarray, "2 nshear time waveno"]:
+        """95% confidence interval (upper, lower) of power spectrum.
         Sec. 3.3.5 in the ATOMIX paper"""
-        return np.concatenate(
+        return np.stack(
             (
-                self.psi_k_sh * np.exp(1.96 * self.log_psi_std)[newaxis, ...],
-                self.psi_k_sh * np.exp(-1.96 * self.log_psi_std)[newaxis, ...],
-            ),
-            axis=0,
+                self.psi_k_sh * np.exp(1.96 * self.cfg.log_psi_std),
+                self.psi_k_sh * np.exp(-1.96 * self.cfg.log_psi_std),
+            )
         )
 
     @property
@@ -389,7 +333,7 @@ class ShearLevel4(Level4[ShearLevel3]):
             freq_cutoff_corrupt=level3.cfg.freq_cutoff_corrupt,
             waveno_spectral_min=level3.cfg.waveno_spectral_min,
             data_length=level3.data_length,
-            log_psi_std=level3.log_psi_std,
+            log_psi_std=level3.cfg.log_psi_std,
         )
 
         quality_metric = get_quality_metric(
@@ -426,37 +370,13 @@ class ShearLevel4(Level4[ShearLevel3]):
     @classmethod
     def from_atomix_netcdf(cls, fname: str) -> "ShearLevel4":
         # TODO: flag to switch off loading of levels below
-        with xr.open_dataset(fname, group="L4_dissipation") as ds:
-            level3 = ShearLevel3.from_atomix_netcdf(fname)
-            fom, log_diss_mad, _ = figure_of_merit(
-                waveno=level3.waveno,
-                waveno_cutoff=ds["KMAX"].values,
-                eps=ds["EPSI"].values,
-                molvisc=ds["KVISC"].values,
-                psi=level3.psi_k_sh,
-                log_psi_std=level3.log_psi_std,
-            )
-            return cls(
-                eps=ds["EPSI"].values,
-                level_below=level3,
-                time=ds["TIME"].values,
-                eps_source_flag=ds["METHOD"].values.astype(int) + 1,
-                section_number=ds["SECTION_NUMBER"].values.astype(int),
-                quality_metric=ds["EPSI_FLAGS"].values.astype(int),
-                molvisc=ds["KVISC"].values,
-                resolved_var_frac=ds["VAR_RESOLVED"].values,
-                fom=ds["FOM"].values if "FOM" in ds else fom,
-                num_spec_points=ds["N_S"].values.astype(int),
-                waveno_cutoff=ds["KMAX"].values,
-                kolmlen=(ds["KVISC"].values[newaxis, :] ** 3 / ds["EPSI"].values)
-                ** 0.25,
-                log_diss_std=(
-                    ds["EPSI_STD"].values
-                    if "EPSI_STD" in ds
-                    else np.nan * np.ones_like(ds["EPSI"].values)
-                ),
-                log_diss_mad=log_diss_mad,
-            )
+        level3 = ShearLevel3.from_atomix_netcdf(fname)
+        return cls(
+            **atomix.level4_kwarg(
+                fname, level3.waveno, level3.psi_k_sh, level3.cfg.log_psi_std
+            ),
+            level_below=level3,
+        )
 
 
 class ShearProcessing(Processing):

@@ -82,6 +82,14 @@ def test_add_aux_data_name_out_level2_to_level3(agg_method, name_out, expected_n
     np.testing.assert_allclose(arr, expected_agg(pres, agg_method))
 
 
+def test_add_aux_data_full_api_merges():
+    level1 = make_level1()
+    level1.add_aux_data(np.ones(N), name="a")
+    level1.add_aux_data({"b": (["time"], np.zeros(N), {"mean": None})})
+    level1.add_aux_data(None)  # no-op
+    assert list(level1.aux_data) == ["a", "b"]
+
+
 def test_level2_from_level1():
     level1 = make_level1()
     level2 = Level2.from_level_below(level1)
