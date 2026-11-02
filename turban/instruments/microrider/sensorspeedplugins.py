@@ -6,6 +6,7 @@ import numpy as np
 from scipy.interpolate import make_interp_spline
 
 from turban.instruments.microrider import rsIO
+from turban.instruments.microrider.rsCommon import MicrostructureRawData
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +23,8 @@ class SensorSpeedABC(ABC):
 
     def __init__(self) -> None:
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
-
+        self.microstructure_raw_data: None | MicrostructureRawData = None
+    
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -54,7 +56,9 @@ class SensorSpeedABC(ABC):
         """
         pass
 
-
+    def set_microstructure_raw_data(self, microstructure_raw_data : MicrostructureRawData) -> None:
+        self.microstructure_raw_data = microstructure_raw_data
+        
 
 # Create a registry of SensorSpeedPlugin classes:
 

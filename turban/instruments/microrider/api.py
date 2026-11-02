@@ -66,9 +66,8 @@ class MicroriderInstrument(Instrument):
         """
         channel_configs = self.cfg.channel_cfgs
         microstructure_raw_data = rsIO.read_p_file(filename, channel_configs)
-        breakpoint()
-        self.sensor_speed_plugin.set_microrider_data(microrider_data)
-        time = microrider_data.header.t_fast + microrider_data.header.timestamp
+        self.sensor_speed_plugin.set_microstructure_raw_data(microstructure_raw_data)
+        time = microstructure_raw_data.header.t_fast + microstructure_raw_data.header.timestamp
         senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
         level1 = ShearLevel1(
             time=time,
@@ -76,11 +75,11 @@ class MicroriderInstrument(Instrument):
             cfg=cfg,
             shear=np.array(
                 [
-                    microrider_data.sh1.data / senspeed**2,
-                    microrider_data.sh2.data / senspeed**2,
+                    microstructure_raw_data.data["sh1"] / senspeed**2,
+                    microstructure_raw_data.data["sh2"] / senspeed**2,
                 ]
             ),
-            section_number=np.ones_like(microrider_data.header.t_fast, dtype=int),
+            section_number=np.ones_like(time, dtype=int),
         )
         return level1
 
