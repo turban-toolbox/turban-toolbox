@@ -162,9 +162,8 @@ class Therm(Converter):
         )
         if beta is None:
             logger.error("No beta or beta_1 for this thermistor")
-            ValueError("No beta or beta_1 for this thermistor")
-        else:
-            physical = 1 / t_0 + (1 / beta) * log_R
+            raise ValueError("No beta or beta_1 for this thermistor")
+        physical = 1 / t_0 + (1 / beta) * log_R
 
         beta_2 = self.get_optional_parameter("beta_2")
         if not beta_2 is None:
@@ -320,14 +319,18 @@ class Aem1g_d(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
+    def decode(self, raw: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+        """The digital EM current word is always an unsigned 16 bit integer,
+        irrespective of the configured sign."""
+        return raw.view(np.uint16).astype(np.float64)
+
     def convert(self, v: np.typing.NDArray[np.float64]
                 ) -> np.typing.NDArray[np.float64]:
-        u = v.astype(">u2")  # unsigned 16 bit integer
         a = self.get_parameter("a") / 100  # cm/s -> m/s
         b = self.get_parameter("b") / 100  # cm/s -> m/s
         bias = self.get_parameter("bias")
         v_unit: np.typing.NDArray[np.float64]
-        v_unit = a + b * u
+        v_unit = a + b * v
         v_unit -= bias
         if b > 1:
             m = """Provided coefficients (a,b) are not correct.  Each

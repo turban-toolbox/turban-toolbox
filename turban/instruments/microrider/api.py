@@ -66,7 +66,10 @@ class MicroriderInstrument(Instrument):
         """
         channel_configs = self.cfg.channel_cfgs
         microstructure_raw_data = rsIO.read_p_file(filename, channel_configs)
-        self.sensor_speed_plugin.set_microstructure_raw_data(microstructure_raw_data)
+        try:
+            self.sensor_speed_plugin.set_microstructure_raw_data(microstructure_raw_data)
+        except AttributeError:
+            raise MicroriderAPIError("MicroriderInstrument instance has no sensor speed plugin defined.")
         time = microstructure_raw_data.header.t_fast + microstructure_raw_data.header.timestamp
         senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
         level1 = ShearLevel1(
@@ -85,7 +88,7 @@ class MicroriderInstrument(Instrument):
 
     def _check_for_presence_of_required_parameters(
         self, requested_plugin: str
-    ) -> tuple[bool, dict[str, float | str]]:
+    ) -> tuple[bool, dict[str, float | str], list[str]]:
         plugin_required_argument_list = plugins.get_registered_plugin_parameter_list(
             requested_plugin
         )
@@ -93,13 +96,14 @@ class MicroriderInstrument(Instrument):
         # check if required arguments are given.
         argument_list_check = True
         args: dict[str, float | str] = {}
+        unconfigured_args: list[str] = []
         for n, dtype, v in plugin_required_argument_list:
             if not n in plugin_arguments:
                 argument_list_check = False
-                break
+                unconfigured_args.append(n)
             else:
                 args[n] = v
-        return argument_list_check, args
+        return argument_list_check, args, unconfigured_args
 
     def _check_for_unused_parameters(self, args: dict[str, str | float]) -> list[str]:
         configured_args = self.cfg.sensor_speed_plugin_parameters
@@ -112,11 +116,11 @@ class MicroriderInstrument(Instrument):
     def _set_sensor_speed_plugin_from_cfg(self) -> None:
         requested_plugin = self.cfg.sensor_speed_plugin
         if requested_plugin:
-            argument_list_check, args = self._check_for_presence_of_required_parameters(
+            argument_list_check, args, unconfigured_args = self._check_for_presence_of_required_parameters(
                 requested_plugin
             )
             if not argument_list_check:
-                for n in args:
+                for n in unconfigured_args:
                     mesg = f"Required parameter {n} for {requested_plugin} is not configured."
                     logger.error(mesg)
                 raise MicroriderAPIError("Configuration error. (See logs).")

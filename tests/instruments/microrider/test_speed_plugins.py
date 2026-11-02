@@ -5,7 +5,11 @@ import pytest
 
 from turban.instruments.microrider.channels import channel_config_factory
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderConfig, MicroriderInstrument
+from turban.instruments.microrider.api import (
+    MicroriderAPIError,
+    MicroriderConfig,
+    MicroriderInstrument,
+)
 from turban.process.shear.api import ShearConfig
 
 # Start and end times for data_0413.p
@@ -156,4 +160,46 @@ def test_overwriting_plugin_prints_log(instrumentPreConfigured, caplog):
     record = caplog.records[0]
     assert record.levelname=="WARNING" and record.message.startswith("Overwriting sensor speed plugin:")
 
+
+# Missing required plugin parameters must be named in the error log.
+def test_missing_plugin_parameter_is_logged(caplog):
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           sensor_speed_plugin="SensorSpeedConstant",
+                           sensor_speed_plugin_parameters={})
+    with caplog.at_level("ERROR"), pytest.raises(MicroriderAPIError):
+        MicroriderInstrument(cfg=cfg)
+    messages = [r.message for r in caplog.records if r.levelname == "ERROR"]
+    assert messages == [
+        "Required parameter constant_speed for SensorSpeedConstant is not configured."
+    ]
+
+
+def test_only_missing_plugin_parameters_are_logged(caplog):
+    @plugins.register_plugin([("p_a", float, 1.0), ("p_b", float, 2.0), ("p_c", float, 3.0)])
+    class SensorSpeedTestMissingParameters(plugins.SensorSpeedABC):
+        def __init__(self, p_a: float, p_b: float, p_c: float) -> None:
+            super().__init__()
+
+        def interpolation_factory(self):
+            raise NotImplementedError
+
+        def get_sensor_speed(self, t):
+            return np.ones_like(t)
+
+    cfg = MicroriderConfig(sampfreq=1.0,
+                           sensors={},
+                           sensor_speed_plugin="SensorSpeedTestMissingParameters",
+                           sensor_speed_plugin_parameters={"p_b": 5.0})
+    with caplog.at_level("ERROR"), pytest.raises(MicroriderAPIError):
+        MicroriderInstrument(cfg=cfg)
+    errors = " ".join(r.message for r in caplog.records if r.levelname == "ERROR")
+    assert "p_a" in errors and "p_c" in errors
+    assert "p_b" not in errors
+
+
+# Without a configured sensor speed plugin, to_shear_level1 must raise a clear error.
+def test_to_shear_level1_without_plugin_raises(instrument, data_path, shear_cfg):
+    with pytest.raises(MicroriderAPIError, match="[Ss]ensor speed plugin"):
+        instrument.to_shear_level1(str(data_path), cfg=shear_cfg)
 
