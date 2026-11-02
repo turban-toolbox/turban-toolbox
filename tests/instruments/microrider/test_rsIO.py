@@ -279,7 +279,7 @@ def test_channel_data(microrider_channel_data):
     # The DAT_058 reference was made with U_EM coefficients a=-24.4605, b=151.341,
     # where the setup string has a=-24.46052, b=151.3413 (diff up to 1.6e-6 m/s).
     for name in channels_to_test:
-        v = data[name]
+        v = data.data[name]
         v_ref = mdata[odas_names.get(name, name)]
         if name == "U_EM":
             atol=2e-6 # see comment above.
@@ -297,9 +297,9 @@ def test_user_channel_config_058():
     u_em_config = channels.ChannelConfigU_EM(name="U_EM", a=-24.4605, b=151.341)
     data = rsIO.read_p_file(fn, channel_configs=[u_em_config])
     mdata = load_odas_reference_data(mfn)
-    assert data["U_EM"].shape == mdata["U_EM"].shape
+    assert data.data["U_EM"].shape == mdata["U_EM"].shape
     # rtol=0: a relative tolerance would hide the 1.6e-6 m/s difference without the override.
-    assert np.allclose(data["U_EM"], mdata["U_EM"], rtol=0, atol=2e-12)
+    assert np.allclose(data.data["U_EM"], mdata["U_EM"], rtol=0, atol=2e-12)
     
 
     

@@ -59,7 +59,7 @@ def load_data(filename, matfilename, a, b):
         chars_as_strings=True,
         simplify_cells=True,
     )
-    return pdata, mdata
+    return pdata.data, mdata
 
 
 @pytest.fixture(scope="session")

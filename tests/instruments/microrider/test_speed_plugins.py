@@ -59,7 +59,7 @@ def instrument():
 
 
 @pytest.fixture
-def InstrumentPostConfigureSensitivity(channel_cfgs):
+def instrumentPostConfigureSensitivity(channel_cfgs):
     cfg = MicroriderConfig(sampfreq=1.0,
                            sensors={},
                            channel_cfgs=channel_cfgs,
@@ -69,7 +69,7 @@ def InstrumentPostConfigureSensitivity(channel_cfgs):
     return MicroriderInstrument(cfg=cfg)
 
 @pytest.fixture
-def InstrumentPreConfigured():
+def instrumentPreConfigured():
     cfg = MicroriderConfig(sampfreq=1.0,
                            sensors={},
                            sensor_speed_plugin='SensorSpeedConstant',

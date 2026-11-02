@@ -48,7 +48,7 @@ class HeaderInfo:
     date: str
     time: str
 
-@dataclass(kw_only=True, frozen=True, slots=True
+@dataclass(kw_only=True, frozen=True, slots=True)
 class MicrostructureRawData:
     header: HeaderInfo
     data: dict[str, NDArray[float64]]
