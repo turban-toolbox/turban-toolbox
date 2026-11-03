@@ -21,7 +21,10 @@ from turban.process.shear.api import (
     NetcdfReader,
 )
 from turban.process.shear.api import ShearProcessing
-from turban.utils.filepaths import atomix_benchmark_baltic_fpath, atomix_benchmark_faroe_fpath
+from turban.utils.filepaths import (
+    atomix_benchmark_baltic_fpath,
+    atomix_benchmark_faroe_fpath,
+)
 from turban.utils.seawater import viscosity_kinematic
 
 
@@ -66,16 +69,18 @@ def test_agg_aux():
 
 
 def test_goodman_config():
+    # ACC signals are loaded from the ATOMIX file as vibration channels
     l2 = ShearLevel2.from_atomix_netcdf(atomix_benchmark_faroe_fpath)
-    l3_vib = ShearLevel3.from_level_below(l2)
-
-    # now with vibration removal
-    ds = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L2_cleaned")
-    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=0).values, "vib1")
-    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=1).values, "vib2")
-    l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=2).values, "vib3")
-    l2.cfg.vibration_channels = ("vib1", "vib2", "vib3")
+    assert l2.cfg.vibration_channels == ("ACC1", "ACC2", "ACC3")
+    # vibration removal with the first channel only
+    l2.cfg.vibration_channels = ("ACC1",)
     l3_novib = ShearLevel3.from_level_below(l2)
+    assert l3_novib.cfg.number_signals_vibration_removal == 1
+
+    # now without vibration removal
+    l2.cfg.vibration_channels = ()
+    l3_vib = ShearLevel3.from_level_below(l2)
+    assert not np.allclose(l3_vib.psi_k_sh, l3_novib.psi_k_sh, equal_nan=True)
 
     fig, ax = plt.subplots()
     ax.loglog(l3_vib.freq, l3_vib.psi_f_sh[0].mean(axis=0), label="Uncleaned")

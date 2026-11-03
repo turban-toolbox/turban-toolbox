@@ -69,18 +69,62 @@ def test_level0_to_level1_missing(mss_conf_and_level0, missing):
         assert level1.sizes["time"] == nrecords - 2
         np.testing.assert_allclose(np.unique(dt), [1, 3])
         assert not np.isnan(press).any()
+        assert "inserted" not in level1
     else:
         assert level1.sizes["time"] == nrecords
         np.testing.assert_allclose(dt, 1)
+        assert np.flatnonzero(level1["inserted"].values).tolist() == [1000, 1001]
         if missing == "nan":
             assert np.isnan(press).sum() == 2
             assert np.isnan(press[1000:1002]).all()
+            # derived quantities are computed before masking, so the filters do
+            # not spread NaN beyond the inserted records
+            for name in ["PSPD_REL", "SHEAR"]:
+                isnan = np.isnan(level1[name].values).reshape(-1, nrecords)
+                assert np.flatnonzero(isnan.any(axis=0)).tolist() == [1000, 1001]
+                assert isnan[:, 1000:1002].all()
         else:
             assert not np.isnan(press).any()
             np.testing.assert_allclose(
                 press[1000:1002],
                 np.interp([1000, 1001], [999, 1002], press[[999, 1002]]),
             )
+
+
+def test_level0_to_level1_missing_external_pspd_rel(mss_conf_and_level0):
+    # external speed is filled at the gap together with the level0 channels
+    mss_conf, level0 = mss_conf_and_level0
+    mss_conf = mss_conf.model_copy(update={"pspd_rel_method": "external"})
+    nrecords = len(level0["index"])
+    pspd_rel = 0.5 + 1e-5 * np.arange(nrecords)
+    keep = np.delete(np.arange(nrecords), [1000, 1001])
+    level1 = level0_to_level1(
+        mss_conf, level0.isel(index=keep), pspd_rel=pspd_rel[keep], missing="nan"
+    )
+    pspd = level1["PSPD_REL"].values
+    assert np.isnan(pspd[1000:1002]).all()
+    np.testing.assert_allclose(np.delete(pspd, [1000, 1001]), pspd_rel[keep])
+
+    level1 = level0_to_level1(
+        mss_conf,
+        level0.isel(index=keep),
+        pspd_rel=pspd_rel[keep],
+        missing="interpolate",
+    )
+    np.testing.assert_allclose(level1["PSPD_REL"].values, pspd_rel)
+
+
+def test_level0_to_level1_no_count(mss_conf_and_level0, caplog):
+    mss_conf, level0 = mss_conf_and_level0
+    count_names = [k for k in level0.data_vars if str(k).upper() == "COUNT"]
+    assert count_names
+    with caplog.at_level("WARNING"):
+        level1 = level0_to_level1(mss_conf, level0.drop_vars(count_names))
+    assert "No COUNT channel found" in caplog.text
+    np.testing.assert_allclose(
+        level1["time_count"].values,
+        np.arange(len(level0["index"])) / mss_conf.sampling_freq,
+    )
 
 
 def test_level0_to_level1_missing_invalid(mss_conf_and_level0):

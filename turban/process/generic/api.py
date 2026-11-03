@@ -239,7 +239,7 @@ class AuxiliaryData(TimeseriesLevel):
         cls, ds: xr.Dataset
     ) -> AuxDataTypehintLevel12 | AuxDataTypehintLevel34:
         """Auxiliary data: all data variables not recognised as core fields.
-        
+
         NB! TURBAN currently has no way of saving/loading aggregation instructions
         for levels 1/2. This routine will assume a mean operation on level 1/2 aux
         data and that the variable keeps its name into level 3/4."""
@@ -304,12 +304,14 @@ class AuxiliaryData(TimeseriesLevel):
         If data is a 1D numpy array, uses simplified API.
         Must then supply `name`, `agg_method` and optionally `name_out`.
 
-        Otherwise, use the full API.
+        Otherwise, use the full API: the dict is merged into the existing aux data.
+        In both cases, variables already present in the aux data or defined on the
+        level itself are skipped with a warning. None leaves the aux data unchanged.
         """
         if data is None:
-            self._aux_data = {}
+            return
 
-        elif isinstance(data, ndarray):
+        if isinstance(data, ndarray):
             # Simplified API
             if agg_method is None:
                 raise ValueError("`agg_method` must not be None")
@@ -338,7 +340,7 @@ class AuxiliaryData(TimeseriesLevel):
                 for varname, v in data.items()
                 if not self._variable_present(varname)
             }
-            self._aux_data = data
+            self._aux_data = cast(dict, self._aux_data) | data
 
 
 @dataclass(kw_only=True)

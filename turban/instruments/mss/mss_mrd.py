@@ -419,8 +419,11 @@ def level0_to_level1(
     missing : {"nan", "interpolate"} or None, optional
         Handling of missing data records detected from the COUNT channel. None
         (default) keeps the records as they are, so that time is irregular at gaps.
-        "nan" inserts time steps filled with NaN, "interpolate" inserts linearly
-        interpolated time steps. Both also drop duplicate records.
+        "interpolate" inserts linearly interpolated records into the calibrated
+        channels before the derived quantities (PSAL, DENS, PSPD_REL, SHEAR, utemp)
+        are computed. "nan" does the same and then sets the inserted records to NaN
+        in all variables. Both drop duplicate records and add the boolean variable
+        "inserted". Gaps of 65536 records or more cannot be detected.
 
     Returns
     -------
@@ -443,17 +446,9 @@ def level0_to_level1(
 
         n_shear = range(len(shearsensors)) if shearsensors else range(1)
         # dummy dimension for NaN shear values
-        index = level0["index"]
-        nsamples = len(level0["index"])
 
-        level1_dataset = xr.Dataset(
-            coords={
-                "n_shear": n_shear,
-                "index": index,
-            },
-        )
-        # Time of each record since first sample from the COUNT channel, accounting
-        # for missing records. Used at the end to insert empty time steps.
+        # Sample number of each record from the COUNT channel, accounting for
+        # missing records
         count_sensornames = [k for k in level0.keys() if str(k).upper() == "COUNT"]
         if count_sensornames:
             time_record = count_to_time(
@@ -463,7 +458,39 @@ def level0_to_level1(
             logger.warning(
                 "No COUNT channel found, time assumes no missing data records"
             )
-            time_record = numpy.arange(nsamples) / mss_config.sampling_freq
+            time_record = numpy.arange(len(level0["index"])) / mss_config.sampling_freq
+        sample = numpy.round(time_record * mss_config.sampling_freq).astype(int)
+
+        # Optionally fill missing records (dropping duplicate records). The
+        # calibrated channels are always linearly interpolated onto the regular
+        # sample axis before the derived quantities are computed, because their
+        # filters (filtfilt, lfilter) assume a constant sampling frequency and
+        # would spread a single NaN over the whole profile. For missing="nan" the
+        # inserted records are set to NaN at the end.
+        if missing is not None:
+            _, keep = numpy.unique(sample, return_index=True)
+            sample_full = numpy.arange(sample[-1] + 1)
+            inserted = ~numpy.isin(sample_full, sample[keep])
+            if pspd_rel is not None:
+                pspd_rel = numpy.interp(
+                    sample_full, sample[keep], numpy.asarray(pspd_rel)[keep]
+                )
+            level0 = (
+                level0.isel(index=keep)
+                .assign_coords(index=sample[keep])
+                .interp(index=sample_full, method="linear")
+            )
+            sample = sample_full
+
+        index = level0["index"]
+        nsamples = len(level0["index"])
+
+        level1_dataset = xr.Dataset(
+            coords={
+                "n_shear": n_shear,
+                "index": index,
+            },
+        )
 
         # Create a time vector, TODO: This has to be improved alot!
         if False:  # Calculate time
@@ -572,18 +599,17 @@ def level0_to_level1(
             )[numpy.newaxis, :],
         )
 
-        # Optionally insert time steps for missing records (dropping duplicate records)
-        sample = numpy.round(time_record * mss_config.sampling_freq).astype(int)
+        # Mask the inserted records only after the derived quantities are computed
         if missing is not None:
-            _, keep = numpy.unique(sample, return_index=True)
-            level1_dataset = level1_dataset.isel(index=keep).assign_coords(
-                index=sample[keep]
-            )
-            sample = numpy.arange(sample[-1] + 1)
             if missing == "nan":
-                level1_dataset = level1_dataset.reindex(index=sample)
-            else:
-                level1_dataset = level1_dataset.interp(index=sample, method="linear")
+                level1_dataset = level1_dataset.where(
+                    xr.DataArray(~inserted, dims=["index"])
+                )
+            level1_dataset["inserted"] = (["index"], inserted)
+            level1_dataset["inserted"].attrs["description"] = (
+                "record missing in the MRD file (gap in COUNT), inserted by "
+                f'missing="{missing}"'
+            )
 
         time_count = sample / mss_config.sampling_freq
         level1_dataset["time_count"] = (["index"], time_count)

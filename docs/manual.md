@@ -43,21 +43,18 @@ with TemporaryDirectory() as tmpdir:
 
 ### Removal of coherent vibrations
 
-TURBAN has implemented the Goodman method as described in the ATOMIX shear paper. It is not activated by default since vibration channels are not required, but can be achieved in this way:
+TURBAN has implemented the Goodman method as described in the ATOMIX shear paper. Going from Level 2 to Level 3 removes the noise coherent with the aux variables named in `cfg.vibration_channels`. Their number $N_V$ enters `ShearConfig.log_psi_std` ($\sigma_{\ln\Psi}$). Every channel in `vibration_channels` must be present in the aux data, otherwise creating Level 3 raises a `KeyError`. A warning is logged if there are too few FFT segments per chunk for the number of vibration channels ($N_f - N_V \le 3$, Sec. 3.3.4 in the ATOMIX paper).
+
+By default, `vibration_channels` is empty, i.e. no vibration removal. Loading from an ATOMIX netCDF file, however, sets the vibration channels as implied by the file itself: the ATOMIX loaders of the levels (`ShearLevelN.from_atomix_netcdf`) set up the vibration signals in the file (`VIB`, else `ACC`) as aux data `VIB1, VIB2, ...` (`ACC1, ...`) and accordingly `vibration_channels`, so that processing from an ATOMIX Level 1 or 2 removes vibrations with these signals. They are taken from `L1_converted`, else `L2_cleaned`, at Level 1, and from `L2_cleaned`, else Level 1, at Level 2. `ShearConfig.from_atomix_netcdf` alone leaves `vibration_channels` empty, as it has no aux data. `ShearLevel3.from_atomix_netcdf` loads the cleaned spectra (`SH_SPEC_CLEAN`) if present.
 
 ```python
-import xarray as xr
 from turban import ShearLevel2, ShearLevel3
 from turban.utils.filepaths import atomix_benchmark_faroe_fpath
 
-ds = xr.load_dataset(atomix_benchmark_faroe_fpath, group="L2_cleaned")
-# now, add as many channels as desired to detect coherent vibrations
 l2 = ShearLevel2.from_atomix_netcdf(atomix_benchmark_faroe_fpath)
-l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=0).values, "vib1")
-l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=1).values, "vib2")
-l2.add_aux_data(ds.ACC.isel(N_ACC_SENSORS=2).values, "vib3")
-l2.cfg.vibration_channels = ("vib1", "vib2", "vib3")
-# now, propagation to ShearLevel3 will automatically remove these 
+assert l2.cfg.vibration_channels == ("ACC1", "ACC2", "ACC3")
+# any aux variables added with add_aux_data can be used, () switches removal off
+l2.cfg.vibration_channels = ("ACC1", "ACC2")
 l3 = ShearLevel3.from_level_below(l2)
 ```
 
@@ -91,7 +88,7 @@ level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
 
 ### Figure of merit and its ingredients
 
-ATOMIX defines as a poor figure of merit (FOM), i.e. $\mathrm{FOM} = \mathrm{MAD} / (\sigma_{\ln\Psi} T_M) > 1.4$, where the threshold of 1.4 is empirical. `ShearLevel4` stores the FOM as `fom` (and exports it with `to_xarray()`), as well as the ingredients needed to recompute it (`waveno_cutoff`, `log_diss_mad`, `num_spec_points`), including `log_psi_var` from `ShearLevel3`:
+ATOMIX defines as a poor figure of merit (FOM), i.e. $\mathrm{FOM} = \mathrm{MAD} / (\sigma_{\ln\Psi} T_M) > 1.4$, where the threshold of 1.4 is empirical. `ShearLevel4` stores the FOM as `fom` (and exports it with `to_xarray()`), as well as the ingredients needed to recompute it (`waveno_cutoff`, `log_diss_mad`, `num_spec_points`), including `log_psi_std` from the config (`ShearConfig.log_psi_std`):
 
 ```python
 import numpy as np
@@ -107,7 +104,7 @@ fom, log_diss_mad, num_spec_points = figure_of_merit(
     eps=l4.eps,
     molvisc=l4.molvisc,
     psi=l3.psi_k_sh,
-    log_psi_var=l3.log_psi_var,  # sigma_{ln Psi}
+    log_psi_std=l3.cfg.log_psi_std,  # sigma_{ln Psi}
 )
 # T_M in the ATOMIX paper
 tm = 0.8 + 1.25 / np.sqrt(num_spec_points)  
