@@ -7,7 +7,9 @@ from turban.process.generic.config import SegmentConfig
 
 type SpectrumModel = Literal["batchelor", "kraichnan"]
 # keys of FP07_RESPONSE_MODELS, or "none" for no response correction
-type FP07ResponseModelName = Literal["nash99", "rsi", "gm", "kocsis", "nash02", "sommer"]
+type FP07ResponseModelName = Literal[
+    "nash99", "rsi", "gm", "kocsis", "nash02", "sommer"
+]
 
 
 class FP07Response(BaseModel):
@@ -44,6 +46,16 @@ class UTempConfig(SegmentConfig):
     # --- Level 3: frequency response of the FP07 thermistor
     fp07_response: FP07Response | None = FP07_RESPONSE_MODELS["nash99"]
 
+    # --- Level 4: physical properties (if no auxiliary data `temp`)
+    molvisc_fallback: float = 1.6e-6  # [m2 s-1]
+    moldiff_fallback: float = 1.4e-7  # [m2 s-1]
+
+    # --- Level 4: spectral fitting
+    spectrum_model: SpectrumModel = "batchelor"
+    q_batchelor: float = 3.7  # Oakey (1982)
+    q_kraichnan: float = 5.26  # Bogucki et al. (1997)
+    waveno_limit_upper: float | None = None  # [cpm] optional hard upper limit
+
     @field_validator("fp07_response", mode="before")
     @classmethod
     def _resolve_fp07_response(cls, v):
@@ -58,3 +70,17 @@ class UTempConfig(SegmentConfig):
                     "or None."
                 ) from None
         return v
+
+    @property
+    def dof_spectrum(self) -> float:
+        """Degrees of freedom of the spectral estimates, 1.9 N_f (Nuttall 1971)."""
+        return 1.9 * self.number_fft_windows_per_chunk
+
+    @property
+    def q(self) -> float:
+        return {"batchelor": self.q_batchelor, "kraichnan": self.q_kraichnan}[
+            self.spectrum_model
+        ]
+
+
+#########################
