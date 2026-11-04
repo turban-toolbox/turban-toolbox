@@ -1,8 +1,60 @@
+from typing import Literal
+
+from pydantic import BaseModel, field_validator
+from enum import Enum
+
 from turban.process.generic.config import SegmentConfig
+
+type SpectrumModel = Literal["batchelor", "kraichnan"]
+# keys of FP07_RESPONSE_MODELS, or "none" for no response correction
+type FP07ResponseModelName = Literal["nash99", "rsi", "gm", "kocsis", "nash02", "sommer"]
+
+
+class FP07Response(BaseModel):
+    # tau = tau0 * (W / 1 m s-1) ** exponent
+    name: FP07ResponseModelName
+    tau0: float  # response time [s]
+    gamma: float  # exponent of speed,
+    npoles: int  # number of poles
+
+
+FP07_RESPONSE_MODELS: dict[FP07ResponseModelName, FP07Response] = {
+    # Nash et al. (1999), as in Piccolroaz et al. (2021)
+    "nash99": FP07Response(name="nash99", tau0=7e-3, gamma=-0.12, npoles=1),
+    # Vachon & Lueck (1984), RSI default (F0 = 25 W^0.5)
+    "rsi": FP07Response(name="rsi", tau0=4.1e-3, gamma=-0.5, npoles=2),
+    # Gregg & Meagher (1980)
+    "gm": FP07Response(name="gm", tau0=10.6e-3, gamma=-0.32, npoles=2),
+    # Kocsis et al. (1999)
+    "kocsis": FP07Response(name="kocsis", tau0=7e-3, gamma=-0.32, npoles=2),
+    # Nash et al. (2002) according to Sommer et al. (2013)
+    "nash02": FP07Response(name="nash02", tau0=8.5e-3, gamma=0.0, npoles=2),
+    # Sommer et al. (2013)
+    "sommer": FP07Response(name="sommer", tau0=10e-3, gamma=0.0, npoles=2),
+}
 
 
 class UTempConfig(SegmentConfig):
-    """Configures processing of timeseries using temperature gradient spectra."""
+    """Configures processing of timeseries using temperature gradient spectra.
 
-    waveno_limit_upper: float = 500.0
-    diff_gain: float
+    OBS: fp07_response can also be instantiated as string (one of keys of
+    FP07_RESPONSE_MODELS)
+    """
+
+    # --- Level 3: frequency response of the FP07 thermistor
+    fp07_response: FP07Response | None = FP07_RESPONSE_MODELS["nash99"]
+
+    @field_validator("fp07_response", mode="before")
+    @classmethod
+    def _resolve_fp07_response(cls, v):
+        if isinstance(v, str):
+            try:
+                return FP07_RESPONSE_MODELS[v]
+            except KeyError:
+                raise ValueError(
+                    f"Unknown FP07 response model {v!r}. "
+                    f"Choose one of {sorted(FP07_RESPONSE_MODELS)}, "
+                    "pass an FP07Response compliant dict or similar,"
+                    "or None."
+                ) from None
+        return v
