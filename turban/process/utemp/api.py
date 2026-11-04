@@ -193,7 +193,7 @@ class UTempLevel4(Level4[UTempLevel3]):
     kbatch_ci: Float[ndarray, "ntemp time"]
     likelihood_ratio: Float[ndarray, "ntemp time"]
     mad_ratio: Float[ndarray, "ntemp time"]
-    mad_powerlaw: Float[ndarray, "ntemp time"]
+    mad_ratio_pow: Float[ndarray, "ntemp time"]
     molvisc: Float[ndarray, "time"]
     moldiff: Float[ndarray, "time"]
     cfg: UTempConfig
@@ -240,7 +240,7 @@ class UTempLevel4(Level4[UTempLevel3]):
             kbatch_ci,
             likelihood_ratio,
             mad_ratio,
-            mad_powerlaw,
+            mad_ratio_pow,
         ) = temperature_dissipation(
             psi_k_gradt=level3.psi_k_gradt,
             waveno=level3.waveno,
@@ -266,7 +266,7 @@ class UTempLevel4(Level4[UTempLevel3]):
                 kbatch_ci=kbatch_ci,
                 likelihood_ratio=likelihood_ratio,
                 mad_ratio=mad_ratio,
-                mad_powerlaw=mad_powerlaw,
+                mad_ratio_pow=mad_ratio_pow,
                 molvisc=molvisc,
                 moldiff=moldiff,
             )
