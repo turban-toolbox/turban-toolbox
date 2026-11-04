@@ -42,7 +42,7 @@ def temperature_dissipation(
     Float[ndarray, "ntemp time"],  # kbatch_ci
     Float[ndarray, "ntemp time"],  # likelihood_ratio
     Float[ndarray, "ntemp time"],  # mad_ratio
-    Float[ndarray, "ntemp time"],  # mad_powerlaw
+    Float[ndarray, "ntemp time"],  # mad_ratio_pow
 ]:
     """Temperature variance dissipation (chi) and TKE dissipation (eps).
 
@@ -77,7 +77,7 @@ def temperature_dissipation(
     -------
     chi : ndarray, shape (n_temp, time_slow)
         Temperature variance dissipation in K2 s-1.
-    eps, eps_lower, eps_upper, kbatch, kbatch_ci, likelihood_ratio, mad_ratio, mad_powerlaw
+    eps, eps_lower, eps_upper, kbatch, kbatch_ci, likelihood_ratio, mad_ratio, mad_ratio_pow
         See ``tke_dissipation``.
 
     All values are NaN where fewer than ``_MIN_POINTS_ABOVE_NOISE`` spectral values
@@ -154,7 +154,7 @@ def temperature_dissipation(
         chi,
         likelihood_ratio,
         mad_ratio,
-        mad_powerlaw,
+        mad_ratio_pow,
     ) = kbat_mle_fine(
         waveno,
         psi_k_gradt,
@@ -186,7 +186,7 @@ def temperature_dissipation(
         kbatch_ci,
         likelihood_ratio,
         mad_ratio,
-        mad_powerlaw,
+        mad_ratio_pow,
     )
     return tuple(np.where(is_valid, x, np.nan) for x in out)
 
@@ -210,7 +210,7 @@ def kbat_mle_fine(
     Float[ndarray, "n_temp time_slow"],  # chi
     Float[ndarray, "n_temp time_slow"],  # likelihood_ratio
     Float[ndarray, "n_temp time_slow"],  # mad_ratio
-    Float[ndarray, "n_temp time_slow"],  # mad_powerlaw
+    Float[ndarray, "n_temp time_slow"],  # mad_ratio_pow
 ]:
     """Maximum likelihood fit of the Batchelor wavenumber (fine search, 2nd pass).
 
@@ -255,7 +255,7 @@ def kbat_mle_fine(
         Temperature variance dissipation from the fitted spectrum in K2 s-1.
     likelihood_ratio : ndarray, shape (n_temp, time_slow)
         Likelihood of the fit relative to that of a power law.
-    mad_ratio, mad_powerlaw : ndarray, shape (n_temp, time_slow)
+    mad_ratio, mad_ratio_pow : ndarray, shape (n_temp, time_slow)
         Mean absolute deviation of psi / psi_fit for the fitted theoretical
         spectrum and for the power law.
 
@@ -350,7 +350,7 @@ def kbat_mle_fine(
 
         # 7. MAD (lines 367-370)
         mad_ratio = _mad_ratio(psi_k_gradt / (psi_fit + psi_noise_), fit_mask)
-        mad_powerlaw = _mad_ratio(psi_k_gradt / psi_powerlaw, fit_mask)
+        mad_ratio_pow = _mad_ratio(psi_k_gradt / psi_powerlaw, fit_mask)
 
     out = (
         kbatch,
@@ -358,7 +358,7 @@ def kbat_mle_fine(
         chi_fit,
         likelihood_ratio,
         mad_ratio,
-        mad_powerlaw,
+        mad_ratio_pow,
     )
     return tuple(np.where(is_valid, x, np.nan) for x in out)
 
