@@ -6,6 +6,8 @@ import numpy as np
 
 from turban.utils.util import agg_fast_to_slow
 from turban.process.utemp.config import UTempConfig
+from turban.variables import VARIABLES
+from turban.process.utemp.variables import VARIABLES_UTEMP
 from turban.process.utemp.level3 import temperature_gradient_spectra
 from turban.process.utemp.level4 import temperature_dissipation
 from turban.process.generic.api import (
@@ -21,6 +23,8 @@ from turban.utils.logging import get_logger
 from turban.utils.seawater import diffusivity_temp, viscosity_kinematic
 
 logger = get_logger(__name__)
+
+_VOCABULARY = [VARIABLES, VARIABLES_UTEMP]
 
 
 @dataclass(kw_only=True)
@@ -39,6 +43,8 @@ class UTempLevel1(Level1):
     spectral_correction: Float[ndarray, "freq"] | None = None
     cfg: UTempConfig
 
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
+
 
 @dataclass(kw_only=True)
 class UTempLevel2(Level2[UTempLevel1]):
@@ -50,6 +56,8 @@ class UTempLevel2(Level2[UTempLevel1]):
     dtempdt: Float[ndarray, "ntemp time"]
     section_number: Int[ndarray, "time"]
     cfg: UTempConfig
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel1
 
@@ -94,6 +102,8 @@ class UTempLevel3(Level3[UTempLevel2]):
     psi_noise: Float[ndarray, "ntemp waveno"]
     psi_f_gradt: Float[ndarray, "ntemp time waveno"]
     cfg: UTempConfig
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel2
 
@@ -179,14 +189,16 @@ class UTempLevel4(Level4[UTempLevel3]):
     eps: Float[ndarray, "ntemp time"]
     eps_lower: Float[ndarray, "ntemp time"]
     eps_upper: Float[ndarray, "ntemp time"]
-    waveno_batchelor: Float[ndarray, "ntemp time"]
-    waveno_batchelor_ci: Float[ndarray, "ntemp time"]
+    kbatch: Float[ndarray, "ntemp time"]
+    kbatch_ci: Float[ndarray, "ntemp time"]
     likelihood_ratio: Float[ndarray, "ntemp time"]
-    mad: Float[ndarray, "ntemp time"]
+    mad_ratio: Float[ndarray, "ntemp time"]
     mad_powerlaw: Float[ndarray, "ntemp time"]
     molvisc: Float[ndarray, "time"]
     moldiff: Float[ndarray, "time"]
     cfg: UTempConfig
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel3
 
@@ -224,10 +236,10 @@ class UTempLevel4(Level4[UTempLevel3]):
             eps,
             eps_lower,
             eps_upper,
-            waveno_batchelor,
-            waveno_batchelor_ci,
+            kbatch,
+            kbatch_ci,
             likelihood_ratio,
-            mad,
+            mad_ratio,
             mad_powerlaw,
         ) = temperature_dissipation(
             psi_k_gradt=level3.psi_k_gradt,
@@ -250,10 +262,10 @@ class UTempLevel4(Level4[UTempLevel3]):
                 eps=eps,
                 eps_lower=eps_lower,
                 eps_upper=eps_upper,
-                waveno_batchelor=waveno_batchelor,
-                waveno_batchelor_ci=waveno_batchelor_ci,
+                kbatch=kbatch,
+                kbatch_ci=kbatch_ci,
                 likelihood_ratio=likelihood_ratio,
-                mad=mad,
+                mad_ratio=mad_ratio,
                 mad_powerlaw=mad_powerlaw,
                 molvisc=molvisc,
                 moldiff=moldiff,
@@ -263,8 +275,7 @@ class UTempLevel4(Level4[UTempLevel3]):
 
 
 class UTempProcessing(Processing):
-    """Microtemperature processing pipeline from any start level up to ``UTempLevel4``.
-    """
+    """Microtemperature processing pipeline from any start level up to ``UTempLevel4``."""
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
         Level.level1: UTempLevel1,

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from turban.process.utemp.level4 import (
-    eps_from_k_batchelor,
+    eps_from_kbatch,
     temperature_dissipation,
     theoretical_spectrum,
 )
@@ -10,12 +10,12 @@ from turban.process.utemp.level4 import (
 MOLVISC, MOLDIFF = 1.6e-6, 1.4e-7
 
 
-def _synthetic(model, q, k_batchelor, chi, noise, ntime=3):
+def _synthetic(model, q, kbatch, chi, noise, ntime=3):
     freq = np.fft.rfftfreq(2048, 1 / 1024)
     senspeed = np.linspace(0.6, 1.0, ntime)
     waveno = freq[np.newaxis, :] / senspeed[:, np.newaxis]
     psi_noise = np.full((1, len(freq)), noise)
-    psi = theoretical_spectrum(model, waveno, k_batchelor, chi, MOLDIFF, q)
+    psi = theoretical_spectrum(model, waveno, kbatch, chi, MOLDIFF, q)
     return waveno, psi[np.newaxis] + psi_noise[:, np.newaxis, :], psi_noise
 
 
@@ -37,14 +37,14 @@ def _run(waveno, psi, psi_noise, model, q):
 
 @pytest.mark.parametrize("model,q", [("batchelor", 3.7), ("kraichnan", 5.26)])
 def test_temperature_dissipation_synthetic(model, q):
-    k_batchelor, chi = 150.0, 1e-8
-    waveno, psi, psi_noise = _synthetic(model, q, k_batchelor, chi, 1e-7)
+    kbatch, chi = 150.0, 1e-8
+    waveno, psi, psi_noise = _synthetic(model, q, kbatch, chi, 1e-7)
     chi_est, eps, eps_lower, eps_upper, kb, kb_ci, *_ = _run(
         waveno, psi, psi_noise, model, q
     )
-    assert np.allclose(kb, k_batchelor, rtol=0.03)
+    assert np.allclose(kb, kbatch, rtol=0.03)
     assert np.allclose(chi_est, chi, rtol=0.1)
-    eps_true = eps_from_k_batchelor(np.array([[k_batchelor]]), MOLVISC, MOLDIFF)
+    eps_true = eps_from_kbatch(np.array([[kbatch]]), MOLVISC, MOLDIFF)
     assert np.allclose(eps, eps_true, rtol=0.15)
     assert np.all((eps_lower <= eps) & (eps <= eps_upper))
 

@@ -79,6 +79,10 @@ class TimeseriesLevel:
     cfg: SegmentConfig  # only define this here - other levels get it through HasLevelBelow
     _coords: ClassVar[list[str]] = ["time"]
     _level: ClassVar[Level]
+    # Variable vocabularies (``{varname: {attribute: value}}``) used for variable
+    # attributes in ``to_xarray``. Later entries take precedence. Subclasses may
+    # extend this, e.g. for method-specific variables.
+    vocabulary: ClassVar[list[dict]] = [VARIABLES]
 
     def arrays_as_xr_dicts(self):
         """Separate array-typed fields into data-variable and coordinate dicts.
@@ -102,11 +106,18 @@ class TimeseriesLevel:
         coords = {k: v for k, v in dct.items() if k in self._coords}
         return data_vars, coords
 
-    def to_xarray(self) -> xr.Dataset:
+    def to_xarray(self, vocabulary: list[dict] | None = None) -> xr.Dataset:
         """Export this level to an xarray Dataset.
 
         Only this level is exported, not ``level_below``. To export the whole
         pipeline, use ``Processing.to_xarray``.
+
+        Parameters
+        ----------
+        vocabulary : list of dict, optional
+            Variable vocabularies to take variable attributes from, in the form
+            ``{varname: {attribute: value}}``. Later entries take precedence.
+            Defaults to the class attribute ``vocabulary``.
 
         Returns
         -------
@@ -114,10 +125,13 @@ class TimeseriesLevel:
             Dataset containing all array fields as data variables and coordinates,
             with TURBAN standard attributes and config stored as global attributes.
         """
+        if vocabulary is None:
+            vocabulary = self.vocabulary
         data_vars, coords = self.arrays_as_xr_dicts()
         ds = xr.Dataset(data_vars=data_vars, coords=coords)
         for varname in set(list(ds.data_vars) + list(ds.coords)):
-            ds[varname].attrs.update(VARIABLES.get(varname, {}))
+            for v in vocabulary:
+                ds[varname].attrs.update(v.get(varname, {}))
 
         # add config as global attributes
         self.cfg.add_to_xarray(ds)
@@ -664,8 +678,11 @@ class Processing:
         else:
             return self.level2.time.shape[-1]
 
-    def to_xarray(self) -> xr.DataTree:
+    def to_xarray(self, vocabulary: list[dict] | None = None) -> xr.DataTree:
         """Export all available levels to a DataTree with nodes ``level1`` ... ``level4``.
+
+        ``vocabulary`` is passed on to each level's ``to_xarray``; by default every
+        level uses its class attribute ``vocabulary``.
 
         Auxiliary data shared with the level below (Level2 from Level1, Level4
         from Level3) are only stored on the lower level.
@@ -675,7 +692,7 @@ class Processing:
         out_data = {}
         for data in [self.level1, self.level2, self.level3, self.level4]:
             if data is not None:
-                out = data.to_xarray()
+                out = data.to_xarray(vocabulary)
                 source = aux_source.get(data._level)
                 if source is not None:
                     out = out.drop_vars(list(source.aux_data), errors="ignore")

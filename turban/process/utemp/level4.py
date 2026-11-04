@@ -38,10 +38,10 @@ def temperature_dissipation(
     Float[ndarray, "ntemp time"],  # eps
     Float[ndarray, "ntemp time"],  # eps_lower
     Float[ndarray, "ntemp time"],  # eps_upper
-    Float[ndarray, "ntemp time"],  # k_batchelor
-    Float[ndarray, "ntemp time"],  # k_batchelor_ci
+    Float[ndarray, "ntemp time"],  # kbatch
+    Float[ndarray, "ntemp time"],  # kbatch_ci
     Float[ndarray, "ntemp time"],  # likelihood_ratio
-    Float[ndarray, "ntemp time"],  # mad
+    Float[ndarray, "ntemp time"],  # mad_ratio
     Float[ndarray, "ntemp time"],  # mad_powerlaw
 ]:
     """Temperature variance dissipation (chi) and TKE dissipation (eps).
@@ -77,7 +77,7 @@ def temperature_dissipation(
     -------
     chi : ndarray, shape (n_temp, time_slow)
         Temperature variance dissipation in K2 s-1.
-    eps, eps_lower, eps_upper, k_batchelor, k_batchelor_ci, likelihood_ratio, mad, mad_powerlaw
+    eps, eps_lower, eps_upper, kbatch, kbatch_ci, likelihood_ratio, mad_ratio, mad_powerlaw
         See ``tke_dissipation``.
 
     All values are NaN where fewer than ``_MIN_POINTS_ABOVE_NOISE`` spectral values
@@ -90,7 +90,7 @@ def temperature_dissipation(
 
     chi = integrate_chi(waveno, psi_k_gradt, psi_noise, waveno_upper, moldiff)
 
-    # first pass coarse search for k_batchelor
+    # first pass coarse search for kbatch
     kb_est1, coarse_range = kbat_mle_coarse(
         chi,
         waveno,
@@ -149,11 +149,11 @@ def temperature_dissipation(
     chi = chi + chi_low + chi_high
 
     (
-        k_batchelor,
-        k_batchelor_ci,
+        kbatch,
+        kbatch_ci,
         chi,
         likelihood_ratio,
-        mad,
+        mad_ratio,
         mad_powerlaw,
     ) = kbat_mle_fine(
         waveno,
@@ -170,11 +170,11 @@ def temperature_dissipation(
         dof,
     )
 
-    eps = eps_from_k_batchelor(k_batchelor, molvisc, moldiff)
-    eps_lower = eps_from_k_batchelor(
-        np.maximum(k_batchelor - k_batchelor_ci, 0.0), molvisc, moldiff
+    eps = eps_from_kbatch(kbatch, molvisc, moldiff)
+    eps_lower = eps_from_kbatch(
+        np.maximum(kbatch - kbatch_ci, 0.0), molvisc, moldiff
     )
-    eps_upper = eps_from_k_batchelor(k_batchelor + k_batchelor_ci, molvisc, moldiff)
+    eps_upper = eps_from_kbatch(kbatch + kbatch_ci, molvisc, moldiff)
 
 
     out = (
@@ -182,10 +182,10 @@ def temperature_dissipation(
         eps,
         eps_lower,
         eps_upper,
-        k_batchelor,
-        k_batchelor_ci,
+        kbatch,
+        kbatch_ci,
         likelihood_ratio,
-        mad,
+        mad_ratio,
         mad_powerlaw,
     )
     return tuple(np.where(is_valid, x, np.nan) for x in out)
@@ -194,7 +194,7 @@ def temperature_dissipation(
 def kbat_mle_fine(
     waveno: Float[ndarray, "time_slow waveno"],
     psi_k_gradt: Float[ndarray, "n_temp time_slow waveno"],
-    k_batchelor_estimates: Float[ndarray, "n_temp time_slow"],
+    kbatch_estimates: Float[ndarray, "n_temp time_slow"],
     search_halfwidth: Float[ndarray, "n_temp time_slow"],
     chi: Float[ndarray, "n_temp time_slow"],
     psi_noise: Float[ndarray, "n_temp waveno"],
@@ -205,11 +205,11 @@ def kbat_mle_fine(
     q: float,
     dof: float,
 ) -> tuple[
-    Float[ndarray, "n_temp time_slow"],  # k_batchelor
-    Float[ndarray, "n_temp time_slow"],  # k_batchelor_ci
+    Float[ndarray, "n_temp time_slow"],  # kbatch
+    Float[ndarray, "n_temp time_slow"],  # kbatch_ci
     Float[ndarray, "n_temp time_slow"],  # chi
     Float[ndarray, "n_temp time_slow"],  # likelihood_ratio
-    Float[ndarray, "n_temp time_slow"],  # mad
+    Float[ndarray, "n_temp time_slow"],  # mad_ratio
     Float[ndarray, "n_temp time_slow"],  # mad_powerlaw
 ]:
     """Maximum likelihood fit of the Batchelor wavenumber (fine search, 2nd pass).
@@ -220,10 +220,10 @@ def kbat_mle_fine(
         Wavenumber in cpm.
     psi_k_gradt : ndarray, shape (n_temp, time_slow, waveno)
         Observed temperature gradient spectra in K2 m-2 cpm-1.
-    k_batchelor_estimates : ndarray, shape (n_temp, time_slow)
-        Rough estimate of the Batchelor wavenumber in cpm (``k_batchelor_mle``).
+    kbatch_estimates : ndarray, shape (n_temp, time_slow)
+        Rough estimate of the Batchelor wavenumber in cpm (``kbatch_mle``).
     search_halfwidth : ndarray, shape (n_temp, time_slow)
-        Half width of the fine search in cpm (``k_batchelor_mle``).
+        Half width of the fine search in cpm (``kbatch_mle``).
     chi : ndarray, shape (n_temp, time_slow)
         Temperature variance dissipation corrected for unresolved variance [K2 s-1].
     psi_noise : ndarray, shape (n_temp, waveno)
@@ -247,15 +247,15 @@ def kbat_mle_fine(
         TKE dissipation rate in W kg-1.
     eps_lower, eps_upper : ndarray, shape (n_temp, time_slow)
         eps at the lower/upper bound of the 95 % confidence interval of k_B.
-    k_batchelor : ndarray, shape (n_temp, time_slow)
+    kbatch : ndarray, shape (n_temp, time_slow)
         Batchelor wavenumber in cpm.
-    k_batchelor_ci : ndarray, shape (n_temp, time_slow)
+    kbatch_ci : ndarray, shape (n_temp, time_slow)
         Half width of the 95 % confidence interval of k_B in cpm.
     chi : ndarray, shape (n_temp, time_slow)
         Temperature variance dissipation from the fitted spectrum in K2 s-1.
     likelihood_ratio : ndarray, shape (n_temp, time_slow)
         Likelihood of the fit relative to that of a power law.
-    mad, mad_powerlaw : ndarray, shape (n_temp, time_slow)
+    mad_ratio, mad_powerlaw : ndarray, shape (n_temp, time_slow)
         Mean absolute deviation of psi / psi_fit for the fitted theoretical
         spectrum and for the power law.
 
@@ -265,12 +265,12 @@ def kbat_mle_fine(
     psi_noise_ = psi_noise[:, newaxis, :]
 
     # 1. fine search
-    k_lo = np.maximum(0.0, k_batchelor_estimates - search_halfwidth)
-    k_hi = k_batchelor_estimates + search_halfwidth
+    k_lo = np.maximum(0.0, kbatch_estimates - search_halfwidth)
+    k_hi = kbatch_estimates + search_halfwidth
     k_trial: Float[ndarray, "kbatch n_temp time_slow"] = np.linspace(
         k_lo, k_hi, _N_TRIAL_FINE
     )
-    cost = get_k_batchelor_costfunc(
+    cost = get_kbatch_costfunc(
         k_trial,
         chi,
         waveno,
@@ -288,7 +288,7 @@ def kbat_mle_fine(
 
     # polynomial refinement for numerical conditioning
     # TODO LATER fails for small k_B if the fine search window is wide compared to the
-    # width of the likelihood peak (see k_batchelor_mle)
+    # width of the likelihood peak (see kbatch_mle)
     dk = (k_hi - k_lo) / (_N_TRIAL_FINE - 1)
     k_mid = np.take_along_axis(k_trial, idx_max[newaxis], axis=0)[0]
     offset = np.arange(-_POLYFIT_HALFWIDTH, _POLYFIT_HALFWIDTH + 1)
@@ -315,10 +315,10 @@ def kbat_mle_fine(
         np.argmin(np.abs(_polyval(dcoef, x_grid)), axis=-1)[..., newaxis],
         axis=-1,
     )[..., 0]
-    k_batchelor = k_mid + x_best * dk
+    kbatch = k_mid + x_best * dk
     with np.errstate(divide="ignore", invalid="ignore"):
-        var_k_batchelor = -1 / (_polyval(ddcoef, x_best) / dk**2)
-    k_batchelor_ci = 1.96 * np.sqrt(np.abs(var_k_batchelor))
+        var_kbatch = -1 / (_polyval(ddcoef, x_best) / dk**2)
+    kbatch_ci = 1.96 * np.sqrt(np.abs(var_kbatch))
 
     # power law fit and likelihood ratio
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -339,7 +339,7 @@ def kbat_mle_fine(
         psi_fit = theoretical_spectrum(
             spectrum_model,
             waveno[newaxis],
-            k_batchelor[..., newaxis],
+            kbatch[..., newaxis],
             chi[..., newaxis],
             moldiff[:, newaxis],
             q,
@@ -349,15 +349,15 @@ def kbat_mle_fine(
         )
 
         # 7. MAD (lines 367-370)
-        mad = _mad_ratio(psi_k_gradt / (psi_fit + psi_noise_), fit_mask)
+        mad_ratio = _mad_ratio(psi_k_gradt / (psi_fit + psi_noise_), fit_mask)
         mad_powerlaw = _mad_ratio(psi_k_gradt / psi_powerlaw, fit_mask)
 
     out = (
-        k_batchelor,
-        k_batchelor_ci,
+        kbatch,
+        kbatch_ci,
         chi_fit,
         likelihood_ratio,
-        mad,
+        mad_ratio,
         mad_powerlaw,
     )
     return tuple(np.where(is_valid, x, np.nan) for x in out)
@@ -376,7 +376,7 @@ def kbat_mle_coarse(
     n_trial: int,
     dof: float,
 ) -> tuple[
-    Float[ndarray, "n_temp time_slow"],  # k_batchelor_estimates
+    Float[ndarray, "n_temp time_slow"],  # kbatch_estimates
     Float[ndarray, "n_temp time_slow"],  # search_halfwidth
 ]:
     """Rough maximum likelihood search for the Batchelor wavenumber.
@@ -411,7 +411,7 @@ def kbat_mle_coarse(
 
     Returns
     -------
-    k_batchelor_estimates : ndarray, shape (n_temp, time_slow)
+    kbatch_estimates : ndarray, shape (n_temp, time_slow)
         Rough estimate of the Batchelor wavenumber in cpm.
     search_halfwidth : ndarray, shape (n_temp, time_slow)
         Half width of the fine search in cpm.
@@ -426,7 +426,7 @@ def kbat_mle_coarse(
     k_test: Float[ndarray, "kbatch"] = np.linspace(kmin, kmax, n_trial)
     step = k_test[1] - k_test[0]
 
-    cost: Float[ndarray, "kbatch n_temp time_slow"] = get_k_batchelor_costfunc(
+    cost: Float[ndarray, "kbatch n_temp time_slow"] = get_kbatch_costfunc(
         k_test[:, newaxis, newaxis],
         chi,
         waveno,
@@ -439,7 +439,7 @@ def kbat_mle_coarse(
         dof,
     )
     idx: Int[ndarray, "n_temp time_slow"] = np.argmax(cost, axis=0)
-    k_batchelor_estimates = k_test[idx]
+    kbatch_estimates = k_test[idx]
 
     # curvature of the cost function at its maximum
     def cost_at(i):
@@ -450,7 +450,7 @@ def kbat_mle_coarse(
             2 * cost_at(idx) - cost_at(idx - 1) - cost_at(idx + 1)
         )
     search_halfwidth = np.where(np.isfinite(delta_k), np.maximum(delta_k, step), step)
-    return k_batchelor_estimates, search_halfwidth
+    return kbatch_estimates, search_halfwidth
 
 
 def get_waveno_upper(
@@ -533,7 +533,7 @@ def integrate_chi(
 def integrate_batchelor_theoretical(
     waveno_from: Float[ndarray, "n_temp time"],
     waveno_to: Float[ndarray, "n_temp time"],
-    k_batchelor: Float[ndarray, "n_temp time"],
+    kbatch: Float[ndarray, "n_temp time"],
     waveno: Float[ndarray, "time waveno"],
     chi: Float[ndarray, "n_temp time"],
     moldiff: Float[ndarray, "time"],
@@ -544,7 +544,7 @@ def integrate_batchelor_theoretical(
     psi: Float[ndarray, "n_temp time waveno"] = theoretical_spectrum(
         spectrum_model,
         waveno[newaxis],
-        k_batchelor[..., newaxis],
+        kbatch[..., newaxis],
         chi[..., newaxis],
         moldiff[:, newaxis],
         q,
@@ -552,8 +552,8 @@ def integrate_batchelor_theoretical(
     return integrate(psi, waveno, waveno_from, waveno_to)
 
 
-def get_k_batchelor_costfunc(
-    k_batchelor_test: Float[ndarray, "kbatch #n_temp #time"],
+def get_kbatch_costfunc(
+    kbatch_test: Float[ndarray, "kbatch #n_temp #time"],
     chi: Float[ndarray, "n_temp time"],
     waveno: Float[ndarray, "time waveno"],
     psi: Float[ndarray, "n_temp time waveno"],
@@ -573,7 +573,7 @@ def get_k_batchelor_costfunc(
             theoretical_spectrum(
                 spectrum_model,
                 waveno[newaxis, newaxis],
-                k_batchelor_test[..., newaxis],
+                kbatch_test[..., newaxis],
                 chi[newaxis, ..., newaxis],
                 moldiff[:, newaxis],
                 q,
@@ -620,13 +620,13 @@ def costfunction_c11(
     return np.sum(np.where(fit_mask, log_l, 0.0), axis=-1) / np.sum(fit_mask, axis=-1)
 
 
-def eps_from_k_batchelor(
-    k_batchelor: Float[ndarray, "..."],
+def eps_from_kbatch(
+    kbatch: Float[ndarray, "..."],
     molvisc: Float[ndarray, "..."] | float,
     moldiff: Float[ndarray, "..."] | float,
 ) -> Float[ndarray, "..."]:
     """TKE dissipation eps = nu D^2 (2 pi k_B)^4, k_B in cpm (Batchelor 1959)."""
-    return molvisc * moldiff**2 * (2 * np.pi * k_batchelor) ** 4
+    return molvisc * moldiff**2 * (2 * np.pi * kbatch) ** 4
 
 
 def _waveno_mask(
@@ -679,7 +679,7 @@ _SHAPES = {"batchelor": _shape_batchelor, "kraichnan": _shape_kraichnan}
 def theoretical_spectrum(
     model: SpectrumModel,
     waveno: Float[ndarray, "..."],
-    k_batchelor: Float[ndarray, "..."] | float,
+    kbatch: Float[ndarray, "..."] | float,
     chi: Float[ndarray, "..."] | float,
     moldiff: Float[ndarray, "..."] | float,
     q: float,
@@ -695,7 +695,7 @@ def theoretical_spectrum(
         Spectral form.
     waveno : ndarray
         Wavenumber [cpm].
-    k_batchelor : ndarray or float
+    kbatch : ndarray or float
         Batchelor wavenumber [cpm], broadcast against `waveno`.
     chi : ndarray or float
         Dissipation rate of temperature variance [K2 s-1].
@@ -704,5 +704,5 @@ def theoretical_spectrum(
     q : float
         Universal constant of the spectrum.
     """
-    y = waveno * np.sqrt(2 * q) / k_batchelor
-    return chi / (2 * moldiff * k_batchelor) * np.sqrt(2 * q) * _SHAPES[model](y)
+    y = waveno * np.sqrt(2 * q) / kbatch
+    return chi / (2 * moldiff * kbatch) * np.sqrt(2 * q) * _SHAPES[model](y)
