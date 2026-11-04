@@ -1,20 +1,14 @@
-from typing import ClassVar, Literal, cast
+from typing import ClassVar, cast
 from dataclasses import dataclass
 from jaxtyping import Float, Int
-from netCDF4 import Dataset
-from numpy import newaxis, nan, ndarray
+from numpy import ndarray
 import numpy as np
-import xarray as xr
 
 from turban.utils.util import agg_fast_to_slow
 from turban.process.utemp.config import UTempConfig
-
-# from turban.process.utemp.level2 import process_level2
 from turban.process.utemp.level3 import temperature_gradient_spectra
 from turban.process.utemp.level4 import temperature_dissipation
 from turban.process.generic.api import (
-    AuxDataTypehintLevel12,
-    AuxDataTypehintLevel34,
     Level1,
     Level2,
     Level3,
@@ -54,6 +48,7 @@ class UTempLevel2(Level2[UTempLevel1]):
     """
 
     dtempdt: Float[ndarray, "ntemp time"]
+    section_number: Int[ndarray, "time"]
     cfg: UTempConfig
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel1
@@ -171,37 +166,105 @@ class UTempLevel3(Level3[UTempLevel2]):
 
 
 @dataclass(kw_only=True)
-class UTempLevel4(Level4):
+class UTempLevel4(Level4[UTempLevel3]):
+    """Microtemperature Level 4: dissipation rates of temperature variance (chi) and
+    TKE (eps) from a maximum likelihood spectral fit, derived from ``UTempLevel3``.
+
+    Viscosity and diffusivity are computed from the auxiliary variable ``temp`` if
+    present, otherwise ``cfg.molvisc_fallback`` and ``cfg.moldiff_fallback`` are
+    used.
+    """
+
     chi: Float[ndarray, "ntemp time"]
     eps: Float[ndarray, "ntemp time"]
+    eps_lower: Float[ndarray, "ntemp time"]
+    eps_upper: Float[ndarray, "ntemp time"]
+    waveno_batchelor: Float[ndarray, "ntemp time"]
+    waveno_batchelor_ci: Float[ndarray, "ntemp time"]
+    likelihood_ratio: Float[ndarray, "ntemp time"]
+    mad: Float[ndarray, "ntemp time"]
+    mad_powerlaw: Float[ndarray, "ntemp time"]
+    molvisc: Float[ndarray, "time"]
+    moldiff: Float[ndarray, "time"]
+    cfg: UTempConfig
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = UTempLevel3
 
     @classmethod
     def _from_level_below_kwarg(
         cls,
-        level3: UTempLevel3,
+        data: UTempLevel3,
     ) -> dict:
+        kwarg = super()._from_level_below_kwarg(data)
+        level3 = data
         cfg = cast(UTempConfig, level3.cfg)
-        kwarg = super()._from_level_below_kwarg(level3)
 
-        chi, eps = temperature_dissipation(
-            psi_k=level3.psi_k,
+        # so linters understand we have a dict after __post_init__
+        aux_data = cast(dict, level3._aux_data)
+        ntime = len(level3.time)
+        if "temp" in aux_data:
+            # level 3 aux data entries are (dims, arr, attrs)
+            temp = aux_data["temp"][1]
+            molvisc = viscosity_kinematic(temp)
+            moldiff = diffusivity_temp(temp)
+            logger.debug("Calculated molecular viscosity and diffusivity from `temp`")
+        else:
+            molvisc = cfg.molvisc_fallback
+            moldiff = cfg.moldiff_fallback
+            logger.debug(
+                f"Used fallback values {molvisc}, {moldiff} for molecular viscosity "
+                "and diffusivity"
+            )
+        # always store as array so that it is exported to xarray
+        molvisc = np.broadcast_to(molvisc, (ntime,)).astype(float)
+        moldiff = np.broadcast_to(moldiff, (ntime,)).astype(float)
+
+        (
+            chi,
+            eps,
+            eps_lower,
+            eps_upper,
+            waveno_batchelor,
+            waveno_batchelor_ci,
+            likelihood_ratio,
+            mad,
+            mad_powerlaw,
+        ) = temperature_dissipation(
+            psi_k_gradt=level3.psi_k_gradt,
             waveno=level3.waveno,
             psi_noise=level3.psi_noise,
-            waveno_limit_upper=cfg.waveno_limit_upper,
+            waveno_limit_upper=(
+                np.inf if cfg.waveno_limit_upper is None else cfg.waveno_limit_upper
+            ),
+            molvisc=molvisc,
+            moldiff=moldiff,
+            spectrum_model=cfg.spectrum_model,
+            q=cfg.q,
+            n_trial=100,
+            dof=cfg.dof_spectrum,
         )
         kwarg.update(
             dict(
+                time=level3.time,
                 chi=chi,
                 eps=eps,
-                cfg=cfg,
+                eps_lower=eps_lower,
+                eps_upper=eps_upper,
+                waveno_batchelor=waveno_batchelor,
+                waveno_batchelor_ci=waveno_batchelor_ci,
+                likelihood_ratio=likelihood_ratio,
+                mad=mad,
+                mad_powerlaw=mad_powerlaw,
+                molvisc=molvisc,
+                moldiff=moldiff,
             )
         )
         return kwarg
 
 
 class UTempProcessing(Processing):
+    """Microtemperature processing pipeline from any start level up to ``UTempLevel4``.
+    """
 
     _level_mapping: dict[Level, type[TimeseriesLevel]] = {
         Level.level1: UTempLevel1,
