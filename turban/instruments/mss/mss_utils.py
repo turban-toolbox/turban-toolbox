@@ -1,9 +1,9 @@
 import numpy as np
 import scipy.signal
 import numpy as np
-from jaxtyping import Num
+from jaxtyping import Float, Num
 from numpy import ndarray, newaxis
-from scipy.signal import butter, lfilter, lfiltic
+from scipy.signal import butter, freqz, lfilter, lfiltic
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -273,3 +273,36 @@ def deconvolve_mss_ntchp(
     zi = lfiltic(b, a, x[:1], x_emph[:1])  # initial conditions
     x_d, _ = lfilter(b, a, x_emph, zi=zi)  # deconvoluted
     return x_d
+
+
+def correction_frequency_response_bilinear(
+    freq: Float[ndarray, "freq"],
+    sampfreq: float,
+    diff_gain: float,
+) -> Float[ndarray, "freq"]:
+    """Correction of power spectra for the bilinear (digital) low-pass deconvolution.
+
+    The pre-emphasis of the MSS NTC channel is removed by a digital first-order
+    Butterworth low-pass (bilinear transform, see ``deconvolve_mss_ntchp``). The
+    ideal analog low-pass has the power response ``1 / (1 + (2 pi f tau)**2)``
+    with ``tau = diff_gain``. The returned ratio of the analog to the digital power
+    response multiplies power spectra of the deconvolved signal.
+
+    Parameters
+    ----------
+    freq : ndarray, shape (freq,)
+        Frequencies in Hz at which the correction is evaluated.
+    sampfreq : float
+        Sampling frequency in Hz.
+    diff_gain : float
+        Time constant of the pre-emphasis differentiator in s.
+
+    Returns
+    -------
+    ndarray, shape (freq,)
+        Multiplicative correction factor for power spectra.
+    """
+    b, a = butter(1, 1 / (2 * np.pi * diff_gain * sampfreq / 2))
+    _, h_digital = freqz(b, a, worN=freq, fs=sampfreq)
+    h_analog = 1 / (1 + (2 * np.pi * freq * diff_gain) ** 2)
+    return h_analog / np.abs(h_digital) ** 2
