@@ -32,6 +32,9 @@ logger = get_logger(__name__)
 @dataclass(kw_only=True)
 class UTempLevel1(Level1):
     dtempdt: Float[ndarray, "ntemp time"]
+    # this assumes that spectral_correction was evaluated on the frequency grid defined
+    # by cfg.sampfrq and cfg.segment_length
+    spectral_correction: Float[ndarray, "freq"] | None = None
     cfg: UTempConfig
 
 
