@@ -139,7 +139,7 @@ def temperature_gradient_spectra(
         tau0=tau0,
         gamma=gamma,
         npoles=npoles,
-        response_model=response_model,
+        model=response_model,
     )
 
     # TODO LATER explore supplying own noise level by input arguments
