@@ -133,25 +133,6 @@ def temperature_gradient_spectra(
     return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow, psi_noise, ii
 
 
-def correction_frequency_response_bilinear(
-    freq: Float[ndarray, "frequency"],
-    sampfreq: float,
-    diff_gain: float,
-):
-    [b, a] = butter(
-        1, 1 / (2 * np.pi * diff_gain * sampfreq / 2)
-    )  #  The LP-filter that was applied
-    w, junk = freqz(
-        b, a, len(freq), fs=sampfreq, include_nyquist=True
-    )  # axis=1 indexes frequencies
-    junk = np.absolute(junk) ** 2  #  The mag-squared of the applied LP-filter.
-    H = 1 / (1 + (2 * np.pi * freq * diff_gain) ** 2)  #  What should have been applied
-
-    assert np.all(np.allclose(w[newaxis, :], freq))
-    bl_correction = H / junk  #  The bilinear transformation correction.
-    return bl_correction
-
-
 def correction_frequency_response_vachon_lueck(
     freq: Float[ndarray, "frequency"], senspeed: Float[ndarray, "time"]
 ) -> Float[ndarray, "time frequency"]:
