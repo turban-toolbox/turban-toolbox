@@ -3,7 +3,7 @@
 from enum import IntEnum
 from functools import wraps
 from inspect import isclass
-from typing import get_type_hints, ClassVar, Self, cast
+from typing import get_args, get_type_hints, ClassVar, Self, cast
 from abc import abstractmethod, ABC
 from typing import Literal
 from dataclasses import dataclass
@@ -90,15 +90,14 @@ class TimeseriesLevel:
         coords : dict
             Fields listed in ``_coords``, in xarray ``(dims, data)`` format.
         """
-        dct = {
-            name: (
-                [dim.name for dim in t.dims],
-                getattr(self, name),
-            )
-            for name, t in get_type_hints_recursive(type(self)).items()
-            if isclass(t)
-            if issubclass(t, AbstractArray)
-        }
+        dct = {}
+        for name, hint in get_type_hints_recursive(type(self)).items():
+            # also export optional arrays (`Array | None`) unless they are None
+            for t in (hint, *get_args(hint)):
+                if isclass(t) and issubclass(t, AbstractArray):
+                    if getattr(self, name) is not None:
+                        dct[name] = ([dim.name for dim in t.dims], getattr(self, name))
+                    break
         data_vars = {k: v for k, v in dct.items() if k not in self._coords}
         coords = {k: v for k, v in dct.items() if k in self._coords}
         return data_vars, coords
