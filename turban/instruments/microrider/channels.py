@@ -131,4 +131,3 @@ def channel_config_factory(name: str) -> ChannelConfigBaseModel:
     except KeyError:
         raise ValueError(f"{name} is not a known MicroRider channel.") from None
     return cls(name=name)
-

@@ -24,7 +24,7 @@ class SensorSpeedABC(ABC):
     def __init__(self) -> None:
         self._ifun: Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]
         self.microstructure_raw_data: None | MicrostructureRawData = None
-    
+
     @abstractmethod
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -56,10 +56,12 @@ class SensorSpeedABC(ABC):
         """
         pass
 
-    def set_microstructure_raw_data(self, microstructure_raw_data : MicrostructureRawData) -> None:
-        self.__dict__.pop("_ifun", None) # Rmove _ifun if present in case of new data.
+    def set_microstructure_raw_data(
+        self, microstructure_raw_data: MicrostructureRawData
+    ) -> None:
+        self.__dict__.pop("_ifun", None)  # Rmove _ifun if present in case of new data.
         self.microstructure_raw_data = microstructure_raw_data
-        
+
 
 # Create a registry of SensorSpeedPlugin classes:
 
@@ -200,7 +202,10 @@ class SensorSpeedEMC(SensorSpeedABC):
         try:
             return self._ifun
         except AttributeError:
-            t = self.microstructure_raw_data.header.timestamp + self.microstructure_raw_data.header.t_slow
+            t = (
+                self.microstructure_raw_data.header.timestamp
+                + self.microstructure_raw_data.header.t_slow
+            )
             U = self.microstructure_raw_data.data["U_EM"]
             self._ifun = make_interp_spline(t, U, 1)
             return self._ifun
@@ -242,7 +247,7 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         U : Float[np.ndarray, "time"]
             Sensor speed in m/s, one value per element of `t`.
         """
-        self.__dict__.pop("_ifun", None) # Rmove _ifun if present in case of new data.
+        self.__dict__.pop("_ifun", None)  # Rmove _ifun if present in case of new data.
         self.data["t"] = t
         self.data["U"] = U
 

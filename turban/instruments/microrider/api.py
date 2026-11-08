@@ -44,6 +44,7 @@ class MicroriderConfig(InstrumentConfig):
             result.append(item)
         return result
 
+
 class MicroriderInstrument(Instrument):
 
     def __init__(self, cfg: MicroriderConfig) -> None:
@@ -88,10 +89,17 @@ class MicroriderInstrument(Instrument):
         channel_configs = self.cfg.channel_cfgs
         microstructure_raw_data = rsIO.read_p_file(filename, channel_configs)
         try:
-            self.sensor_speed_plugin.set_microstructure_raw_data(microstructure_raw_data)
+            self.sensor_speed_plugin.set_microstructure_raw_data(
+                microstructure_raw_data
+            )
         except AttributeError:
-            raise MicroriderAPIError("MicroriderInstrument instance has no sensor speed plugin defined.")
-        time = microstructure_raw_data.header.t_fast + microstructure_raw_data.header.timestamp
+            raise MicroriderAPIError(
+                "MicroriderInstrument instance has no sensor speed plugin defined."
+            )
+        time = (
+            microstructure_raw_data.header.t_fast
+            + microstructure_raw_data.header.timestamp
+        )
         senspeed = self.sensor_speed_plugin.get_sensor_speed(time)
         level1 = ShearLevel1(
             time=time,
@@ -137,8 +145,8 @@ class MicroriderInstrument(Instrument):
     def _set_sensor_speed_plugin_from_cfg(self) -> None:
         requested_plugin = self.cfg.sensor_speed_plugin
         if requested_plugin:
-            argument_list_check, args, unconfigured_args = self._check_for_presence_of_required_parameters(
-                requested_plugin
+            argument_list_check, args, unconfigured_args = (
+                self._check_for_presence_of_required_parameters(requested_plugin)
             )
             if not argument_list_check:
                 for n in unconfigured_args:

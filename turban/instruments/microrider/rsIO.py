@@ -18,7 +18,7 @@ from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
     ByteHeader,
     HeaderInfo,
-    MicrostructureRawData
+    MicrostructureRawData,
 )
 
 from turban import logger_manager
@@ -58,26 +58,26 @@ class Channel(object):
 
     """
 
-    def __init__(
-        self, channel_config: ChannelConfigBaseModel) -> None:
+    def __init__(self, channel_config: ChannelConfigBaseModel) -> None:
         self.name: str = channel_config.name
         self.config: ChannelConfigBaseModel = channel_config
         self.converter = rsConversions.get_converter(channel_config)(channel_config)
         self.converted = False
 
-    def convert_to_units(self,
-                         records: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64],
-                         skip_decode=False
-                         ) -> np.typing.NDArray[np.float64]:
+    def convert_to_units(
+        self,
+        records: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64],
+        skip_decode=False,
+    ) -> np.typing.NDArray[np.float64]:
         """Converts channel into unit bearing data
 
         Sets the converted_into_units flag.
         """
         if not self.converted:
             self.converted = True
-            if skip_decode: # deconvolution channels have the data
-                            # already decoded and will set this flag
-                            # to True
+            if skip_decode:  # deconvolution channels have the data
+                # already decoded and will set this flag
+                # to True
                 data = self.converter.convert(records)
             else:
                 data = self.converter(records)
@@ -87,13 +87,16 @@ class Channel(object):
             )
         return data
 
-    def deconvolve(self,
-                   records: np.typing.NDArray[np.int16],
-                   co_channel: np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+    def deconvolve(
+        self,
+        records: np.typing.NDArray[np.int16],
+        co_channel: np.typing.NDArray[np.float64],
+    ) -> np.typing.NDArray[np.float64]:
         pass
 
     def reset(self) -> None:
         self.converted = False
+
 
 class ChannelMatrix(object):
     """Class to handle the sensor matrix
@@ -105,19 +108,20 @@ class ChannelMatrix(object):
 
     """
 
-    def __init__(self,
-                 microrider_config: rsConfig_parser.MicroRiderConfig,
-                 header_data: ByteHeader,
-                 header_info: HeaderInfo) -> None:
+    def __init__(
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        header_data: ByteHeader,
+        header_info: HeaderInfo,
+    ) -> None:
         self.matrix = self._get_matrix(microrider_config)
-        self.header_info = header_info # header information to pass
-        self.header_data = header_data # header information extracted from file.
+        self.header_info = header_info  # header information to pass
+        self.header_data = header_data  # header information extracted from file.
         self.channels = self._create_channels(microrider_config)
         self._set_sample_rates()
         self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
-        
-        
+
     def get_record_indices(self, channel_name: str) -> np.typing.NDArray[np.int64]:
         n_matrix_rows, _ = self.matrix.shape
         channel_positions = self.matrix.flatten()
@@ -133,20 +137,24 @@ class ChannelMatrix(object):
         )
         # Make sure we end up with int16, as we may get '>i2'
         matrix_size = np.prod(self.matrix.shape)
-        data = bindata[:, self.header_data.record_header_size :].reshape(
-            -1, matrix_size).astype(np.int16)
+        data = (
+            bindata[:, self.header_data.record_header_size :]
+            .reshape(-1, matrix_size)
+            .astype(np.int16)
+        )
         return data
-        
-    def convert_channels(self, data_bytes: bytes) -> dict[str,np.typing.NDArray[np.float64]]:
-        """
-        """
+
+    def convert_channels(
+        self, data_bytes: bytes
+    ) -> dict[str, np.typing.NDArray[np.float64]]:
+        """ """
         data = self.bytes_to_records(data_bytes)
         data_dict: dict[str, np.typing.NDArray[np.float64]] = {}
 
         # First any channels that require deconvolution
         for name, channel in self.channels.items():
             regex_preemph = self._regex_deconvolve_preemph_name.match(name)
-            if regex_preemph: # preemphasis channel
+            if regex_preemph:  # preemphasis channel
                 logger.info(f"Converting via convolution {name}")
                 indices = self.get_record_indices(name)
                 records = data[:, indices].ravel()
@@ -176,12 +184,12 @@ class ChannelMatrix(object):
                 X_hires = co_channel.convert_to_units(X_hires, skip_decode=True)
                 # Unit-bearing data are put onto the fast time base, as in ODAS.
                 data_dict[co_channel_name] = self._interpolate_to_fast(X_hires)
-        
+
         # Then do all normal channels (no deconvolution step required).
         for name, channel in self.channels.items():
             regex = self._regex_deconvolve_name.match(name)
             regex_preemph = self._regex_deconvolve_preemph_name.match(name)
-            if not regex and not regex_preemph: # normal channel
+            if not regex and not regex_preemph:  # normal channel
                 indices = self.get_record_indices(name)
                 records = data[:, indices].ravel()
                 logger.info(f"Converting {name}")
@@ -192,28 +200,32 @@ class ChannelMatrix(object):
             channel.reset()
         return data_dict
 
-
-
     def get_co_channel_name(self, name: str) -> str:
         # Note: we rely on whether there is a co channel or not has been decided upon before.
         co_channel_name, _ = name.split("_")
         return co_channel_name
 
-    def _interpolate_to_fast(self, v: np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+    def _interpolate_to_fast(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         """Interpolates v onto the fast time base (ODAS interp1_if_req: spline, extrapolated)"""
         t_fast = self.header_info.t_fast
         if v.shape[0] == t_fast.shape[0]:
             return v
-        t = np.arange(v.shape[0]) / (self.header_info.fs_fast * v.shape[0] / t_fast.shape[0])
+        t = np.arange(v.shape[0]) / (
+            self.header_info.fs_fast * v.shape[0] / t_fast.shape[0]
+        )
         ifun = si_CubicSpline(t, v, bc_type="not-a-knot", extrapolate=True)
         return np.asarray(ifun(t_fast), dtype=np.float64)
-    
+
     def _set_sample_rates(self) -> None:
         n_rows = self.matrix.shape[0]
         for name, channel in self.channels.items():
             n_samples_per_matrix = len(self.get_record_indices(name))
-            channel.config.update("sample_rate", self.header_info.fs_fast * n_samples_per_matrix / n_rows)
-            
+            channel.config.update(
+                "sample_rate", self.header_info.fs_fast * n_samples_per_matrix / n_rows
+            )
+
     def _get_matrix(
         self, microrider_config: rsConfig_parser.MicroRiderConfig
     ) -> np.typing.NDArray[np.int64]:
@@ -257,7 +269,7 @@ class ChannelMatrix(object):
             channels["ch255"] = Channel(channel_config)
             n += 1
             logger.info(f"\t{n:2d}: ch255")
-        return channels 
+        return channels
 
     def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
         name = section["name"]
@@ -274,7 +286,7 @@ class ChannelMatrix(object):
             channel_config.update(k, v)
         return channel_config
 
-    
+
 class HeaderParser:
     def parse(self, fd: io.BufferedReader) -> ByteHeader:
         """Parses header block of a data record. It is assumed that the block is HeaderEnum.HeaderSize large.
@@ -293,13 +305,13 @@ class HeaderParser:
         match self.__get(HeaderEnum.Endianness, block=block, fmt="<H"):
             case 0:
                 get = partial(self.__get, block=block, fmt="<H")
-                endianness="<"
+                endianness = "<"
             case 1 | 256:  # little endian
                 get = partial(self.__get, block=block, fmt="<H")
-                endianness="<"
+                endianness = "<"
             case 2 | 512:  # big endian
                 get = partial(self.__get, block=block, fmt=">H")
-                endianness=">"
+                endianness = ">"
             case _:
                 raise ValueError(
                     "Failed to determine the endianness of this block of data."
@@ -421,7 +433,6 @@ class HeaderParser:
         fd.seek(fd_current, 0)
         return s
 
-
     def get_header_info(self, byte_header: ByteHeader, n_records: int) -> HeaderInfo:
         """
 
@@ -456,7 +467,7 @@ class HeaderParser:
             time=timestring,
         )
         return header_info
-    
+
     def get_file_timestamp(self, byte_header: ByteHeader) -> tuple[float, str, str]:
         """Gets time stamp of the file
 
@@ -481,7 +492,7 @@ class HeaderParser:
             byte_header.hour,
             byte_header.minute,
             byte_header.second,
-            byte_header.millisecond*1000, # this field is for microseconds.
+            byte_header.millisecond * 1000,  # this field is for microseconds.
         )
         timestamp = date.timestamp()
         datestr = date.strftime("%Y-%m-%d")
@@ -489,11 +500,9 @@ class HeaderParser:
         return timestamp, datestr, timestr
 
 
-    
-
-        
-def read_p_file(filename: str,
-                channel_configs: list[ChannelConfigBaseModel]=[]) -> MicrostructureRawData:
+def read_p_file(
+    filename: str, channel_configs: list[ChannelConfigBaseModel] = []
+) -> MicrostructureRawData:
     """Function to read a single .p file.
 
     Parameters
@@ -522,9 +531,9 @@ def read_p_file(filename: str,
         for channel_config in channel_configs:
             microrider_config.update_config(channel_config)
         # Create the channel matrix
-        channel_matrix: ChannelMatrix = ChannelMatrix(microrider_config,
-                                                      header_data,
-                                                      header_info)
+        channel_matrix: ChannelMatrix = ChannelMatrix(
+            microrider_config, header_data, header_info
+        )
 
         # Now we are ready to read in the data, which could
         # technically be done in small parts too.
@@ -532,6 +541,7 @@ def read_p_file(filename: str,
         fd.seek(HeaderEnum.HeaderSize + header_data.setupfile_size, 0)
         data_bytes = fd.read()
 
-    microstructure_data = MicrostructureRawData(header=header_info,
-                                     data=channel_matrix.convert_channels(data_bytes))
+    microstructure_data = MicrostructureRawData(
+        header=header_info, data=channel_matrix.convert_channels(data_bytes)
+    )
     return microstructure_data

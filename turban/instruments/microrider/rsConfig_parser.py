@@ -6,6 +6,7 @@ from turban import logger_manager
 
 logger = logger_manager.get_logger(__name__)
 
+
 class MicroRiderConfig:
     """Class to handle MicroRider configuration from the raw setupstr
     read from the header information.
@@ -104,7 +105,7 @@ class MicroRiderConfig:
         updated = False
         for ch, cfg in self._config.items():
             try:
-                channel_name = cfg['name']
+                channel_name = cfg["name"]
             except KeyError:
                 continue
             else:
@@ -116,8 +117,10 @@ class MicroRiderConfig:
                         cfg[field_name] = getattr(channel_config, field_name)
                     updated = True
         if not updated:
-            logger.warning(f"A user-supplied sensor configuration ({channel_config.name}) was supplied, but no match was found.")
-            
+            logger.warning(
+                f"A user-supplied sensor configuration ({channel_config.name}) was supplied, but no match was found."
+            )
+
     @property
     def number_of_channels(self) -> int:
         return self._number_of_channels

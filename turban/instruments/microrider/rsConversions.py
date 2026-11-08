@@ -27,9 +27,10 @@ class Converter(ABC):
     def __init__(self, config: ChannelConfigBaseModel) -> None:
         self.config: ChannelConfigBaseModel = config
         self.defaults: ChannelConfigBaseModel
-        
+
     def __call__(
-        self, raw: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
+        self, raw: np.typing.NDArray[np.int16]
+    ) -> np.typing.NDArray[np.float64]:
         return self.convert(self.decode(raw))
 
     def get_parameter(self, p: str) -> int | float:
@@ -87,19 +88,18 @@ class Converter(ABC):
             return_value = None
         return return_value
 
-
     def decode(self, raw: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
-        """ Interet the raw 16 bit word as counts """
+        """Interet the raw 16 bit word as counts"""
         if self.config.sign == "unsigned":
             return raw.view(np.uint16).astype(np.float64)
         else:
             return raw.astype(np.float64)
-        
+
     @abstractmethod
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
-        """ Counts (float) -> physical units"""
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
+        """Counts (float) -> physical units"""
 
 
 class Piezo(Converter):
@@ -109,9 +109,9 @@ class Piezo(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfigPiezo(a0=0.0, units="[ counts ]")
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         a0 = self.get_parameter("a0")
         v_unit = v - a0
         return v_unit
@@ -127,12 +127,12 @@ class Gnd(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfig(units="[ counts ]")
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         return v
-    
-    
+
+
 class Therm(Converter):
     def __init__(self, config: ChannelConfigBaseModel) -> None:
         """Specific converter method for thermistor type channels"""
@@ -140,10 +140,9 @@ class Therm(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfigThermistor(units="[ °C ]")
 
-    
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         a = self.get_parameter("a")
         b = self.get_parameter("b")
         adc_fs = self.get_parameter("adc_fs")
@@ -186,9 +185,9 @@ class Shear(Converter):
             adc_zero=0.0, sig_zero=0.0, units="[ s^{-1} ]"
         )
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         adc_zero = self.get_parameter("adc_zero")
         sig_zero = self.get_parameter("sig_zero")
         adc_fs = self.get_parameter("adc_fs")
@@ -207,9 +206,9 @@ class Poly(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfigPressure(units=" ")
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         polyVals: list[float | int] = []
         for i in range(9):
             p = self.get_optional_parameter(f"coef{i:d}")
@@ -225,11 +224,13 @@ class Voltage(Converter):
 
     def __init__(self, config: ChannelConfigBaseModel):
         super().__init__(config)
-        self.defaults = channels.ChannelConfigVoltage(adc_zero=0.0, g=1.0, units="[ V ]")
+        self.defaults = channels.ChannelConfigVoltage(
+            adc_zero=0.0, g=1.0, units="[ V ]"
+        )
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         adc_zero = self.get_parameter("adc_zero")
         gain = self.get_parameter("g")
         adc_fs = self.get_parameter("adc_fs")
@@ -241,11 +242,10 @@ class Voltage(Converter):
 class Incl(Converter):
     """Specific converter method channels to attitude type channels"""
 
-
     def decode(self, raw: np.typing.NDArray[np.int16]) -> np.typing.NDArray[np.float64]:
         """
         The ADIS16209 inclinometer outputs words have the following format:
-        
+
         bit15 = new data present
         bit14 = error flag
         bit[13:0] = X and Y inclination data, 2s-compliment (X and Y channels)
@@ -255,10 +255,14 @@ class Incl(Converter):
         # we slect bits 0..12, and upgrade this to an int32, after
         # subtracting bit 13, it will work for negative values (X/Y),
         # but 12 bit positive values (T) will also fit.
-        v_raw = np.bitwise_and(raw, (1<<13) -1).astype(np.int32) - np.bitwise_and(raw, (1<<13))
+        v_raw = np.bitwise_and(raw, (1 << 13) - 1).astype(np.int32) - np.bitwise_and(
+            raw, (1 << 13)
+        )
         return v_raw.astype(np.float64)
 
-    def convert(self, v: np.typing.NDArray[np.float64]) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         coefs = [self.get_parameter("coef1"), self.get_parameter("coef0")]
         return np.polyval(coefs, v)
 
@@ -288,9 +292,9 @@ class Aem1g_a(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfigU_EM(bias=0.0, units="[ m s^{-1} ]")
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         bias = self.get_parameter("bias")
         adc_fs = self.get_parameter("adc_fs")
         adc_bits = self.get_parameter("adc_bits")
@@ -324,8 +328,9 @@ class Aem1g_d(Converter):
         irrespective of the configured sign."""
         return raw.view(np.uint16).astype(np.float64)
 
-    def convert(self, v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         a = self.get_parameter("a") / 100  # cm/s -> m/s
         b = self.get_parameter("b") / 100  # cm/s -> m/s
         bias = self.get_parameter("bias")
@@ -348,9 +353,9 @@ class PassThrough(Converter):
         super().__init__(config)
         self.defaults = channels.ChannelConfig()
 
-    def convert(self,
-                v: np.typing.NDArray[np.float64]
-                ) -> np.typing.NDArray[np.float64]:
+    def convert(
+        self, v: np.typing.NDArray[np.float64]
+    ) -> np.typing.NDArray[np.float64]:
         return v
 
 
