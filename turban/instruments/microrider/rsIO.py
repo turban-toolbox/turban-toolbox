@@ -5,7 +5,7 @@ import io
 import os.path
 import re
 import struct
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 import arrow
 import numpy as np
@@ -67,7 +67,7 @@ class Channel(object):
     def convert_to_units(
         self,
         records: np.typing.NDArray[np.int16] | np.typing.NDArray[np.float64],
-        skip_decode=False,
+        skip_decode: bool = False,
     ) -> np.typing.NDArray[np.float64]:
         """Converts channel into unit bearing data
 
@@ -78,9 +78,9 @@ class Channel(object):
             if skip_decode:  # deconvolution channels have the data
                 # already decoded and will set this flag
                 # to True
-                data = self.converter.convert(records)
+                data = self.converter.convert(records.astype(np.float64, copy=False))
             else:
-                data = self.converter(records)
+                data = self.converter(records.astype(np.int16, copy=False))
         else:
             raise ValueError(
                 "Refusing to convert to units for a parameter already converted."
@@ -92,7 +92,7 @@ class Channel(object):
         records: np.typing.NDArray[np.int16],
         co_channel: np.typing.NDArray[np.float64],
     ) -> np.typing.NDArray[np.float64]:
-        pass
+        raise NotImplementedError
 
     def reset(self) -> None:
         self.converted = False
@@ -302,6 +302,7 @@ class HeaderParser:
             a dataclass with (byte) header information
         """
         block = fd.read(HeaderEnum.HeaderSize)
+        endianness: Literal["<", ">"]
         match self.__get(HeaderEnum.Endianness, block=block, fmt="<H"):
             case 0:
                 get = partial(self.__get, block=block, fmt="<H")

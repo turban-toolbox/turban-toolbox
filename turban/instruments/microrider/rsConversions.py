@@ -215,7 +215,7 @@ class Poly(Converter):
             if p is None:
                 break
             polyVals.insert(0, p)
-        v_unit = np.polyval(polyVals, v)
+        v_unit = np.polyval(polyVals, v).astype(np.float64)
         return v_unit
 
 
@@ -264,7 +264,7 @@ class Incl(Converter):
         self, v: np.typing.NDArray[np.float64]
     ) -> np.typing.NDArray[np.float64]:
         coefs = [self.get_parameter("coef1"), self.get_parameter("coef0")]
-        return np.polyval(coefs, v)
+        return np.polyval(coefs, v).astype(np.float64)
 
 
 class InclXY(Incl):

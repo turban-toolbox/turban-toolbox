@@ -202,6 +202,10 @@ class SensorSpeedEMC(SensorSpeedABC):
         try:
             return self._ifun
         except AttributeError:
+            if self.microstructure_raw_data is None:
+                raise ValueError(
+                    "No microstructure raw data set; call set_microstructure_raw_data() first."
+                )
             t = (
                 self.microstructure_raw_data.header.timestamp
                 + self.microstructure_raw_data.header.t_slow
