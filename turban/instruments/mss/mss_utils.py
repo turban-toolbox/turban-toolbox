@@ -43,7 +43,7 @@ def calc_shear(shear, vsink, density, fs):
         btype="high",
     )
     dshdt = fft_grad(shear, 1 / fs)
-    vsink[vsink<= 0] = np.nan
+    vsink[vsink <= 0] = np.nan
     return dshdt / (density * vsink**2)
 
 
