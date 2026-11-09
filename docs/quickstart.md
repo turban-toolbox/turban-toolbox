@@ -60,7 +60,7 @@ cfg = ShearConfig(
     chunk_overlap=2560,
     freq_cutoff_antialias=None,  # None means that this cutoff is not applied
     freq_cutoff_corrupt=None,  # None means that this cutoff is not applied
-    freq_highpass=0.15,
+    freq_highpass=None,  # None means 1/(2T) = 0.5 * sampfreq / segment_length
     spatial_response_wavenum=50.0,
     waveno_cutoff_spatial_corr=None,  # None means that this cutoff is not applied
     waveno_spectral_min=None,  # None means that this cutoff is not applied

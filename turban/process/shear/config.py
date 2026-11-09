@@ -1,12 +1,15 @@
 import numpy as np
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from turban.process.generic.config import SegmentConfig
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ShearConfig(SegmentConfig):
     freq_cutoff_antialias: float | None = None
     freq_cutoff_corrupt: float | None = None  #
-    freq_highpass: float = 0.15  # [Hz]
+    freq_highpass: float | None = None  # [Hz] None -> 1/(2T), T = segment duration
     spatial_response_wavenum: float = 50.0  # [1/m]
     waveno_cutoff_spatial_corr: float | None = None  # [1/m] #
     waveno_spectral_min: float | None = None
@@ -20,6 +23,14 @@ class ShearConfig(SegmentConfig):
     molvisc_fallback: float = 1.6e-6  # used for level4 when not available from level3
     # tuple of variable names in auxiliary level 2 data used for vibration removal
     vibration_channels: tuple[str, ...] = tuple()
+
+    @model_validator(mode="after")
+    def _freq_highpass(self):
+        if self.freq_highpass is None:
+            # 1/(2T) with segment duration T = segment_length / sampfreq
+            self.freq_highpass = 0.5 * self.sampfreq / self.segment_length
+            logger.info(f"Setting `freq_highpass` to {self.freq_highpass:0.3f} Hz")
+        return self
 
     @field_validator("vibration_channels", mode="before")
     @classmethod
