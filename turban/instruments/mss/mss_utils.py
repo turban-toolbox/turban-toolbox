@@ -36,12 +36,6 @@ def calc_shear(shear, vsink, density, fs):
     ndarray
         Shear du/dz in 1/s; NaN where the profiling speed is below `vsink_min`.
     """
-    shear = butterfilt(
-        signal=shear,
-        cutoff_freq_Hz=1,
-        sampfreq=fs,
-        btype="high",
-    )
     dshdt = fft_grad(shear, 1 / fs)
     vsink[vsink <= 0] = np.nan
     return dshdt / (density * vsink**2)
