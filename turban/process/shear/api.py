@@ -101,7 +101,7 @@ class ShearLevel2(Level2[ShearLevel1]):
             level1.shear,
             level1.section_number,
             cfg.sampfreq,
-            cfg.segment_length,
+            cfg.freq_highpass,
             cfg.cutoff_freq_lp,
             cfg.spike_threshold,
             cfg.max_tries,
