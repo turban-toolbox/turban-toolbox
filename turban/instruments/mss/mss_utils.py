@@ -1,54 +1,50 @@
 import numpy as np
 import scipy.signal
-import numpy as np
 from jaxtyping import Num
 from numpy import ndarray, newaxis
 from scipy.signal import butter, lfilter, lfiltic
 from turban.utils.logging import get_logger
+from turban.utils.util import fft_grad, butterfilt
 
 logger = get_logger(__name__)
 
 
 def calc_shear(shear, vsink, density, fs):
-    """Calculate physical shear from sensor data.
+    """Convert a raw MSS shear-probe signal to shear in physical units.
 
-    High-pass filters at 1 Hz, computes time gradient, then applies
-    the relationship: shear = dshear/dt / (density * vsink^2).
+    MSS shear probes have no electronic differentiator: the sensitivity-scaled
+    probe signal is ``E = rho * W * u`` (Eq. 1-2 in the ATOMIX paper, Lueck et
+    al. 2024). Shear follows from Eq. 11,
+
+        du/dz = (1/W) du/dt = (dE/dt) / (rho * W**2).
+
+    The time derivative is computed spectrally (``fft_grad``).
 
     Parameters
     ----------
-    shear : array_like
-        Raw shear probe signal.
-    vsink : array_like
-        Sinking velocity in m/s.
-    density : array_like
-        Water density in kg/m³.
+    shear : ndarray
+        Shear-probe signal, already divided by the probe sensitivity.
+    vsink : ndarray
+        Profiling (sinking) speed W in m/s, same length as `shear`.
+    density : float or ndarray
+        Seawater density in kg/m^3 (scalar or same length as `shear`).
     fs : float
         Sampling frequency in Hz.
 
     Returns
     -------
     ndarray
-        Physical shear.
+        Shear du/dz in 1/s; NaN where the profiling speed is below `vsink_min`.
     """
-    dt = 1 / fs
-    degree = 4
-    cutoff_Fs = 1  # 1 Hz
-    cutoff = cutoff_Fs / (fs / 2)  # non - dim with Nyquist freq.
-    [b, a] = scipy.signal.butter(degree, cutoff, "high")
-
-    shear_hp = scipy.signal.filtfilt(b, a, shear)
-    # calculate time gradient of raw shear
-    dshdt = np.gradient(shear_hp, dt)
-    # screen for spikes
-    # dshdt_desp = despike_std(dshdt, 1024, 4)
-    dshdt_desp = dshdt  # do not despike at level1!
-
-    vsink_tmp = vsink.copy()
-    vsink_tmp[vsink_tmp == 0] = np.nan
-
-    shear = dshdt_desp * (density ** (-1)) * (vsink_tmp ** (-2))
-    return shear
+    shear = butterfilt(
+        signal=shear,
+        cutoff_freq_Hz=1,
+        sampfreq=fs,
+        btype="high",
+    )
+    dshdt = fft_grad(shear, 1 / fs)
+    vsink[vsink<= 0] = np.nan
+    return dshdt / (density * vsink**2)
 
 
 def calc_vsink(press, fs, f_low=0.2):
