@@ -302,7 +302,7 @@ def split_data(
 def fft_grad(
     signal: Float[ndarray, "... time"],
     dt: float,
-) -> Float[ndarray, "... freq"]:
+) -> Float[ndarray, "... time"]:
     """Compute gradient via FFT along last axis.
 
     Parameters
@@ -314,7 +314,7 @@ def fft_grad(
 
     Returns
     -------
-    Float[ndarray, "... freq"]
+    Float[ndarray, "... time"]
         Gradient computed via FFT.
     """
     N = signal.shape[-1]
@@ -358,6 +358,8 @@ def butterfilt(signal, cutoff_freq_Hz, sampfreq, axis=-1, **kwarg):
         Cutoff frequency in Hz.
     sampfreq : float
         Sampling frequency in Hz.
+    axis : int, optional
+        Axis along which to filter. Default is -1.
     **kwarg
         Additional keyword arguments passed to `scipy.signal.butter`.
 
