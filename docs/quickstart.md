@@ -4,19 +4,13 @@ Currently, only shear processing is fully functional. The high-level API can be 
 
 ### Setup
 
-Clone the repository:
+Activate your Python environment of choice. Then, install TURBAN from PyPI with the instrument-specific extras as needed:
 
 ```bash
-git clone https://github.com/turban-toolbox/turban-toolbox.git
-cd turban-toolbox
+python -m pip install "turban-toolbox[mss,microrider]"
 ```
 
-Activate your Python environment of choice. Then, install TURBAN with dependency groups as needed. Requires pip >= 24.1 for `--groups` support:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e . --group mss --group microrider
-```
+For an editable install from the git repository, see the [developer's guide](devguide.md).
 
 Example data, also needed for the unit tests, can be downloaded using:
 ```bash
@@ -36,8 +30,12 @@ from turban import ShearProcessing, plot
 # Process a level 1 dataset all the way to level 4
 p = ShearProcessing.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc", level=1)
 
-# export level 4 to an xarray.Dataset
+# export level 4 only to an xarray.Dataset
 ds = p.level4.to_xarray()
+
+# or export the whole pipeline (levels 1-4) to an xarray.DataTree
+# (see the manual for netCDF export/import)
+data_tree = p.to_xarray()
 
 # or plot e.g. like this:
 plot(p)
@@ -62,7 +60,7 @@ cfg = ShearConfig(
     chunk_overlap=2560,
     freq_cutoff_antialias=None,  # None means that this cutoff is not applied
     freq_cutoff_corrupt=None,  # None means that this cutoff is not applied
-    freq_highpass=0.15,
+    freq_highpass=None,  # None means 1/(2T) = 0.5 * sampfreq / segment_length
     spatial_response_wavenum=50.0,
     waveno_cutoff_spatial_corr=None,  # None means that this cutoff is not applied
     waveno_spectral_min=None,  # None means that this cutoff is not applied

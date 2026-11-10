@@ -6,7 +6,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 from turban.instruments.mss import mss_mrd
-
+from turban.variables import STANDARD_CTD_TYPE
 from turban.process.shear.config import ShearConfig
 from turban.process.shear.api import ShearLevel1
 from turban.utils.logging import get_logger
@@ -14,8 +14,9 @@ from turban.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-# Define standard names for sensors
-mss_standard_ctd_sensornames = {}
+# Standard names for sensors, only used for (deprecated) guessing of sensornames_ctd
+# in MssDeviceConfig.from_mrd
+mss_standard_ctd_sensornames: dict[STANDARD_CTD_TYPE, list[str]] = {}
 mss_standard_ctd_sensornames["press"] = ["PRESS", "P250", "P1000"]
 mss_standard_ctd_sensornames["temp"] = ["TEMP", "NTC"]
 mss_standard_ctd_sensornames["cond"] = ["COND"]
@@ -68,7 +69,7 @@ class MssSensorPoly(MssSensor):
 class MssShearSensor(MssSensor):
     sensitivity: float
     serial_number: str = Field(default="")
-    reference_temperature: float = Field(default=np.nan)
+    reference_temperature: float | None = None
     calibration_date: str = Field(default="")
     calibration_type: Literal["SHE"] = Field(default="SHE")
 
@@ -344,16 +345,9 @@ class MssDeviceConfig(BaseModel):
     ] = Field(
         default={}, description="A dictionary of the sensors mounted to the probe"
     )
-    sensornames_ctd: dict[
-        Union[Literal["cond"], Literal["temp"], Literal["press"]],
-        str,
-    ] = Field(
+    sensornames_ctd: dict[STANDARD_CTD_TYPE, str] = Field(
         default={"cond": "", "temp": "", "press": ""},
         description="A dictionary to link standard ctd names to the names of the MSS config",
-    )
-    pressure_sensorname: Optional[str] = Field(
-        default=None,
-        description="The sensorname of the pressure sensor, if None a best guess will be made",
     )
     pspd_rel_method: Literal["pressure", "constant", "external"] = Field(
         default="pressure",
@@ -369,6 +363,7 @@ class MssDeviceConfig(BaseModel):
         cls,
         filename: str | Path,
         shear_sensitivities: dict[str, float],
+        sensornames_ctd: dict[STANDARD_CTD_TYPE, str] | None = None,
         offset: int = 0,
     ):
         """Create a MssDeviceConfig from an MRD file.
@@ -379,6 +374,12 @@ class MssDeviceConfig(BaseModel):
             Path to the MRD file.
         shear_sensitivities : dict[str, float]
             Mapping of sensor name to sensitivity value for shear sensors.
+        sensornames_ctd : dict[STANDARD_CTD_TYPE, str], optional
+            Mapping of standard ctd names (see `turban.variables.STANDARD_CTD_TYPE`)
+            to sensor names in the MRD header, e.g.
+            ``{"cond": "COND", "temp": "TEMP", "press": "PRESS"}``. If None
+            (deprecated), the sensor names are guessed from
+            `mss_standard_ctd_sensornames`.
         offset : int, optional
             16-bit count offset, typically 0 or -32768 for older devices
             (default 0).
@@ -396,6 +397,23 @@ class MssDeviceConfig(BaseModel):
         mrd_file.close()
         header_raw = data["header"]
         header = mss_mrd.parse_header(header_raw)
+        if sensornames_ctd is not None:
+            sensornames = [
+                header["mss"]["channels"][ch]["name"]
+                for ch in header["mss"]["channels"]
+            ]
+            missing = set(sensornames_ctd.values()) - set(sensornames)
+            if missing:
+                raise ValueError(
+                    f"Sensors {sorted(missing)} given in sensornames_ctd not found in "
+                    f"MRD header of {filename}, available: {sensornames}"
+                )
+            self.sensornames_ctd = dict(sensornames_ctd)
+        else:
+            logger.warning(
+                "Deprecated: guessing sensornames_ctd from standard sensor names, "
+                "pass sensornames_ctd explicitly."
+            )
         # Check for CTD sensors and link names
         for ctd_sensor in self.sensornames_ctd.keys():
             sensorname_mss = self.sensornames_ctd[ctd_sensor]
@@ -409,9 +427,9 @@ class MssDeviceConfig(BaseModel):
                     header["mss"]["channels"][ch]["name"].casefold()
                     for ch in header["mss"]["channels"]
                 ]
-                for k in mss_standard_ctd_sensornames[
-                    ctd_sensor
-                ]:  # Loop over the stanndard names
+                for k in mss_standard_ctd_sensornames.get(
+                    ctd_sensor, []
+                ):  # Loop over the stanndard names
                     if k.casefold() in sensornames_casefold:
                         index_sensor = sensornames_casefold.index(k.casefold())
                         sensorname_mss = sensornames[index_sensor]

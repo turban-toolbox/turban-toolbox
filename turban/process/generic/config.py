@@ -72,7 +72,7 @@ class SegmentConfig(BaseModel):
         ds : xr.Dataset
             Dataset whose ``attrs`` will be updated in-place.
         """
-        ds.attrs.update(self.model_dump())
+        ds.attrs.update(self.model_dump(exclude_none=True))
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):

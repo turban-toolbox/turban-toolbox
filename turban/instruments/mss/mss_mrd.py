@@ -2,7 +2,8 @@ import datetime
 from pytz import timezone
 import math
 import re
-from importlib.metadata import version as pkg_version
+from typing import Literal
+from importlib.metadata import PackageNotFoundError, version as pkg_version
 
 import numpy
 import gsw
@@ -22,7 +23,10 @@ except ImportError:
         return datetime.datetime(1970, 1, 1)
 
 
-version = pkg_version("turban-toolbox")
+try:
+    version = pkg_version("turban-toolbox")
+except PackageNotFoundError:
+    version = "unknown"
 
 
 def read_mrd(filestream, header_only=False, pos_time_only=False) -> dict:
@@ -219,8 +223,11 @@ def parse_header(header):
     hs = header.splitlines()
     sensor_str = []
 
-    logger.debug("PC-Time line:{}".format(hs[2]))
-    config["date_pc"] = parse_date(hs[2]).isoformat()
+    try:
+        config["date_pc"] = parse_date(hs[2]).isoformat()
+    except:
+        logger.warning(f"Could not infer date_pc from '{hs[2]}'")
+
     # print('Config date',config['date_pc'])
     # print('HS')
     # print('hs',hs)
@@ -276,17 +283,48 @@ def parse_header(header):
     return config
 
 
+def count_to_time(count, sampling_freq: float) -> numpy.ndarray:
+    """Convert the MSS sample counter into time since the first sample.
+
+    The counter is a 16 bit integer that increases by one per sample and wraps
+    around at 65536. Missing data records show up as increments larger than one
+    and are accounted for in the returned time. Gaps of 65536 samples or more
+    cannot be detected.
+
+    Parameters
+    ----------
+    count : array_like
+        Sample counter (raw or calibrated with slope 1, i.e. only offset).
+    sampling_freq : float
+        Sampling frequency in Hz.
+
+    Returns
+    -------
+    ndarray
+        Time since the first sample in s.
+    """
+    count = numpy.round(numpy.asarray(count)).astype(numpy.int64)
+    dcount = numpy.diff(count) % 2**16
+    nmissing = int(numpy.sum(dcount[dcount > 1] - 1))
+    if nmissing > 0:
+        logger.warning(
+            "COUNT has %d gaps, %d data records are missing",
+            numpy.sum(dcount > 1),
+            nmissing,
+        )
+    if numpy.any(dcount == 0):
+        logger.warning(
+            "COUNT has %d repeated values (duplicate data records)",
+            numpy.sum(dcount == 0),
+        )
+    return numpy.concatenate([[0], numpy.cumsum(dcount)]) / sampling_freq
+
+
 def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
     rawdatac = rawdata["channels"]
     # logger.debug('rawdata keys',rawdata.keys())
-    try:
-        gps = rawdata["gps"]
-        gps_date = rawdata["date"]
-        logger.debug("Found gps information")
-    except:
-        logger.debug("No gps information in data")
-        gps = None
-        pass
+    gps = rawdata.get("gps")
+    gps_date = rawdata.get("date")
 
     count_offset = mss_config.offset
     if rawdata["numsamples"] == 0:
@@ -310,11 +348,15 @@ def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
     if gps:
         level0_dataset.attrs["longitude"] = gps[0][1]
         level0_dataset.attrs["latitude"] = gps[0][2]
+    else:
+        logger.info("No GPS data available.")
+        level0_dataset.attrs["longitude"] = numpy.nan
+        level0_dataset.attrs["latitude"] = numpy.nan
+    # time packets are independent of position packets
+    if gps_date:
         level0_dataset.attrs["date_gps"] = gps_date[0][1].isoformat()
     else:
-        logger.warning("No GPS data available, setting longitude/latitude to 0.")
-        level0_dataset.attrs["longitude"] = 0
-        level0_dataset.attrs["latitude"] = 0
+        logger.warning("No time packet available, physical time cannot be derived.")
         level0_dataset.attrs["date_gps"] = None
     # Add the header to the dataset
     # try:
@@ -358,8 +400,36 @@ def raw_to_level0(mss_config, rawdata: dict[str, list]) -> xr.Dataset:
     return level0_dataset
 
 
-def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
-    logger.debug("Pressure sensor:{}".format(mss_config.pressure_sensorname))
+def level0_to_level1(
+    mss_config,
+    level0,
+    pspd_rel=None,
+    missing: Literal["nan", "interpolate"] | None = None,
+) -> xr.Dataset:
+    """Convert level0 data to level1 (physical shear, CTD derived variables, time).
+
+    Parameters
+    ----------
+    mss_config : MssDeviceConfig
+        Device configuration.
+    level0 : xr.Dataset
+        Level0 data from `raw_to_level0`.
+    pspd_rel : array_like, optional
+        External platform speed, used if `mss_config.pspd_rel_method` is "external".
+    missing : {"nan", "interpolate"} or None, optional
+        Handling of missing data records detected from the COUNT channel. None
+        (default) keeps the records as they are, so that time is irregular at gaps.
+        "interpolate" inserts linearly interpolated records into the calibrated
+        channels before the derived quantities (PSAL, DENS, PSPD_REL, SHEAR, utemp)
+        are computed. "nan" does the same and then sets the inserted records to NaN
+        in all variables. Both drop duplicate records and add the boolean variable
+        "inserted". Gaps of 65536 records or more cannot be detected.
+
+    Returns
+    -------
+    xr.Dataset
+        Level1 data with dimension "time".
+    """
     logger.debug("Keys of level0 data:{}".format(level0.keys()))
     if True:
         # Loop over all shear sensors and calculate shear
@@ -374,7 +444,44 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
             if ("SHE" in k) and (numshear is not None):
                 shearsensors.append(k)
 
-        n_shear = range(len(shearsensors))
+        n_shear = range(len(shearsensors)) if shearsensors else range(1)
+        # dummy dimension for NaN shear values
+
+        # Sample number of each record from the COUNT channel, accounting for
+        # missing records
+        count_sensornames = [k for k in level0.keys() if str(k).upper() == "COUNT"]
+        if count_sensornames:
+            time_record = count_to_time(
+                level0[count_sensornames[0]].values, mss_config.sampling_freq
+            )
+        else:
+            logger.warning(
+                "No COUNT channel found, time assumes no missing data records"
+            )
+            time_record = numpy.arange(len(level0["index"])) / mss_config.sampling_freq
+        sample = numpy.round(time_record * mss_config.sampling_freq).astype(int)
+
+        # Optionally fill missing records (dropping duplicate records). The
+        # calibrated channels are always linearly interpolated onto the regular
+        # sample axis before the derived quantities are computed, because their
+        # filters (filtfilt, lfilter) assume a constant sampling frequency and
+        # would spread a single NaN over the whole profile. For missing="nan" the
+        # inserted records are set to NaN at the end.
+        if missing is not None:
+            _, keep = numpy.unique(sample, return_index=True)
+            sample_full = numpy.arange(sample[-1] + 1)
+            inserted = ~numpy.isin(sample_full, sample[keep])
+            if pspd_rel is not None:
+                pspd_rel = numpy.interp(
+                    sample_full, sample[keep], numpy.asarray(pspd_rel)[keep]
+                )
+            level0 = (
+                level0.isel(index=keep)
+                .assign_coords(index=sample[keep])
+                .interp(index=sample_full, method="linear")
+            )
+            sample = sample_full
+
         index = level0["index"]
         nsamples = len(level0["index"])
 
@@ -384,16 +491,6 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
                 "index": index,
             },
         )
-        # Count the number of samples and divide by sampling frequency, to get a time vector
-        time_count = numpy.cumsum(index) / mss_config.sampling_freq
-        logger.debug("time count %s", time_count)
-        logger.debug("Time count %s %s", numpy.shape(time_count), numpy.shape(index))
-        channelname = "time_count"
-        level1_dataset[channelname] = time_count
-        level1_dataset[channelname].attrs["units"] = "s"
-        level1_dataset[channelname].attrs[
-            "description"
-        ] = "count of samples divided by sampling frequency"
 
         # Create a time vector, TODO: This has to be improved alot!
         if False:  # Calculate time
@@ -413,7 +510,7 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
                 level1_units["TIME"] = tstr
                 level1["TIME"] = level0["t"]
 
-        # Derive salinity, conservative temperature and density
+        # Derive practical salinity and density
         cond_sensorname = mss_config.sensornames_ctd["cond"]
         temp_sensorname = mss_config.sensornames_ctd["temp"]
         press_sensorname = mss_config.sensornames_ctd["press"]
@@ -423,16 +520,11 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         level1_dataset["PSAL"] = SP
         level1_dataset["PSAL"].attrs["units"] = "1"
 
-        SA = gsw.SA_from_SP(
-            SP, level0[press_sensorname], level0.longitude, level0.latitude
-        )
-        level1_dataset["SA"] = SA
-        level1_dataset["SA"].attrs["units"] = "g kg-1"
-        # Calculating conservative temperature
-        CT = gsw.CT_from_t(SA, level0[temp_sensorname], level0[press_sensorname])
-        level1_dataset["CT"] = CT
-        level1_dataset["CT"].attrs["units"] = "degC"
-        dens = gsw.rho(SA, CT, level0[press_sensorname])
+        # Density from reference salinity, which (unlike absolute salinity)
+        # does not depend on the GPS position parsed from the MRD header
+        SR = gsw.SR_from_SP(SP)
+        CT = gsw.CT_from_t(SR, level0[temp_sensorname], level0[press_sensorname])
+        dens = gsw.rho(SR, CT, level0[press_sensorname])
         level1_dataset["DENS"] = dens
         level1_dataset["DENS"].attrs["units"] = "kg m-3"
         # Calculating sinking velocity
@@ -464,10 +556,11 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
         level1_dataset["PSPD_REL"] = (["index"], vsink)
         level1_dataset["PSPD_REL"].attrs["units"] = "m s-1"
 
-        # copy some variables, TODO: discuss variablenames
-        for sensor in [press_sensorname, temp_sensorname, cond_sensorname]:
-            level1_dataset[sensor] = level0[sensor]
-            level1_dataset[sensor].attrs["units"] = level0[sensor].attrs["units"]
+        # copy all non-shear channels (CTD, chlorophyll, vibration, tilt, ...)
+        for sensor in level0.data_vars:
+            if "SHE" not in sensor:
+                level1_dataset[sensor] = level0[sensor]
+                level1_dataset[sensor].attrs["units"] = level0[sensor].attrs["units"]
 
         # Loop over all shear sensors and calculate shear
         shearsensors = []
@@ -488,16 +581,63 @@ def level0_to_level1(mss_config, level0, pspd_rel=None) -> xr.Dataset:
 
         shear = numpy.asarray(shear)
         shear[numpy.isinf(shear)] = numpy.nan
-        level1_dataset["SHEAR"] = (["n_shear", "index"], shear)
+        if shear.size:
+            level1_dataset["SHEAR"] = (["n_shear", "index"], shear)
+        else:  # no shear data exists
+            level1_dataset["SHEAR"] = (
+                ["n_shear", "index"],
+                numpy.zeros((1, len(level0.Count)), dtype=float) * numpy.nan,
+            )
 
         level1_dataset["utemp"] = (
-            ["n_temp", "time"],
+            ["n_temp", "index"],
             mss_utils.deconvolve_mss_ntchp(
                 level0["NTCHP"].values,
                 level0["NTC"].values,
                 sampfreq=mss_config.sampling_freq,
                 gain=mss_config.gain_utemp,
             )[numpy.newaxis, :],
+        )
+
+        # Mask the inserted records only after the derived quantities are computed
+        if missing is not None:
+            if missing == "nan":
+                level1_dataset = level1_dataset.where(
+                    xr.DataArray(~inserted, dims=["index"])
+                )
+            level1_dataset["inserted"] = (["index"], inserted)
+            level1_dataset["inserted"].attrs["description"] = (
+                "record missing in the MRD file (gap in COUNT), inserted by "
+                f'missing="{missing}"'
+            )
+
+        time_count = sample / mss_config.sampling_freq
+        level1_dataset["time_count"] = (["index"], time_count)
+        level1_dataset["time_count"].attrs["units"] = "s"
+        level1_dataset["time_count"].attrs["description"] = "time since first sample"
+
+        # Physical time: start time of the file (time packet, 1 s resolution) + time_count
+        if level0.attrs.get("date_gps") is not None:
+            t0 = (
+                datetime.datetime.fromisoformat(level0.attrs["date_gps"])
+                .astimezone(datetime.timezone.utc)
+                .replace(tzinfo=None)
+            )
+            time = numpy.datetime64(t0, "ns") + numpy.round(time_count * 1e9).astype(
+                "timedelta64[ns]"
+            )
+            time_attrs = {
+                "description": "UTC, start time from MRD time packet "
+                "(1 s resolution) plus time since first sample"
+            }
+        else:
+            time = time_count
+            time_attrs = {"units": "s", "description": "time since first sample"}
+
+        level1_dataset = (
+            level1_dataset.drop_vars("index")
+            .rename_dims(index="time")
+            .assign_coords(time=(["time"], time, time_attrs))
         )
 
         return level1_dataset

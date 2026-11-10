@@ -1,6 +1,6 @@
 [project]
 name = "turban-toolbox"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Turbulence Analysis Toolbox"
 authors = [
   { name = "Achim Randelhoff", email = "ara@akvaplan.niva.no" },
@@ -9,23 +9,22 @@ authors = [
 ]
 license = { text = "GPLv03" }
 dependencies = [
-  "arrow>=1.4.0",
-  'beartype>=0.16',
-  'gsw>=3.6',
+  'beartype>=0.18',
+  'gsw>=3.6.18',
   'jaxtyping>=0.2.20',
-  'matplotlib>=3.6',
-  'netCDF4>=1.6.3',
-  'numba>=0.58',
+  'matplotlib>=3.8.4',
+  'netCDF4>=1.7.0',
+  'numba>=0.60',
   'numpy>=2.0',
-  'pandas>=1.5',
+  'pandas>=2.2.2',
   'pydantic>=2.0',
   'requests>=2.32.0',
-  'scipy>=1.10',
+  'scipy>=1.13',
   'setuptools>=65',
-  'xarray>=2022.11',
+  'xarray>=2024.10.0',
 ]
 
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 readme = "README.md"
 classifiers = [
   'Development Status :: 4 - Beta',
@@ -36,8 +35,13 @@ classifiers = [
   'Programming Language :: Python :: 3 :: Only',
 ]
 
+[project.optional-dependencies]
+mss = ["pytz>=2020.1", "dateparser>=1.2.0"]
+microrider = ["arrow>=1.4.0"]
+
 [dependency-groups]
 dev = [
+    "turban-toolbox[mss,microrider]",
     "black>=25.11.0",
     "ipython>=8.18.1",
     "mypy>=1.19.1",
@@ -50,20 +54,23 @@ dev = [
     "mkdocstrings[python]>=0.24",
     "scipy-stubs>=1.17.1.5",
 ]
-mss = ["pytz", "dateparser"]
-microrider = ["arrow>=1.4.0"]
 
 [project.scripts]
 turban_download_datafiles="turban.utils.cli:download_datafiles"
 
 [build-system]
-requires = ["setuptools", "pip>=24.1"]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = false
 
 [tool.setuptools.packages.find]
+
+[tool.setuptools_scm]
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true, tags = true } }]
 
 [tool.pytest.ini_options]
 filterwarnings = "always::UserWarning"

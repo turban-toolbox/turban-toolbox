@@ -116,7 +116,9 @@ class hhl:
                                 channel = data_proc[0]
                                 data = data_proc[1]
                             else:
-                                logger.debug("Problem decoding, realigning %s", data_proc)
+                                logger.debug(
+                                    "Problem decoding, realigning %s", data_proc
+                                )
                                 align = self.align_buffer()
                                 if align is None:
                                     logger.debug("Could not realign align buffer")
@@ -172,13 +174,13 @@ class hhl:
                 data_tmp = self.decode_HHL(self.buffer)
                 # Check if the datastream is valid, if not delete the first byte and try again
                 if data_tmp is not None:
-                    logger.debug('Found valid HHL packet')
+                    logger.debug("Found valid HHL packet")
                     self.FLAG_VALID_HHL = True
                     channel = data_tmp[0]
                     data = data_tmp[1]
                     break
                 else:
-                    logger.debug('Did not find valid HHL packet')
+                    logger.debug("Did not find valid HHL packet")
                     self.buffer = self.buffer[1:]
 
             logger.debug("Valid %s", self.FLAG_VALID_HHL)

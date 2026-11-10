@@ -2,9 +2,11 @@
 
 ## Installation
 
-Install the package in editable mode with the development dependency group:
+Clone the repository, then install the package in editable mode with the `dev` dependency group, which contains the developer tools and all optional extras. Requires pip >= 24.1 for `--group` support:
 
 ```bash
+git clone https://github.com/turban-toolbox/turban-toolbox.git
+cd turban-toolbox
 python -m pip install -e . --group dev
 ```
 

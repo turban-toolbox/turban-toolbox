@@ -1,11 +1,15 @@
-from netCDF4 import Dataset
+import numpy as np
+from pydantic import field_validator, model_validator
 from turban.process.generic.config import SegmentConfig
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ShearConfig(SegmentConfig):
     freq_cutoff_antialias: float | None = None
     freq_cutoff_corrupt: float | None = None  #
-    freq_highpass: float = 0.15  # [Hz]
+    freq_highpass: float | None = None  # [Hz] None -> 1/(2T), T = segment duration
     spatial_response_wavenum: float = 50.0  # [1/m]
     waveno_cutoff_spatial_corr: float | None = None  # [1/m] #
     waveno_spectral_min: float | None = None
@@ -20,13 +24,48 @@ class ShearConfig(SegmentConfig):
     # tuple of variable names in auxiliary level 2 data used for vibration removal
     vibration_channels: tuple[str, ...] = tuple()
 
+    @model_validator(mode="after")
+    def _freq_highpass(self):
+        if self.freq_highpass is None:
+            # 1/(2T) with segment duration T = segment_length / sampfreq
+            self.freq_highpass = 0.5 * self.sampfreq / self.segment_length
+            logger.info(f"Setting `freq_highpass` to {self.freq_highpass:0.3f} Hz")
+        return self
+
+    @field_validator("vibration_channels", mode="before")
+    @classmethod
+    def _str_to_tuple(cls, v):
+        # netCDF returns a single-element string attribute as a plain str,
+        # so need to manually recreate a single-element tuple
+        return (v,) if isinstance(v, str) else v
+
+    @property
+    def number_signals_vibration_removal(self) -> int:
+        """N_V in the ATOMIX paper: number of vibration (and other) signals used to
+        remove vibration-coherent noise from the shear spectra (Goodman et al. 2006).
+        See Eqs. 16-17 in the ATOMIX paper.
+
+        Equals the number of ``vibration_channels``, since level 3 cannot be
+        built if any of them is missing from the aux data.
+        """
+        return len(self.vibration_channels)
+
+    @property
+    def log_psi_std(self) -> float:
+        r"""sigma_{ln\Psi} in the ATOMIX paper (Eq. 17, Sec. 3.3.5)"""
+        return np.sqrt(
+            5
+            / 4
+            * (
+                self.number_fft_windows_per_chunk
+                - self.number_signals_vibration_removal
+            )
+            ** (-7 / 9)
+        )
+
     @staticmethod
     def _attrs_from_atomix_netcdf(fname):
-        attrs = super(ShearConfig, ShearConfig)._attrs_from_atomix_netcdf(fname)
-        with Dataset(fname) as f:
-            attrs.update(
-                dict(
-                    freq_highpass=f.HP_cut,
-                )
-            )
-        return attrs
+        # imported here since turban.process.shear.atomix imports ShearConfig
+        from turban.process.shear.atomix import config_attrs
+
+        return config_attrs(fname)

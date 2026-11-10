@@ -1,73 +1,211 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import json
+import pytest
+from beartype.roar import BeartypeCallHintParamViolation
 
+from turban.instruments.mss.api import mrd_to_level1
 from turban.instruments.mss.config import MssDeviceConfig
-from turban.instruments.mss.mss_mrd import read_mrd, raw_to_level0, level0_to_level1
+from turban.instruments.mss.mss_mrd import (
+    read_mrd,
+    raw_to_level0,
+    level0_to_level1,
+    count_to_time,
+)
 from turban.process.shear.api import ShearProcessing, ShearLevel1, ShearConfig
 from turban.utils.filepaths import atomix_benchmark_baltic_mrd_fpath
 
+SHEAR_SENSITIVITIES = {"SHE1": 3.90e-4, "SHE2": 4.05e-4}
+SENSORNAMES_CTD = {"cond": "COND", "temp": "TEMP", "press": "PRESS"}
+
+
+@pytest.fixture(scope="module")
+def mss_conf_and_level0():
+    mss_conf = MssDeviceConfig.from_mrd(
+        filename=atomix_benchmark_baltic_mrd_fpath,
+        shear_sensitivities=SHEAR_SENSITIVITIES,
+        sensornames_ctd=SENSORNAMES_CTD,
+    )
+    with open(atomix_benchmark_baltic_mrd_fpath, "rb") as f:
+        data_raw = read_mrd(f)
+    return mss_conf, raw_to_level0(mss_conf, data_raw)
+
+
+def test_count_to_time():
+    # regular counter, offset as from calibration with coefficients [32768, 1]
+    count = np.arange(5) + 32768.0
+    np.testing.assert_allclose(count_to_time(count, 2.0), np.arange(5) / 2.0)
+
+
+def test_count_to_time_wraparound_and_gap(caplog):
+    # wraps around at 65536 and two records (2, 3) are missing
+    count = np.array([65534, 65535, 0, 1, 4, 5])
+    with caplog.at_level("WARNING"):
+        time = count_to_time(count, 1.0)
+    np.testing.assert_allclose(time, [0, 1, 2, 3, 6, 7])
+    assert "1 gaps, 2 data records are missing" in caplog.text
+
+
+def test_count_to_time_duplicate(caplog):
+    count = np.array([10, 11, 11, 12])
+    with caplog.at_level("WARNING"):
+        time = count_to_time(count, 1.0)
+    np.testing.assert_allclose(time, [0, 1, 1, 2])
+    assert "1 repeated values" in caplog.text
+
+
+@pytest.mark.parametrize("missing", [None, "nan", "interpolate"])
+def test_level0_to_level1_missing(mss_conf_and_level0, missing):
+    # SH2_0330.MRD has no missing records, so simulate a gap of two records
+    mss_conf, level0 = mss_conf_and_level0
+    nrecords = len(level0["index"])
+    level0_gap = level0.drop_isel(index=[1000, 1001])
+    level1 = level0_to_level1(mss_conf, level0_gap, missing=missing)
+
+    assert np.issubdtype(level1["time"].dtype, np.datetime64)
+    dt = np.diff(level1["time_count"].values) * mss_conf.sampling_freq
+    press = level1["PRESS"].values
+    if missing is None:
+        assert level1.sizes["time"] == nrecords - 2
+        np.testing.assert_allclose(np.unique(dt), [1, 3])
+        assert not np.isnan(press).any()
+        assert "inserted" not in level1
+    else:
+        assert level1.sizes["time"] == nrecords
+        np.testing.assert_allclose(dt, 1)
+        assert np.flatnonzero(level1["inserted"].values).tolist() == [1000, 1001]
+        if missing == "nan":
+            assert np.isnan(press).sum() == 2
+            assert np.isnan(press[1000:1002]).all()
+            # derived quantities are computed before masking, so the filters do
+            # not spread NaN beyond the inserted records
+            for name in ["PSPD_REL", "SHEAR"]:
+                isnan = np.isnan(level1[name].values).reshape(-1, nrecords)
+                assert np.flatnonzero(isnan.any(axis=0)).tolist() == [1000, 1001]
+                assert isnan[:, 1000:1002].all()
+        else:
+            assert not np.isnan(press).any()
+            np.testing.assert_allclose(
+                press[1000:1002],
+                np.interp([1000, 1001], [999, 1002], press[[999, 1002]]),
+            )
+
+
+def test_level0_to_level1_missing_external_pspd_rel(mss_conf_and_level0):
+    # external speed is filled at the gap together with the level0 channels
+    mss_conf, level0 = mss_conf_and_level0
+    mss_conf = mss_conf.model_copy(update={"pspd_rel_method": "external"})
+    nrecords = len(level0["index"])
+    pspd_rel = 0.5 + 1e-5 * np.arange(nrecords)
+    keep = np.delete(np.arange(nrecords), [1000, 1001])
+    level1 = level0_to_level1(
+        mss_conf, level0.isel(index=keep), pspd_rel=pspd_rel[keep], missing="nan"
+    )
+    pspd = level1["PSPD_REL"].values
+    assert np.isnan(pspd[1000:1002]).all()
+    np.testing.assert_allclose(np.delete(pspd, [1000, 1001]), pspd_rel[keep])
+
+    level1 = level0_to_level1(
+        mss_conf,
+        level0.isel(index=keep),
+        pspd_rel=pspd_rel[keep],
+        missing="interpolate",
+    )
+    np.testing.assert_allclose(level1["PSPD_REL"].values, pspd_rel)
+
+
+def test_level0_to_level1_no_count(mss_conf_and_level0, caplog):
+    mss_conf, level0 = mss_conf_and_level0
+    count_names = [k for k in level0.data_vars if str(k).upper() == "COUNT"]
+    assert count_names
+    with caplog.at_level("WARNING"):
+        level1 = level0_to_level1(mss_conf, level0.drop_vars(count_names))
+    assert "No COUNT channel found" in caplog.text
+    np.testing.assert_allclose(
+        level1["time_count"].values,
+        np.arange(len(level0["index"])) / mss_conf.sampling_freq,
+    )
+
+
+def test_level0_to_level1_missing_invalid(mss_conf_and_level0):
+    mss_conf, level0 = mss_conf_and_level0
+    with pytest.raises(BeartypeCallHintParamViolation):
+        level0_to_level1(mss_conf, level0, missing="zero")
+
+
+def test_from_mrd_guessing_sensornames_ctd_deprecated(caplog):
+    with caplog.at_level("WARNING"):
+        mss_conf = MssDeviceConfig.from_mrd(
+            filename=atomix_benchmark_baltic_mrd_fpath,
+            shear_sensitivities=SHEAR_SENSITIVITIES,
+        )
+    assert "Deprecated" in caplog.text
+    assert mss_conf.sensornames_ctd == SENSORNAMES_CTD
+
+
+def test_from_mrd_unknown_sensornames_ctd():
+    with pytest.raises(ValueError, match="P9999"):
+        MssDeviceConfig.from_mrd(
+            filename=atomix_benchmark_baltic_mrd_fpath,
+            shear_sensitivities=SHEAR_SENSITIVITIES,
+            sensornames_ctd={"cond": "COND", "temp": "TEMP", "press": "P9999"},
+        )
+
+
+def test_mrd_to_level1_without_mss_cfg():
+    cfg = ShearConfig(
+        sampfreq=1024.0,
+        segment_length=2048,
+        segment_overlap=1024,
+        chunk_length=4 * 2048,
+        chunk_overlap=1024,
+    )
+    level1 = mrd_to_level1(
+        atomix_benchmark_baltic_mrd_fpath,
+        "shear",
+        cfg,
+        shear_sensitivities=SHEAR_SENSITIVITIES,
+        sensornames_ctd=SENSORNAMES_CTD,
+    )
+    assert isinstance(level1, ShearLevel1)
+
 
 def test_mss():
-
+    """Only checks loading/saving of config, metadata and data"""
     mss_conf = MssDeviceConfig.from_mrd(
         filename=atomix_benchmark_baltic_mrd_fpath,
         shear_sensitivities={
             "SHE1": 3.90e-4,
             "SHE2": 4.05e-4,
         },  # sensors 32 and 33 (MSS038)
+        sensornames_ctd=SENSORNAMES_CTD,
         offset=0,
     )
-    # # Change the pressure sensor manually, because P250 had a cap on and did not measure properly
-    # mss_conf.sensornames_ctd["press"] = "P1000"
+    assert mss_conf.sensornames_ctd == SENSORNAMES_CTD
 
     with open(atomix_benchmark_baltic_mrd_fpath, "rb") as f:
         data_raw = read_mrd(f)
     data_level0 = raw_to_level0(mss_conf, data_raw)
 
-    print("Attributes", data_level0.attrs)
     data_level1 = level0_to_level1(mss_conf, data_level0)
 
-    #
-    shear_config = ShearConfig(
+    # save an existing configuration
+    with open(f"out/tests/instruments/mss/SH2_0330_config.json", "w") as f:
+        f.write(mss_conf.model_dump_json(indent=4))
+
+    # load back in again
+    with open(f"out/tests/instruments/mss/SH2_0330_config.json", "r") as f:
+        mss_conf2 = MssDeviceConfig.model_validate(json.load(f))
+
+    assert mss_conf == mss_conf2
+
+    # full MRD -> ShearLevel1 path via the api, including derived aux data
+    cfg = ShearConfig(
         sampfreq=1024.0,
         segment_length=2048,
         segment_overlap=1024,
         chunk_length=4 * 2048,
         chunk_overlap=1024,
-        freq_highpass=0.15,
-        spatial_response_wavenum=50.0,
-        spike_threshold=8.0,
-        max_tries=10,
-        spike_replace_before=512,
-        spike_replace_after=512,
-        spike_include_before=10,
-        spike_include_after=20,
-        cutoff_freq_lp=0.5,
     )
-    section_number = np.asarray(data_level1["time_count"] * 0, dtype=int)
-    section_number[2677:152620] = int(1)
-    shear_level1 = ShearLevel1(
-        time=np.asarray(data_level1["time_count"]),
-        senspeed=np.asarray(data_level1["PSPD_REL"]),
-        shear=np.asarray(data_level1["SHEAR"]),
-        section_number=section_number,
-        cfg=shear_config,
-    )
-
-    print(data_level1)
-
-    for v in ["PRESS", "TEMP", "COND"]:
-        shear_level1.add_aux_data(data_level1[v].values, v.lower())
-
-    p = ShearProcessing(shear_level1)
-    level4 = p.level4.to_xarray()
-
-    fig, ax = plt.subplots()
-    ax.plot(level4["eps"][0, :], level4["press_mean"])
-    ax.plot(level4["eps"][1, :], level4["press_mean"])
-    ax.set_xscale("log")
-    ax.invert_yaxis()
-    ax.set_ylabel("Pressure [dbar]")
-    ax.set_xlabel("Epsilon [W kg-1]")
-    ax.legend(["Shear 1", "Shear 2"])
-    fig.savefig("out/tests/instruments/mss/SH2_0330.png")
+    level1 = mrd_to_level1(atomix_benchmark_baltic_mrd_fpath, "shear", cfg, mss_conf)
+    assert isinstance(level1, ShearLevel1)

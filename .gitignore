@@ -19,6 +19,7 @@ mrd-format-info/
 *.so
 *.png
 
+out/tests/
 __pycache__
 
 site/
@@ -30,3 +31,5 @@ scraps/
 
 *~
 uv.lock
+
+CLAUDE.md
