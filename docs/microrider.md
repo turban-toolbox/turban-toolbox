@@ -174,7 +174,7 @@ from collections.abc import Callable
 from turban.instruments.microrider.sensorspeedplugins import SensorSpeedABC, register_plugin
 
 
-@register_plugin([("scale", float, 1.0)])
+@register_plugin([("scale", float)])
 class SensorSpeedMyCustom(SensorSpeedABC):
 
     def __init__(self, scale: float) -> None:

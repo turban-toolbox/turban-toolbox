@@ -126,7 +126,7 @@ class MicroriderInstrument(Instrument):
         argument_list_check = True
         args: dict[str, float | str] = {}
         unconfigured_args: list[str] = []
-        for n, dtype, v in plugin_required_argument_list:
+        for n, dtype in plugin_required_argument_list:
             if not n in plugin_arguments:
                 argument_list_check = False
                 unconfigured_args.append(n)

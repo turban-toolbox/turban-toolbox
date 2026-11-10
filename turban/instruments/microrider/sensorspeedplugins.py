@@ -43,19 +43,6 @@ class SensorSpeedABC(ABC):
         """
         pass
 
-    @abstractmethod
-    def interpolation_factory(
-        self,
-    ) -> Callable[[Float[np.ndarray, "time"]], Float[np.ndarray, "time"]]:
-        """Build and return the interpolation function for sensor speed.
-
-        Returns
-        -------
-        Callable
-            A callable that accepts a time vector and returns sensor speed values.
-        """
-        pass
-
     def set_microstructure_raw_data(
         self, microstructure_raw_data: MicrostructureRawData
     ) -> None:
@@ -66,7 +53,7 @@ class SensorSpeedABC(ABC):
 # Create a registry of SensorSpeedPlugin classes:
 
 _SENSOR_SPEED_PLUGIN_REGISTRY: dict[
-    str, tuple[type[SensorSpeedABC], list[tuple[str, type, float | str]]]
+    str, tuple[type[SensorSpeedABC], list[tuple[str, type]]]
 ] = {}
 
 
@@ -74,19 +61,54 @@ _SENSOR_SPEED_PLUGIN_REGISTRY: dict[
 # class, and returns a class. To reflect this, the return type is
 # defined as a callable Callable[[args], result]. See also rsCommon.py
 def register_plugin(
-    parameter_list: list[tuple[str, type, float | str]],
+    parameter_list: list[tuple[str, type]],
 ) -> Callable[[type[SensorSpeedABC]], type[SensorSpeedABC]]:
     def wrapper(cls: type[SensorSpeedABC]) -> type[SensorSpeedABC]:
-        name = cls.__name__
-        _SENSOR_SPEED_PLUGIN_REGISTRY[name] = (cls, parameter_list)
+        _SENSOR_SPEED_PLUGIN_REGISTRY[plugin_name(cls)] = (cls, parameter_list)
         return cls
 
     return wrapper
 
 
+def plugin_name(cls: type[SensorSpeedABC]) -> str:
+    """Return the name under which a sensor speed plugin class is registered.
+
+    Parameters
+    ----------
+    cls : type[SensorSpeedABC]
+        Plugin class.
+
+    Returns
+    -------
+    str
+        The bare class name for built-in plugins (defined in this module), or
+        ``"module:ClassName"`` for custom plugins defined elsewhere.
+    """
+    if cls.__module__ == __name__:  # built-in plugin
+        return cls.__name__
+    return f"{cls.__module__}:{cls.__name__}"
+
+def handle_custom_plugins(name: str) -> None:
+    if name.count(":") == 0:
+        return
+    if name.count(":") == 1:
+        module_name, class_name = name.split(":")
+        mesg = ""
+        import importlib
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            mesg = f"Failed to import module {module_name}."
+    else:
+        mesg = f"Invalid plugin name ({name})."
+    if mesg:
+        logger.error(mesg)
+        raise PluginError(mesg)
+    
+
 def get_registered_plugin_parameter_list(
     name: str,
-) -> list[tuple[str, type, float | str]]:
+) -> list[tuple[str, type]]:
     """Return the parameter list for a registered sensor speed plugin.
 
     Parameters
@@ -96,15 +118,17 @@ def get_registered_plugin_parameter_list(
 
     Returns
     -------
-    list[tuple[str, type, float | str]]
-        List of ``(parameter_name, type, default_value)`` tuples describing
-        the constructor arguments required by the plugin.
+    list[tuple[str, type]]
+        List of ``(parameter_name, type)`` tuples describing the constructor
+        arguments of the plugin. There are no defaults: every parameter must
+        be set in the configuration.
 
     Raises
     ------
     PluginError
         If `name` is not found in the plugin registry.
     """
+    handle_custom_plugins(name)
     try:
         _, parameter_list = _SENSOR_SPEED_PLUGIN_REGISTRY[name]
     except KeyError:
@@ -137,11 +161,12 @@ def plugin_factory(name: str, args: dict[str, float | str]) -> SensorSpeedABC:
     SensorSpeedABC
         An instance of the requested plugin.
     """
+    handle_custom_plugins(name)
     C, _ = _SENSOR_SPEED_PLUGIN_REGISTRY[name]
     return C(**args)
 
 
-@register_plugin([("constant_speed", float, 1.0)])
+@register_plugin([("constant_speed", float)])
 class SensorSpeedConstant(SensorSpeedABC):
 
     def __init__(self, constant_speed: float) -> None:
@@ -295,7 +320,7 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         return ifun(t)
 
 
-@register_plugin([("filename", str, "datafile.txt")])
+@register_plugin([("filename", str)])
 class SensorSpeedDataFile(SensorSpeedLookupTable):
 
     def __init__(self, filename: str) -> None:

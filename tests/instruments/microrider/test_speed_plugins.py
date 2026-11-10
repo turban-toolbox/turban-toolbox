@@ -119,13 +119,10 @@ def test_sensor_speed_data_file(instrument, data_path, shear_cfg, tmp_path):
 
 
 def test_custom_plugin(instrument, data_path, shear_cfg):
-    @plugins.register_plugin([("scale", float, 1.0)])
+    @plugins.register_plugin([("scale", float)])
     class SensorSpeedTestCustom(plugins.SensorSpeedABC):
         def __init__(self, scale: float) -> None:
             self._scale = scale
-
-        def interpolation_factory(self):
-            raise NotImplementedError
 
         def get_sensor_speed(self, t):
             return np.ones_like(t) * self._scale
@@ -178,26 +175,37 @@ def test_missing_plugin_parameter_is_logged(caplog):
 
 
 def test_only_missing_plugin_parameters_are_logged(caplog):
-    @plugins.register_plugin([("p_a", float, 1.0), ("p_b", float, 2.0), ("p_c", float, 3.0)])
+    @plugins.register_plugin([("p_a", float), ("p_b", float), ("p_c", float)])
     class SensorSpeedTestMissingParameters(plugins.SensorSpeedABC):
         def __init__(self, p_a: float, p_b: float, p_c: float) -> None:
             super().__init__()
 
-        def interpolation_factory(self):
-            raise NotImplementedError
-
         def get_sensor_speed(self, t):
             return np.ones_like(t)
-
     cfg = MicroriderConfig(sampfreq=1.0,
                            sensors={},
-                           sensor_speed_plugin="SensorSpeedTestMissingParameters",
+                           sensor_speed_plugin=plugins.plugin_name(SensorSpeedTestMissingParameters),
                            sensor_speed_plugin_parameters={"p_b": 5.0})
     with caplog.at_level("ERROR"), pytest.raises(MicroriderAPIError):
         MicroriderInstrument(cfg=cfg)
     errors = " ".join(r.message for r in caplog.records if r.levelname == "ERROR")
     assert "p_a" in errors and "p_c" in errors
     assert "p_b" not in errors
+
+
+# Built-in plugins are registered under their bare class name, custom plugins
+# under "module:ClassName".
+def test_plugin_name():
+    assert plugins.plugin_name(plugins.SensorSpeedConstant) == "SensorSpeedConstant"
+
+    @plugins.register_plugin([])
+    class SensorSpeedTestName(plugins.SensorSpeedABC):
+        def get_sensor_speed(self, t):
+            return np.ones_like(t)
+
+    expected = f"{__name__}:SensorSpeedTestName"
+    assert plugins.plugin_name(SensorSpeedTestName) == expected
+    assert plugins.get_registered_plugin_parameter_list(expected) == []
 
 
 # Configured plugin parameters must reach the plugin. Use values that differ from
