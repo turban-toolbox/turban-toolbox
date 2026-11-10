@@ -148,6 +148,36 @@ def test_requesting_nonexisting_plugin():
     with pytest.raises(plugins.PluginError):
         plugin = plugins.get_registered_plugin_parameter_list("non_exisiting")
 
+
+# Malformed plugin names must give a PluginError, not whatever importlib raises.
+@pytest.mark.parametrize("name", [":Foo", "some_module:", ".foo:Bar", "a:b:c"])
+def test_invalid_plugin_name_raises_plugin_error(name):
+    with pytest.raises(plugins.PluginError):
+        plugins.get_registered_plugin_parameter_list(name)
+
+
+def test_unimportable_plugin_module_raises_plugin_error():
+    with pytest.raises(plugins.PluginError, match="no_such_module_xyz"):
+        plugins.get_registered_plugin_parameter_list("no_such_module_xyz:Foo")
+
+
+# A plugin module that exists but fails on one of its own imports must say which
+# import failed.
+def test_import_error_inside_plugin_module_is_reported(tmp_path, monkeypatch):
+    (tmp_path / "plugin_with_missing_dependency.py").write_text(
+        "import no_such_dependency_xyz\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    with pytest.raises(plugins.PluginError, match="no_such_dependency_xyz"):
+        plugins.get_registered_plugin_parameter_list(
+            "plugin_with_missing_dependency:Foo"
+        )
+
+
+def test_plugin_factory_unknown_plugin_raises_plugin_error():
+    with pytest.raises(plugins.PluginError):
+        plugins.plugin_factory("Nope", {})
+
 def test_overwriting_plugin_prints_log(instrumentPreConfigured, caplog):
     instrument = instrumentPreConfigured
     _t = np.linspace(_T0, _T1)

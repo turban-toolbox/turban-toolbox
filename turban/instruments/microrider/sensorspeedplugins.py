@@ -94,17 +94,62 @@ def handle_custom_plugins(name: str) -> None:
     if name.count(":") == 1:
         module_name, class_name = name.split(":")
         mesg = ""
-        import importlib
-        try:
-            importlib.import_module(module_name)
-        except ImportError:
-            mesg = f"Failed to import module {module_name}."
+        if not module_name:
+            mesg = f"Cannot import empty module. ({name})"
+        elif module_name.startswith("."):
+            mesg = f"Refuse to import relative modules. ({name})"
+        elif not class_name:
+            mesg = f"A plugin name is required. ({name})"
+        else:
+            import importlib
+            try:
+                importlib.import_module(module_name)
+            except ImportError as e:
+                mesg = f"Failed to import module {module_name} because {e}."
     else:
         mesg = f"Invalid plugin name ({name})."
     if mesg:
         logger.error(mesg)
         raise PluginError(mesg)
     
+
+def _lookup_plugin(
+    name: str,
+) -> tuple[type[SensorSpeedABC], list[tuple[str, type]]]:
+    """Return the registry entry ``(class, parameter_list)`` for `name`.
+
+    Imports the plugin's module first if `name` is ``"module:ClassName"``.
+
+    Parameters
+    ----------
+    name : str
+        Registered name of the plugin.
+
+    Returns
+    -------
+    tuple[type[SensorSpeedABC], list[tuple[str, type]]]
+        The plugin class and its parameter list.
+
+    Raises
+    ------
+    PluginError
+        If `name` is invalid, its module cannot be imported, or it is not
+        registered.
+    """
+    handle_custom_plugins(name)
+    try:
+        return _SENSOR_SPEED_PLUGIN_REGISTRY[name]
+    except KeyError:
+        mesg = (
+            f"{name} is not registered as a sensor speed plugin. Registered plugins:\n"
+        )
+        mesg += f"    {'plugin name':20s} | parameter list\n"
+        mesg += "-" * 76 + "\n"
+        for k, (c, v) in _SENSOR_SPEED_PLUGIN_REGISTRY.items():
+            mesg += f"    {k:20s} : {v}\n"
+        logger.error(mesg)
+        raise PluginError(f"{name} is not a registered SensorSpeed plugin") from None
+
 
 def get_registered_plugin_parameter_list(
     name: str,
@@ -128,22 +173,8 @@ def get_registered_plugin_parameter_list(
     PluginError
         If `name` is not found in the plugin registry.
     """
-    handle_custom_plugins(name)
-    try:
-        _, parameter_list = _SENSOR_SPEED_PLUGIN_REGISTRY[name]
-    except KeyError:
-        mesg = (
-            f"{name} is not registered as a sensor speed plugin. Registered plugins:\n"
-        )
-        mesg += f"    {'plugin name':20s} | parameter list\n"
-        mesg += "-" * 76 + "\n"
-        for k, (c, v) in _SENSOR_SPEED_PLUGIN_REGISTRY.items():
-            mesg += f"    {k:20s} : {v}\n"
-        logger.error(mesg)
-    else:
-        return parameter_list
-    # If we get here, we didn't manage to return the parameter list.
-    raise PluginError(f"{name} is not a registered SensorSpeed plugin")
+    _, parameter_list = _lookup_plugin(name)
+    return parameter_list
 
 
 def plugin_factory(name: str, args: dict[str, float | str]) -> SensorSpeedABC:
@@ -160,9 +191,13 @@ def plugin_factory(name: str, args: dict[str, float | str]) -> SensorSpeedABC:
     -------
     SensorSpeedABC
         An instance of the requested plugin.
+
+    Raises
+    ------
+    PluginError
+        If `name` is not a registered plugin.
     """
-    handle_custom_plugins(name)
-    C, _ = _SENSOR_SPEED_PLUGIN_REGISTRY[name]
+    C, _ = _lookup_plugin(name)
     return C(**args)
 
 
