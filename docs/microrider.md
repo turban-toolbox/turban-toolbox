@@ -1,6 +1,6 @@
-# MicroriderProbe
+# MicroriderInstrument
 
-`MicroriderProbe` reads a RSI MicroRider binary `.p` file and converts it into a
+`MicroriderInstrument` reads a RSI MicroRider binary `.p` file and converts it into a
 [`ShearLevel1`][turban.process.shear.api.ShearLevel1] dataclass, ready for the turban
 shear processing pipeline. Because sensor speed — the speed of the instrument relative
 to the water — depends on how the instrument is deployed, it is provided through a
@@ -10,7 +10,7 @@ swappable **sensor speed plugin**.
 
 ```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 from turban.process.shear.api import ShearConfig
 
 # Processing configuration
@@ -37,12 +37,12 @@ cfg = ShearConfig(
 # Instrument configuration
 microrider_config = MicroriderConfig(sampfreq=512.0, sensors={})
 
-# Create the probe and attach a sensor speed plugin
-probe = MicroriderProbe(cfg=microrider_config)
-probe.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
+# Create the instrument and attach a sensor speed plugin
+instrument = MicroriderInstrument(cfg=microrider_config)
+instrument.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
 
 # Convert the .p file to ShearLevel1
-level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg)
+level1 = instrument.to_shear_level1("path/to/data.p", cfg=cfg)
 ```
 
 `level1` is a `ShearLevel1` instance containing:
@@ -77,13 +77,13 @@ deployments where the platform speed is well-known and stable.
 
 ```python
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
 cfg = MicroriderConfig(sampfreq=512.0, sensors={})
-probe = MicroriderProbe(cfg)
+instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedConstant(constant_speed=0.6)  # 0.6 m/s
-probe.set_sensor_speed_plugin(plugin)
+instrument.set_sensor_speed_plugin(plugin)
 ```
 
 | Parameter | Type | Description |
@@ -99,13 +99,13 @@ automatically when `to_shear_level1` is called.
 
 ```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
 cfg = MicroriderConfig(sampfreq=512.0, sensors={})
-probe = MicroriderProbe(cfg)
+instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedEMC()
-probe.set_sensor_speed_plugin(plugin)
+instrument.set_sensor_speed_plugin(plugin)
 ```
 
 ### `SensorSpeedLookupTable`
@@ -115,14 +115,14 @@ externally (e.g. from a navigation system or DVL) and is available as numpy arra
 
 ```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
 cfg = MicroriderConfig(sampfreq=512.0, sensors={})
-probe = MicroriderProbe(cfg)
+instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedLookupTable()
 plugin.from_timeseries(t=time_array, U=speed_array)
-probe.set_sensor_speed_plugin(plugin)
+instrument.set_sensor_speed_plugin(plugin)
 ```
 
 | Method | Arguments | Description |
@@ -138,13 +138,13 @@ one row per sample. Internally uses `SensorSpeedLookupTable`.
 
 ```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
 cfg = MicroriderConfig(sampfreq=512.0, sensors={})
-probe = MicroriderProbe(cfg)
+instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedDataFile(filename="path/to/speed.txt")
-probe.set_sensor_speed_plugin(plugin)
+instrument.set_sensor_speed_plugin(plugin)
 ```
 
 The file format expected by `numpy.loadtxt`:
@@ -165,12 +165,11 @@ The file format expected by `numpy.loadtxt`:
 
 ## Writing a custom plugin
 
-Subclass `SensorSpeedABC` and implement `get_sensor_speed` and `interpolation_factory`:
+Subclass `SensorSpeedABC` and implement `get_sensor_speed`:
 
 ```python 
 import numpy as np
 from jaxtyping import Float
-from collections.abc import Callable
 from turban.instruments.microrider.sensorspeedplugins import SensorSpeedABC, register_plugin
 
 
@@ -178,11 +177,8 @@ from turban.instruments.microrider.sensorspeedplugins import SensorSpeedABC, reg
 class SensorSpeedMyCustom(SensorSpeedABC):
 
     def __init__(self, scale: float) -> None:
+        super().__init__()
         self._scale = scale
-
-    def interpolation_factory(self) -> Callable:
-        # build and return an interpolation function, or raise NotImplementedError
-        raise NotImplementedError
 
     def get_sensor_speed(
         self, t: Float[np.ndarray, "time"]
@@ -191,28 +187,47 @@ class SensorSpeedMyCustom(SensorSpeedABC):
         return np.ones_like(t) * self._scale
 ```
 
+Before `get_sensor_speed` is called, `to_shear_level1` hands the plugin the data read
+from the `.p` file. They are available as `self.microstructure_raw_data`, so a plugin
+can compute speed from any recorded channel (pressure, inclinometers, ...).
+
 Decorating with `@register_plugin` makes the class available through the config-driven
-factory (see below) and lists it in the registry for introspection.
+factory (see below) and lists it in the registry for introspection. The argument is a
+list of `(parameter_name, type)` pairs, one for each constructor argument. There are no
+default values: every parameter must be set in the configuration, so that a
+configuration always fully describes how the data were processed.
+
+A plugin defined in your own module is registered as `"module:ClassName"`. For
+example, the class above saved in `my_plugins.py` is registered as
+`"my_plugins:SensorSpeedMyCustom"`. Built-in plugins are registered under their bare
+class name (e.g. `"SensorSpeedConstant"`). `plugin_name` returns the registered name
+of a plugin class:
+
+```python notest
+from turban.instruments.microrider.sensorspeedplugins import plugin_name
+
+plugin_name(SensorSpeedMyCustom)  # "my_plugins:SensorSpeedMyCustom"
+```
 
 ---
 
 ## Channel configuration
 
-By default `MicroriderProbe` reads sensor parameters (e.g. shear probe sensitivity `sens`)
+By default `MicroriderInstrument` reads sensor parameters (e.g. shear probe sensitivity `sens`)
 from the setup string embedded in the `.p` file. You can override individual parameters by
 passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
 
-Use `microrider_channel_config_factory` to obtain a pre-populated config object for a named channel,
+Use `channel_config_factory` to obtain a pre-populated config object for a named channel,
 then call `update` to override specific fields:
 
 ```python 
-from turban.instruments.microrider.channels import microrider_channel_config_factory
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.channels import channel_config_factory
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
-sh1 = microrider_channel_config_factory("sh1")
+sh1 = channel_config_factory("sh1")
 sh1.update("sens", 0.0700)  # V / (rad s⁻¹)
 
-sh2 = microrider_channel_config_factory("sh2")
+sh2 = channel_config_factory("sh2")
 sh2.update("sens", 0.0970)
 
 microrider_config = MicroriderConfig(
@@ -220,7 +235,7 @@ microrider_config = MicroriderConfig(
     sensors={},
     channel_cfgs=[sh1, sh2],
 )
-probe = MicroriderProbe(cfg=microrider_config)
+instrument = MicroriderInstrument(cfg=microrider_config)
 ```
 
 Only the fields explicitly passed to `update` override the file-embedded values; all
@@ -231,15 +246,25 @@ the `.p` file.
 
 ## Config-driven plugin selection
 
-`MicroriderProbe` also supports selecting a plugin through the instrument configuration
+`MicroriderInstrument` also supports selecting a plugin through the instrument configuration
 object, which is convenient when configuration is loaded from a file rather than
-constructed in code. The relevant fields on the config are `sensor_speed_plugin` (the
-class name as a string) and `sensor_speed_plugin_parameters` (a dictionary of constructor
-arguments). When these are set, `MicroriderProbe` instantiates the plugin automatically
-at construction time and no explicit call to `set_sensor_speed_plugin` is needed.
+constructed in code. The relevant fields on the config are:
+
+- `sensor_speed_plugin`: the registered name of the plugin. This is the bare class name
+  for a built-in plugin (`"SensorSpeedConstant"`), or `"module:ClassName"` for a custom
+  plugin (`"my_plugins:SensorSpeedMyCustom"`). For a custom plugin the module is imported
+  automatically, which registers the plugin. The module must be importable, i.e. on
+  `sys.path`.
+- `sensor_speed_plugin_parameters`: a dictionary of constructor arguments. Every
+  parameter of the plugin must be given. A missing one is logged by name and raises
+  `MicroriderAPIError`, and parameters the plugin does not use are logged as a warning.
+
+When these are set, `MicroriderInstrument` instantiates the plugin automatically at
+construction time and no explicit call to `set_sensor_speed_plugin` is needed. An
+unknown or unimportable plugin name raises `PluginError`.
 
 ```python notest
-from turban.instruments.microrider.api import MicroriderProbe, MicroriderConfig
+from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 from turban.process.shear.api import ShearConfig
 
 # Microrider configuration
@@ -271,9 +296,9 @@ cfg = ShearConfig(
     cutoff_freq_lp=0.5,
 )
 
-probe = MicroriderProbe(cfg=microrider_config)
+instrument = MicroriderInstrument(cfg=microrider_config)
 # No further call to set_sensor_speed_plugin needed.
-level1 = probe.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
+level1 = instrument.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
 ```
 
 Calling `set_sensor_speed_plugin` after construction always works and overrides any
