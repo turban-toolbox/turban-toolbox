@@ -51,7 +51,7 @@ class MicroriderInstrument(Instrument):
             )
         self.sensor_speed_plugin = sensor_speed_plugin
 
-    def to_shear_level1(self, filename: str, cfg: ShearConfig) -> ShearLevel1:
+    def file_to_shear_level1(self, filename: str, cfg: ShearConfig) -> ShearLevel1:
         """Read a MicroRider .p file and convert it to a ShearLevel1 dataclass.
 
         Parameters

@@ -14,7 +14,7 @@ class Instrument(ABC):
         self.cfg = cfg
         
     @abstractmethod
-    def to_shear_level1(self, filename: str, cfg: ShearConfig) -> "ShearLevel1":
+    def file_to_shear_level1(self, filename: str, cfg: ShearConfig) -> "ShearLevel1":
         """
         Convert raw data to shear level 1
         """
@@ -23,7 +23,7 @@ class Instrument(ABC):
 
 class Dropsonde(Instrument):
 
-    def to_shear_level1(self, filename:str, cfg: ShearConfig) -> "ShearLevel1":
+    def file_to_shear_level1(self, filename:str, cfg: ShearConfig) -> "ShearLevel1":
         """
         Convert raw data to shear level 1
         """
