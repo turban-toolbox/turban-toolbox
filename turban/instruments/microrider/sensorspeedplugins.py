@@ -5,7 +5,6 @@ from jaxtyping import Float
 import numpy as np
 from scipy.interpolate import make_interp_spline
 
-from turban.instruments.microrider import rsIO
 from turban.instruments.microrider.rsCommon import MicrostructureRawData
 from turban.utils.logging import get_logger
 

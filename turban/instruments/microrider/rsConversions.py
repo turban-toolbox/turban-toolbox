@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import logging
-from collections import defaultdict
 import typing
 from typing import Any
 
@@ -9,7 +8,6 @@ import numpy as np
 from scipy.interpolate import PchipInterpolator as si_PchipInterpolator
 import scipy.signal as ss
 
-from turban.instruments.microrider import rsCommon as common
 from turban.instruments.generic.channels import ChannelConfigBaseModel
 
 logger = logging.getLogger(__name__)
@@ -355,11 +353,7 @@ def get_converter(channel_config: ChannelConfigBaseModel) -> type[Converter]:
     Note : this code uses the match/case structure and requires therefore python 3.10+
     """
     converter: type[Converter]
-    try:
-        sensor_type = channel_config.type
-    except KeyError:
-        sensor_type = "none"
-    match sensor_type:
+    match channel_config.type:
         case "piezo":
             converter = Piezo
         case "gnd":
@@ -380,8 +374,6 @@ def get_converter(channel_config: ChannelConfigBaseModel) -> type[Converter]:
             converter = Aem1g_a
         case "aem1g_d":
             converter = Aem1g_d
-        case "none":
-            converter = PassThrough
         case _:
             converter = PassThrough
 

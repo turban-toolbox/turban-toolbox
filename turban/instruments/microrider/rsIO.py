@@ -5,7 +5,7 @@ import io
 import os.path
 import re
 import struct
-from typing import Any, Literal, Self
+from typing import Any, Literal
 
 import arrow
 import numpy as np
@@ -127,7 +127,6 @@ class ChannelMatrix(object):
         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
 
     def get_record_indices(self, channel_name: str) -> np.typing.NDArray[np.int64]:
-        n_matrix_rows, _ = self.matrix.shape
         channel_positions = self.matrix.flatten()
         channel = self.channels[channel_name]
         indices = np.where(channel_positions == channel.config.id)[0]
@@ -521,9 +520,7 @@ def read_p_file(
     MicrostructureRawData object
         Header and raw data, converted into physical units.
     """
-    header_parser = HeaderParser()
     microrider_config = rsConfig_parser.MicroRiderConfig()
-    full_path = os.path.realpath(filename)
 
     with open(filename, "rb") as fd:
         header_parser = HeaderParser()
