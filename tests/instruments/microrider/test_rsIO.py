@@ -7,6 +7,7 @@ import shutil
 import zipfile
 
 import numpy as np
+import pydantic
 from scipy.io import loadmat
 
 from turban.instruments.microrider import channels, rsIO, rsConfig_parser
@@ -166,29 +167,23 @@ def test_check_for_bad_blocks_missing_record(corrupted_0413):
 #
 
 
-def test_channel_config():
-    channel_config = channels.ChannelConfig(name="ch255", id=255, type="")
-    assert channel_config.name == "ch255"
-    assert channel_config.id == 255
-    assert channel_config.type == ""
-    channel_config.update("name", "CH255")
-    assert channel_config.name == "CH255"
-    with pytest.raises(
-        AttributeError, match="ChannelConfig has no attribute not_exsting."
-    ):
-        channel_config.update("not_exsting", 13)
+def test_channel_config_defaults():
+    channel_config = channels.ChannelConfigShear(
+        name="sh1", id=8, adc_fs=4.096, adc_bits=16, diff_gain=0.94, sens=0.07
+    )
+    assert channel_config.adc_zero == 0.0 and channel_config.sig_zero == 0.0
 
 
-def test_channel_config_is_set():
-    channel_config = channels.ChannelConfigThermistor(name="T1", id=12, type="therm")
-    assert channel_config.is_set("name")
-    assert not channel_config.is_set("a")
-    with pytest.raises(
-        AttributeError, match="ChannelConfigThermistor has no attribute a0"
-    ):
-        channel_config.is_set("a0")
-    channel_config.update("a", 1)
-    assert channel_config.is_set("a")
+def test_channel_config_missing_calibration():
+    with pytest.raises(pydantic.ValidationError, match="sens"):
+        channels.ChannelConfigShear(
+            name="sh1", id=8, adc_fs=4.096, adc_bits=16, diff_gain=0.94
+        )
+
+
+def test_channel_config_unknown_field():
+    with pytest.raises(pydantic.ValidationError, match="not_existing"):
+        channels.ChannelConfig(name="ch255", id=255, not_existing=13)
 
 
 #
@@ -294,12 +289,24 @@ def test_user_channel_config_058():
     # that the user-supplied config overrides the one in the setup string.
     fn = os.path.join(datadir, "DAT_058.P")
     mfn = os.path.join(datadir, "DAT_058.mat")
-    u_em_config = channels.ChannelConfigU_EM(name="U_EM", a=-24.4605, b=151.341)
-    data = rsIO.read_p_file(fn, channel_configs=[u_em_config])
+    u_em_config = dict(name="U_EM", a=-24.4605, b=151.341)
+    data = rsIO.read_p_file(fn, channel_cfgs=[u_em_config])
     mdata = load_odas_reference_data(mfn)
     assert data.data["U_EM"].shape == mdata["U_EM"].shape
     # rtol=0: a relative tolerance would hide the 1.6e-6 m/s difference without the override.
     assert np.allclose(data.data["U_EM"], mdata["U_EM"], rtol=0, atol=2e-12)
+
+
+def test_user_channel_config_misspelt_field():
+    fn = os.path.join(datadir, "DAT_058.P")
+    with pytest.raises(pydantic.ValidationError, match="sensitivity"):
+        rsIO.read_p_file(fn, channel_cfgs=[dict(name="sh1", sensitivity=0.07)])
+
+
+def test_user_channel_config_unknown_channel():
+    fn = os.path.join(datadir, "DAT_058.P")
+    with pytest.raises(ValueError, match="sh3"):
+        rsIO.read_p_file(fn, channel_cfgs=[dict(name="sh3", sens=0.07)])
     
 
     

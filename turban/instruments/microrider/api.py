@@ -2,12 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
-from pydantic import SerializeAsAny, field_validator
 
 from turban.instruments.generic.api import Instrument
 from turban.instruments.generic.config import InstrumentConfig
-from turban.instruments.generic.channels import ChannelConfigBaseModel
-from turban.instruments.microrider.channels import CHANNEL_CONFIGS
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider import rsIO
 from turban.process.shear.api import ShearLevel1
@@ -25,24 +22,9 @@ class MicroriderAPIError(Exception):
 class MicroriderConfig(InstrumentConfig):
     sensor_speed_plugin: str = ""
     sensor_speed_plugin_parameters: dict[str, float | str] = {}
-    channel_cfgs: list[SerializeAsAny[ChannelConfigBaseModel]] = []
-
-    @field_validator("channel_cfgs", mode="before")
-    @classmethod
-    def _to_channel_config_classes(cls, v: Any) -> Any:
-        """Turn plain dicts (e.g. from a YAML/JSON file) into the channel-specific
-        config class, looked up by channel name. Config objects pass through."""
-        if not isinstance(v, list):
-            return v  # let pydantic report the type error
-        result = []
-        for item in v:
-            if isinstance(item, dict):
-                name = item.get("name")
-                if name not in CHANNEL_CONFIGS:
-                    raise ValueError(f"{name!r} is not a known MicroRider channel.")
-                item = CHANNEL_CONFIGS[name].model_validate(item)
-            result.append(item)
-        return result
+    # Channel settings overriding those of the setup string in the .p file,
+    # e.g. [{"name": "sh1", "sens": 0.0712}]. Validated when the file is read.
+    channel_cfgs: list[dict[str, Any]] = []
 
 
 class MicroriderInstrument(Instrument):

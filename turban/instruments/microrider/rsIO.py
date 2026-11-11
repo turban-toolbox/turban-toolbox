@@ -12,7 +12,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline as si_CubicSpline
 
 from turban.instruments.generic.channels import ChannelConfigBaseModel
-from turban.instruments.microrider.channels import channel_config_factory
+from turban.instruments.microrider.channels import CHANNEL_CONFIGS
 from turban.instruments.microrider import rsConversions
 from turban.instruments.microrider import rsConfig_parser
 from turban.instruments.microrider.rsCommon import (
@@ -105,6 +105,9 @@ class ChannelMatrix(object):
     ----------
     microrider_config : dict[str, str|int|float|list[int]]
         dictionary holding the MR configuration
+    channel_cfgs : list[dict[str, Any]]
+        user-supplied channel settings that override those of the setup
+        string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     """
 
@@ -113,11 +116,12 @@ class ChannelMatrix(object):
         microrider_config: rsConfig_parser.MicroRiderConfig,
         header_data: ByteHeader,
         header_info: HeaderInfo,
+        channel_cfgs: list[dict[str, Any]] = [],
     ) -> None:
         self.matrix = self._get_matrix(microrider_config)
         self.header_info = header_info  # header information to pass
         self.header_data = header_data  # header information extracted from file.
-        self.channels = self._create_channels(microrider_config)
+        self.channels = self._create_channels(microrider_config, channel_cfgs)
         self._set_sample_rates()
         self._regex_deconvolve_preemph_name = re.compile(r"([TP].?)_d([TP].?)")
         self._regex_deconvolve_name = re.compile(r"^(T[12]|P)$")
@@ -169,12 +173,7 @@ class ChannelMatrix(object):
                 indices = self.get_record_indices(co_channel_name)
                 records_co_channel = data[:, indices].ravel()
                 X = co_channel.converter.decode(records_co_channel)
-                if hasattr(channel.config, "diff_gain"):
-                    diff_gain = channel.config.diff_gain  # <- is required to be present
-                else:
-                    raise AttributeError(
-                        "diff_gain is not an attribute for this configuration object."
-                    )
+                diff_gain = getattr(channel.config, "diff_gain")
                 # The deconvolved data are written to the
                 # co_channel_name. The preemphasis data are dropped.
                 X_hires = rsConversions.Deconvolve(
@@ -222,8 +221,8 @@ class ChannelMatrix(object):
         n_rows = self.matrix.shape[0]
         for name, channel in self.channels.items():
             n_samples_per_matrix = len(self.get_record_indices(name))
-            channel.config.update(
-                "sample_rate", self.header_info.fs_fast * n_samples_per_matrix / n_rows
+            channel.config.sample_rate = (
+                self.header_info.fs_fast * n_samples_per_matrix / n_rows
             )
 
     def _get_matrix(
@@ -248,43 +247,46 @@ class ChannelMatrix(object):
         return np.array(matrix)
 
     def _create_channels(
-        self, microrider_config: rsConfig_parser.MicroRiderConfig
+        self,
+        microrider_config: rsConfig_parser.MicroRiderConfig,
+        channel_cfgs: list[dict[str, Any]],
     ) -> dict[str, Channel]:
         """ """
         channels: dict[str, Channel] = {}
+        overrides = {cfg["name"]: cfg for cfg in channel_cfgs}
+        unknown = set(overrides) - set(microrider_config.get_channel_name_map())
+        if unknown:
+            raise ValueError(
+                f"Configuration given for channels {sorted(unknown)}, "
+                "which are not in the data file."
+            )
 
         logger.info("Available channels:")
         for n in range(microrider_config.number_of_channels):
             section_name = f"channel{n:02d}"
             section_dict = microrider_config.get_section(section_name)
-            channel_config = self._create_channel_config(section_dict)
+            channel_config = self._create_channel_config(
+                section_dict, overrides.get(section_dict["name"], {})
+            )
             channel_name = channel_config.name
             channels[channel_name] = Channel(channel_config)
             logger.info(f"\t{n:2d}: {channel_name}")
         if np.any(self.matrix == 255):
             logger.debug("Created Channel 255...")
-            channel_config = channel_config_factory("ch255")
-            channel_config.id = 255
-            channel_config.type = ""
+            channel_config = CHANNEL_CONFIGS["ch255"](name="ch255", id=255, type="")
             channels["ch255"] = Channel(channel_config)
             n += 1
             logger.info(f"\t{n:2d}: ch255")
         return channels
 
-    def _create_channel_config(self, section: dict[str, Any]) -> ChannelConfigBaseModel:
-        name = section["name"]
-        channel_config = channel_config_factory(name)
-        for k_any_case, v in section.items():
-            k = k_any_case.lower()
-            if k == "name":
-                continue
-            if k == "id":
-                if not isinstance(v, int):
-                    raise NotImplementedError(
-                        "Split channels are not implemented. Exiting."
-                    )
-            channel_config.update(k, v)
-        return channel_config
+    def _create_channel_config(
+        self, section: dict[str, Any], override: dict[str, Any]
+    ) -> ChannelConfigBaseModel:
+        """Validates the setup string section, updated with the user override"""
+        kwargs = {k.lower(): v for k, v in section.items()} | override
+        if not isinstance(kwargs["id"], int):
+            raise NotImplementedError("Split channels are not implemented. Exiting.")
+        return CHANNEL_CONFIGS[kwargs["name"]].model_validate(kwargs)
 
 
 class HeaderParser:
@@ -502,7 +504,7 @@ class HeaderParser:
 
 
 def read_p_file(
-    filename: str, channel_configs: list[ChannelConfigBaseModel] = []
+    filename: str, channel_cfgs: list[dict[str, Any]] = []
 ) -> MicrostructureRawData:
     """Function to read a single .p file.
 
@@ -510,6 +512,9 @@ def read_p_file(
     ----------
     filename : str
          Name of .p file to read
+    channel_cfgs : list[dict[str, Any]]
+         user-supplied channel settings that override those of the setup
+         string, each with the channel name, e.g. ``{"name": "sh1", "sens": 0.07}``.
 
     Returns
     -------
@@ -528,12 +533,9 @@ def read_p_file(
         # read embedded setupstring (leaves the fp in the correct place)
         setupstring = header_parser.read_setupstring(fd, header_data)
         microrider_config.parse(setupstring)
-        # Overwrite any user-defined channel configs
-        for channel_config in channel_configs:
-            microrider_config.update_config(channel_config)
         # Create the channel matrix
         channel_matrix: ChannelMatrix = ChannelMatrix(
-            microrider_config, header_data, header_info
+            microrider_config, header_data, header_info, channel_cfgs
         )
 
         # Now we are ready to read in the data, which could

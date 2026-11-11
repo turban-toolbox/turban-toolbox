@@ -215,32 +215,28 @@ plugin_name(SensorSpeedMyCustom)  # "my_plugins:SensorSpeedMyCustom"
 
 By default `MicroriderInstrument` reads sensor parameters (e.g. shear probe sensitivity `sens`)
 from the setup string embedded in the `.p` file. You can override individual parameters by
-passing a list of channel config objects in `MicroriderConfig.channel_cfgs`.
-
-Use `channel_config_factory` to obtain a pre-populated config object for a named channel,
-then call `update` to override specific fields:
+passing a list of dictionaries, each with the channel `name`, in
+`MicroriderConfig.channel_cfgs`:
 
 ```python 
-from turban.instruments.microrider.channels import channel_config_factory
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
-
-sh1 = channel_config_factory("sh1")
-sh1.update("sens", 0.0700)  # V / (rad s⁻¹)
-
-sh2 = channel_config_factory("sh2")
-sh2.update("sens", 0.0970)
 
 microrider_config = MicroriderConfig(
     sampfreq=512.0,
     sensors={},
-    channel_cfgs=[sh1, sh2],
+    channel_cfgs=[
+        {"name": "sh1", "sens": 0.0700},  # V / (rad s⁻¹)
+        {"name": "sh2", "sens": 0.0970},
+    ],
 )
 instrument = MicroriderInstrument(cfg=microrider_config)
 ```
 
-Only the fields explicitly passed to `update` override the file-embedded values; all
-other parameters continue to be read from the setup string embedded in
-the `.p` file.
+Only the given fields override the file-embedded values; all other parameters
+continue to be read from the setup string embedded in the `.p` file. When the
+file is read, each channel configuration is validated once: a missing
+calibration parameter, a misspelt field or a channel that is not in the file
+raises an error.
 
 ---
 

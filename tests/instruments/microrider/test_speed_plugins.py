@@ -3,9 +3,8 @@ import pathlib
 import numpy as np
 import pytest
 
-from turban.instruments.microrider.channels import channel_config_factory
 import turban.instruments.microrider.sensorspeedplugins as plugins
-from turban.instruments.microrider import channels, rsIO
+from turban.instruments.microrider import rsIO
 from turban.instruments.microrider.rsCommon import MicrostructureRawData
 from turban.instruments.microrider.api import (
     MicroriderAPIError,
@@ -51,11 +50,7 @@ def shear_cfg():
 
 @pytest.fixture(scope="session")
 def channel_cfgs():
-    sh1 = channel_config_factory("sh1")
-    sh1.update("sens", 1e99)
-    sh2 = channel_config_factory("sh2")
-    sh2.update("sens", 1e99)
-    return [sh1, sh2]
+    return [dict(name="sh1", sens=1e99), dict(name="sh2", sens=1e99)]
 
 
 @pytest.fixture
@@ -293,18 +288,6 @@ def test_lookup_table_follows_new_timeseries():
 
     plugin.from_timeseries(t, np.full_like(t, 2.0))
     np.testing.assert_allclose(plugin.get_sensor_speed(t), 2.0)
-
-
-# Channel configs given as plain dicts (as they come from a YAML/JSON config file)
-# must become the channel-specific config class, keeping their calibration values.
-def test_channel_cfgs_from_dict_keep_calibration():
-    cfg = MicroriderConfig(sampfreq=1.0,
-                           sensors={},
-                           channel_cfgs=[{"name": "sh1", "sens": 0.07}])
-    sh1 = cfg.channel_cfgs[0]
-    assert isinstance(sh1, channels.ChannelConfigShear)
-    assert sh1.is_set("sens")
-    assert sh1.sens == 0.07
 
 
 def test_channel_cfgs_from_dict_are_applied(data_path, shear_cfg):

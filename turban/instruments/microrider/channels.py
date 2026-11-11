@@ -1,11 +1,4 @@
-from pydantic import Field
-
-from turban.instruments.generic.channels import (
-    DefaultFloat,
-    DefaultStr,
-    DefaultInt,
-    ChannelConfigBaseModel,
-)
+from turban.instruments.generic.channels import ChannelConfigBaseModel
 
 
 class ChannelConfig(ChannelConfigBaseModel):
@@ -13,90 +6,95 @@ class ChannelConfig(ChannelConfigBaseModel):
 
 
 class ChannelConfigPiezo(ChannelConfigBaseModel):
-    a0: float = Field(default=DefaultFloat)
+    a0: float = 0.0
 
 
 class ChannelConfigThermistor(ChannelConfigBaseModel):
-    adc_fs: float = Field(default=DefaultFloat)
-    adc_bits: int = Field(default=DefaultInt)
-    a: float = Field(default=DefaultFloat)
-    b: float = Field(default=DefaultFloat)
-    g: float = Field(default=DefaultFloat)
-    e_b: float = Field(default=DefaultFloat)
-    sn: str = Field(default=DefaultStr)
-    beta: float = Field(default=DefaultFloat)
-    beta_1: float = Field(default=DefaultFloat)
-    beta_2: float = Field(default=DefaultFloat)
-    beta_3: float = Field(default=DefaultFloat)
-    t_0: float = Field(default=DefaultFloat)
-    cal_date: str = Field(default=DefaultStr)
+    adc_fs: float
+    adc_bits: int
+    a: float
+    b: float
+    g: float
+    e_b: float
+    sn: str = ""
+    beta: float | None = None
+    beta_1: float | None = None
+    beta_2: float | None = None
+    beta_3: float | None = None
+    t_0: float
+    cal_date: str = ""
 
 
 class ChannelConfigThermistorPreEmphasis(ChannelConfigBaseModel):
-    diff_gain: float = Field(default=DefaultFloat)
+    diff_gain: float
 
 
 class ChannelConfigShear(ChannelConfigBaseModel):
-    adc_fs: float = Field(default=DefaultFloat)
-    adc_bits: int = Field(default=DefaultInt)
-    adc_zero: float = Field(default=DefaultFloat)
-    sig_zero: float = Field(default=DefaultFloat)
-    diff_gain: float = Field(default=DefaultFloat)
-    sens: float = Field(default=DefaultFloat)
-    sn: str = Field(default=DefaultStr)
-    cal_date: str = Field(default=DefaultStr)
+    adc_fs: float
+    adc_bits: int
+    adc_zero: float = 0.0
+    sig_zero: float = 0.0
+    diff_gain: float
+    sens: float
+    sn: str = ""
+    cal_date: str = ""
 
 
 class ChannelConfigPressure(ChannelConfigBaseModel):
-    coef0: float = Field(default=DefaultFloat)
-    coef1: float = Field(default=DefaultFloat)
-    coef2: float = Field(default=DefaultFloat)
-    coef3: float = Field(default=DefaultFloat)
-    cal_date: str = Field(default=DefaultStr)
+    coef0: float
+    coef1: float | None = None
+    coef2: float | None = None
+    coef3: float | None = None
+    cal_date: str = ""
 
 
 class ChannelConfigPressurePreEmphasis(ChannelConfigBaseModel):
-    diff_gain: float = Field(default=DefaultFloat)
+    diff_gain: float
 
 
 class ChannelConfigPressureVoltage(ChannelConfigBaseModel):
-    coef0: float = Field(default=DefaultFloat)
-    coef1: float = Field(default=DefaultFloat)
-    coef2: float = Field(default=DefaultFloat)
+    coef0: float
+    coef1: float | None = None
+    coef2: float | None = None
 
 
 class ChannelConfigGnd(ChannelConfigBaseModel):
-    coef0: float = Field(default=DefaultFloat)
+    coef0: float | None = None  # not used
 
 
 class ChannelConfigVoltage(ChannelConfigBaseModel):
-    adc_fs: float = Field(default=DefaultFloat)
-    adc_bits: int = Field(default=DefaultInt)
-    adc_zero: float = Field(default=DefaultFloat)
-    g: float = Field(default=DefaultFloat)
+    adc_fs: float
+    adc_bits: int
+    adc_zero: float = 0.0
+    g: float = 1.0
 
 
 class ChannelConfigInclinometer(ChannelConfigBaseModel):
-    coef0: float = Field(default=DefaultFloat)
-    coef1: float = Field(default=DefaultFloat)
+    coef0: float
+    coef1: float
+
+
+class ChannelConfigInclinometerT(ChannelConfigInclinometer):
+    coef0: float = 624.0
+    coef1: float = -0.47
 
 
 class ChannelConfigEMC_CUR(ChannelConfigBaseModel):
-    adc_fs: float = Field(default=DefaultFloat)
-    adc_bits: int = Field(default=DefaultInt)
-    adc_zero: float = Field(default=DefaultFloat)
-    g: float = Field(default=DefaultFloat)
+    adc_fs: float
+    adc_bits: int
+    adc_zero: float = 0.0
+    g: float = 1.0
 
 
 class ChannelConfigU_EM(ChannelConfigBaseModel):
-    adc_fs: float = Field(default=DefaultFloat)
-    adc_bits: int = Field(default=DefaultInt)
-    adc_zero: float = Field(default=DefaultFloat)
-    a: float = Field(default=DefaultFloat)
-    b: float = Field(default=DefaultFloat)
-    bias: float = Field(default=DefaultFloat)
-    sn: str = Field(default=DefaultStr)
-    cal_date: str = Field(default=DefaultStr)
+    adc_fs: float | None = None  # analog (aem1g_a) only
+    adc_bits: int | None = None  # analog (aem1g_a) only
+    adc_zero: float | None = None  # analog: defaults to adc_fs / 2
+    a: float
+    b: float
+    bias: float = 0.0
+    sn: str = ""
+    cal_date: str = ""
 
 
 # Maps MicroRider channel names (as used in the setup file) to their config class.
@@ -118,16 +116,7 @@ CHANNEL_CONFIGS: dict[str, type[ChannelConfigBaseModel]] = {
     "V_Bat": ChannelConfigVoltage,
     "Incl_Y": ChannelConfigInclinometer,
     "Incl_X": ChannelConfigInclinometer,
-    "Incl_T": ChannelConfigInclinometer,
+    "Incl_T": ChannelConfigInclinometerT,
     "EMC_Cur": ChannelConfigEMC_CUR,
     "U_EM": ChannelConfigU_EM,
 }
-
-
-def channel_config_factory(name: str) -> ChannelConfigBaseModel:
-    """Return a fresh config object of the right class for channel `name`."""
-    try:
-        cls = CHANNEL_CONFIGS[name]
-    except KeyError:
-        raise ValueError(f"{name} is not a known MicroRider channel.") from None
-    return cls(name=name)

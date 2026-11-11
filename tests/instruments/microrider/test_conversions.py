@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from scipy.io import loadmat
 
-from turban.instruments.microrider import rsIO, channels
+from turban.instruments.microrider import rsIO
 from turban.utils.filepaths import microrider_data_directory
 
 logger = logging.getLogger()
@@ -50,8 +50,7 @@ def load_data(filename, matfilename, a, b):
     fn = os.path.join(datadir, filename)
     # We need to override the conversion parameters for U_EM, because
     # matlab drops some nth decimal. See also test_rsIO.
-    u_em_config = channels.ChannelConfigU_EM(name="U_EM", a=a, b=b)
-    pdata = rsIO.read_p_file(fn, channel_configs=[u_em_config])
+    pdata = rsIO.read_p_file(fn, channel_cfgs=[dict(name="U_EM", a=a, b=b)])
     mdata = loadmat(
         os.path.join(datadir, matfilename),
         squeeze_me=True,
