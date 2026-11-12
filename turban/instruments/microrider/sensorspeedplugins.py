@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+import inspect
 from jaxtyping import Float
 
 import numpy as np
@@ -16,8 +17,6 @@ class PluginError(Exception):
 
 
 # Base class for SensorSpeed plugins
-
-
 class SensorSpeedABC(ABC):
 
     def __init__(self) -> None:
@@ -49,24 +48,39 @@ class SensorSpeedABC(ABC):
         self.microstructure_raw_data = microstructure_raw_data
 
 
-# Create a registry of SensorSpeedPlugin classes:
 
-_SENSOR_SPEED_PLUGIN_REGISTRY: dict[
-    str, tuple[type[SensorSpeedABC], list[tuple[str, type]]]
-] = {}
+# Registry: name -> (plugin class, names of its constructor parameters)
+_SENSOR_SPEED_PLUGIN_REGISTRY: dict[str, tuple[type[SensorSpeedABC], list[str]]] = {}
 
+# Decorator to register plugins.
+def register_plugin(cls: type[SensorSpeedABC]) -> type[SensorSpeedABC]:
+    """Class decorator that registers a sensor speed plugin.
+    
+    Parameters
+    ----------
+    cls : type[SensorSpeedABC]
+        Plugin class to register.
 
-# This decorator returns a wrapper, which gets the argument of the
-# class, and returns a class. To reflect this, the return type is
-# defined as a callable Callable[[args], result]. See also rsCommon.py
-def register_plugin(
-    parameter_list: list[tuple[str, type]],
-) -> Callable[[type[SensorSpeedABC]], type[SensorSpeedABC]]:
-    def wrapper(cls: type[SensorSpeedABC]) -> type[SensorSpeedABC]:
-        _SENSOR_SPEED_PLUGIN_REGISTRY[plugin_name(cls)] = (cls, parameter_list)
-        return cls
+    Returns
+    -------
+    type[SensorSpeedABC]
+        The same class, unchanged.
+    """
+    # inspect.signature(cls) gives the __init__ signature without `self`
+    parameter_list = []
+    for p in inspect.signature(cls).parameters.values():
+        if p.kind not in (p.POSITIONAL_OR_KEYWORD, p.KEYWORD_ONLY):
+            mesg = f"{plugin_name(cls)}: parameter {p} is not allowed; use named parameters only."
+            logger.error(mesg)
+            raise PluginError(mesg)
+        if p.default is not p.empty:
+            mesg = f"{plugin_name(cls)}: parameter {p.name} has a default value; plugin parameters must not have defaults."
+            logger.error(mesg)
+            raise PluginError(mesg)
+        parameter_list.append(p.name)
+    _SENSOR_SPEED_PLUGIN_REGISTRY[plugin_name(cls)] = (cls, parameter_list)
+    return cls
 
-    return wrapper
 
 
 def plugin_name(cls: type[SensorSpeedABC]) -> str:
@@ -114,7 +128,7 @@ def handle_custom_plugins(name: str) -> None:
 
 def _lookup_plugin(
     name: str,
-) -> tuple[type[SensorSpeedABC], list[tuple[str, type]]]:
+) -> tuple[type[SensorSpeedABC], list[str]]:
     """Return the registry entry ``(class, parameter_list)`` for `name`.
 
     Imports the plugin's module first if `name` is ``"module:ClassName"``.
@@ -152,7 +166,7 @@ def _lookup_plugin(
 
 def get_registered_plugin_parameter_list(
     name: str,
-) -> list[tuple[str, type]]:
+) -> list[str]:
     """Return the parameter list for a registered sensor speed plugin.
 
     Parameters
@@ -162,10 +176,9 @@ def get_registered_plugin_parameter_list(
 
     Returns
     -------
-    list[tuple[str, type]]
-        List of ``(parameter_name, type)`` tuples describing the constructor
-        arguments of the plugin. There are no defaults: every parameter must
-        be set in the configuration.
+    list[str]
+        List of parameter_names describing the constructor
+        arguments of the plugin.
 
     Raises
     ------
@@ -200,7 +213,7 @@ def plugin_factory(name: str, args: dict[str, float | str]) -> SensorSpeedABC:
     return C(**args)
 
 
-@register_plugin([("constant_speed", float)])
+@register_plugin
 class SensorSpeedConstant(SensorSpeedABC):
 
     def __init__(self, constant_speed: float) -> None:
@@ -210,6 +223,7 @@ class SensorSpeedConstant(SensorSpeedABC):
         constant_speed : float
             Sensor speed in m/s, applied uniformly for all times.
         """
+        super().__init__()
         self._constant_speed = constant_speed
 
     def get_sensor_speed(
@@ -242,7 +256,7 @@ class SensorSpeedConstant(SensorSpeedABC):
         raise NotImplementedError
 
 
-@register_plugin([])
+@register_plugin
 class SensorSpeedEMC(SensorSpeedABC):
 
     def interpolation_factory(
@@ -292,7 +306,7 @@ class SensorSpeedEMC(SensorSpeedABC):
         return ifun(t)
 
 
-@register_plugin([])
+@register_plugin
 class SensorSpeedLookupTable(SensorSpeedABC):
 
     def __init__(self) -> None:
@@ -354,7 +368,7 @@ class SensorSpeedLookupTable(SensorSpeedABC):
         return ifun(t)
 
 
-@register_plugin([("filename", str)])
+@register_plugin
 class SensorSpeedDataFile(SensorSpeedLookupTable):
 
     def __init__(self, filename: str) -> None:

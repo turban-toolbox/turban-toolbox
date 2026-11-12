@@ -1,4 +1,5 @@
 import pathlib
+import re
 
 import numpy as np
 import pytest
@@ -114,7 +115,7 @@ def test_sensor_speed_data_file(instrument, data_path, shear_cfg, tmp_path):
 
 
 def test_custom_plugin(instrument, data_path, shear_cfg):
-    @plugins.register_plugin([("scale", float)])
+    @plugins.register_plugin
     class SensorSpeedTestCustom(plugins.SensorSpeedABC):
         def __init__(self, scale: float) -> None:
             self._scale = scale
@@ -200,7 +201,7 @@ def test_missing_plugin_parameter_is_logged(caplog):
 
 
 def test_only_missing_plugin_parameters_are_logged(caplog):
-    @plugins.register_plugin([("p_a", float), ("p_b", float), ("p_c", float)])
+    @plugins.register_plugin
     class SensorSpeedTestMissingParameters(plugins.SensorSpeedABC):
         def __init__(self, p_a: float, p_b: float, p_c: float) -> None:
             super().__init__()
@@ -223,7 +224,7 @@ def test_only_missing_plugin_parameters_are_logged(caplog):
 def test_plugin_name():
     assert plugins.plugin_name(plugins.SensorSpeedConstant) == "SensorSpeedConstant"
 
-    @plugins.register_plugin([])
+    @plugins.register_plugin
     class SensorSpeedTestName(plugins.SensorSpeedABC):
         def get_sensor_speed(self, t):
             return np.ones_like(t)
@@ -233,9 +234,51 @@ def test_plugin_name():
     assert plugins.get_registered_plugin_parameter_list(expected) == []
 
 
-# Configured plugin parameters must reach the plugin. Use values that differ from
-# the registered defaults (constant_speed=1.0, filename="datafile.txt"), otherwise
-# a plugin built with the defaults would pass unnoticed.
+# Plugin parameters must be set in the configuration, so defaults are refused.
+def test_plugin_parameter_with_default_raises_plugin_error():
+    with pytest.raises(plugins.PluginError, match="scale has a default value"):
+
+        @plugins.register_plugin
+        class SensorSpeedTestDefault(plugins.SensorSpeedABC):
+            def __init__(self, scale: float = 1.0) -> None:
+                super().__init__()
+
+            def get_sensor_speed(self, t):
+                return np.ones_like(t)
+
+    with pytest.raises(plugins.PluginError):
+        plugins.get_registered_plugin_parameter_list(
+            f"{__name__}:SensorSpeedTestDefault"
+        )
+
+
+# Only named parameters can be matched to configured parameters, so *args,
+# **kwargs and positional-only parameters are refused.
+@pytest.mark.parametrize(
+    "signature, parameter",
+    [("*args", "*args"), ("**kwargs", "**kwargs"), ("scale, /", "scale")],
+)
+def test_plugin_parameter_not_named_raises_plugin_error(signature, parameter):
+    namespace: dict = {"plugins": plugins, "np": np}
+    exec(
+        "class SensorSpeedTestNotNamed(plugins.SensorSpeedABC):\n"
+        f"    def __init__(self, {signature}):\n"
+        "        super().__init__()\n"
+        "    def get_sensor_speed(self, t):\n"
+        "        return np.ones_like(t)\n",
+        namespace,
+    )
+    cls = namespace["SensorSpeedTestNotNamed"]
+    with pytest.raises(
+        plugins.PluginError, match=f"parameter {re.escape(parameter)} is not allowed"
+    ):
+        plugins.register_plugin(cls)
+    with pytest.raises(plugins.PluginError):
+        plugins.get_registered_plugin_parameter_list(plugins.plugin_name(cls))
+
+
+# Configured plugin parameters must reach the plugin. Use values other than 1.0,
+# so that a plugin that ignored the configuration would not pass unnoticed.
 def test_configured_constant_speed_is_used():
     cfg = MicroriderConfig(sampfreq=1.0,
                            sensors={},

@@ -173,7 +173,7 @@ from jaxtyping import Float
 from turban.instruments.microrider.sensorspeedplugins import SensorSpeedABC, register_plugin
 
 
-@register_plugin([("scale", float)])
+@register_plugin
 class SensorSpeedMyCustom(SensorSpeedABC):
 
     def __init__(self, scale: float) -> None:
