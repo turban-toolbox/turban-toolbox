@@ -254,21 +254,39 @@ def test_plugin_parameter_with_default_raises_plugin_error():
 
 # Only named parameters can be matched to configured parameters, so *args,
 # **kwargs and positional-only parameters are refused.
+class _SensorSpeedTestStarArgs(plugins.SensorSpeedABC):
+    def __init__(self, *args):
+        super().__init__()
+
+    def get_sensor_speed(self, t):
+        return np.ones_like(t)
+
+
+class _SensorSpeedTestStarKwargs(plugins.SensorSpeedABC):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+    def get_sensor_speed(self, t):
+        return np.ones_like(t)
+
+
+class _SensorSpeedTestPositionalOnly(plugins.SensorSpeedABC):
+    def __init__(self, scale, /):
+        super().__init__()
+
+    def get_sensor_speed(self, t):
+        return np.ones_like(t)
+
+
 @pytest.mark.parametrize(
-    "signature, parameter",
-    [("*args", "*args"), ("**kwargs", "**kwargs"), ("scale, /", "scale")],
+    "cls, parameter",
+    [
+        (_SensorSpeedTestStarArgs, "*args"),
+        (_SensorSpeedTestStarKwargs, "**kwargs"),
+        (_SensorSpeedTestPositionalOnly, "scale"),
+    ],
 )
-def test_plugin_parameter_not_named_raises_plugin_error(signature, parameter):
-    namespace: dict = {"plugins": plugins, "np": np}
-    exec(
-        "class SensorSpeedTestNotNamed(plugins.SensorSpeedABC):\n"
-        f"    def __init__(self, {signature}):\n"
-        "        super().__init__()\n"
-        "    def get_sensor_speed(self, t):\n"
-        "        return np.ones_like(t)\n",
-        namespace,
-    )
-    cls = namespace["SensorSpeedTestNotNamed"]
+def test_plugin_parameter_not_named_raises_plugin_error(cls, parameter):
     with pytest.raises(
         plugins.PluginError, match=f"parameter {re.escape(parameter)} is not allowed"
     ):
