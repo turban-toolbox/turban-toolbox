@@ -52,6 +52,7 @@ dev = [
     "pytest-markdown-docs>=0.6",
     "pymdown-extensions>=10.8",
     "mkdocstrings[python]>=0.24",
+    "scipy-stubs>=1.17.1.5",
 ]
 
 [project.scripts]

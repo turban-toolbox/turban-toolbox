@@ -14,12 +14,13 @@ logger = logging.getLogger()
 
 datadir = microrider_data_directory
 
-ATOL = 2e-6
-RTOL = 1e-5
+# Tolerances close to machine precision.
+ATOL = 1e-12
+RTOL = 0
 
 
 def extract_data(pParameter, mParameter, pdata, mdata):
-    vp = pdata.channel_matrix.channels[pParameter].data
+    vp = pdata[pParameter]
     vm = mdata[mParameter]
     return vp, vm
 
@@ -31,23 +32,25 @@ parameter_table = [
     ("Incl_T", "Incl_T"),
     ("Incl_X", "Incl_X"),
     ("Incl_Y", "Incl_Y"),
-    ("T1_hires", "T1_fast"),
-    ("T2_hires", "T2_fast"),
+    ("T1", "T1_fast"),
+    ("T2", "T2_fast"),
     ("V_Bat", "V_Bat"),
     ("EMC_Cur", "EMC_Cur"),
-    ("T1", "T1_slow"),
-    ("T2", "T2_slow"),
     ("PV", "PV"),
     ("U_EM", "U_EM"),
     ("sh1", "sh1"),
     ("sh2", "sh2"),
 ]
+
+
 parameter_table_persistor_specific = [("Gnd_2", "Gnd_2"), ("ch255", "ch255")]
 
 
-def load_data(filename, matfilename):
+def load_data(filename, matfilename, a, b):
     fn = os.path.join(datadir, filename)
-    pdata = rsIO.read_p_file(fn)
+    # We need to override the conversion parameters for U_EM, because
+    # matlab drops some nth decimal. See also test_rsIO.
+    pdata = rsIO.read_p_file(fn, channel_cfgs=[dict(name="U_EM", a=a, b=b)])
     mdata = loadmat(
         os.path.join(datadir, matfilename),
         squeeze_me=True,
@@ -55,21 +58,25 @@ def load_data(filename, matfilename):
         chars_as_strings=True,
         simplify_cells=True,
     )
-    return pdata, mdata
+    return pdata.data, mdata
 
 
 @pytest.fixture(scope="session")
 def data_058():
     filename = "DAT_058.P"
     matfilename = "DAT_058.mat"
-    return load_data(filename, matfilename)
+    a = -24.4605
+    b = 151.341
+    return load_data(filename, matfilename, a, b)
 
 
 @pytest.fixture(scope="session")
 def data_0413():
     filename = "data_0413.p"
     matfilename = "data_0413.mat"
-    return load_data(filename, matfilename)
+    a = -25.0675
+    b = 0.0114359
+    return load_data(filename, matfilename, a, b)
 
 
 @pytest.mark.parametrize("params", parameter_table)

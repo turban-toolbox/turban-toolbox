@@ -1,6 +1,6 @@
 # Turbulence analysis (TURBAN) toolbox: Infrastructure
 
-This manual assumes that you have read your data into python. For converting common file formats to python data, see the documentation of the individual instruments and platforms (such as [MSS](mss.md) or [MicroRider](urider.md)).
+This manual assumes that you have read your data into python. For converting common file formats to python data, see the documentation of the individual instruments and platforms (such as [MSS](mss.md) or [MicroRider](microrider.md)).
 
 ## Exporting and importing data
 
