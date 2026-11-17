@@ -14,10 +14,10 @@ from collections import defaultdict
 
 # Physical quantities used in the code base
 _vars = {
-    "cond/standard_name": "sea_water_conductivity",
     "chi/explanation": "Dissipation rate of temperature variance",
     "chi/latex": r"$\chi$",
     "chi/unit": "K2 s-1",
+    "cond/standard_name": "sea_water_electrical_conductivity",
     "data_length/explanation": "Length of data used for one dissipation estimate",
     "data_length/latex": r"$l_\epsilon$",
     "data_length/units": "m",
