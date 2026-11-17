@@ -150,8 +150,8 @@ class ShearLevel3(Level3[ShearLevel2]):
     ``level_below``. See ``ShearProcessing`` for the whole pipeline.
     """
 
-    psi_k_sh: Float[ndarray, "nshear time waveno"]
-    psi_f_sh: Float[ndarray, "nshear time waveno"]
+    psi_k_sh: Float[ndarray, "nshear time nfreq"]
+    psi_f_sh: Float[ndarray, "nshear time nfreq"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
@@ -253,7 +253,7 @@ class ShearLevel3(Level3[ShearLevel2]):
     @property
     def psi_k_sh_confidence_interval(
         self,
-    ) -> Float[ndarray, "2 nshear time waveno"]:
+    ) -> Float[ndarray, "2 nshear time nfreq"]:
         """95% confidence interval (upper, lower) of power spectrum.
         Sec. 3.3.5 in the ATOMIX paper"""
         return np.stack(
