@@ -5,25 +5,27 @@ from turban.instruments.generic.config import InstrumentConfig
 from turban.process.shear.api import ShearLevel1
 from turban.process.shear.config import ShearConfig
 
-class InstrumentEnum:
+
+class InstrumentEnum(enum.Enum):
     MSS = "MSS_"
     MicroRider = "MR_"
+
 
 class Instrument(ABC):
     def __init__(self, cfg: InstrumentConfig):
         self.cfg = cfg
-        
+
     @abstractmethod
     def file_to_shear_level1(self, filename: str, cfg: ShearConfig) -> "ShearLevel1":
         """
         Convert raw data to shear level 1
         """
         pass
-    
+
 
 class Dropsonde(Instrument):
 
-    def file_to_shear_level1(self, filename:str, cfg: ShearConfig) -> "ShearLevel1":
+    def file_to_shear_level1(self, filename: str, cfg: ShearConfig) -> "ShearLevel1":
         """
         Convert raw data to shear level 1
         """
