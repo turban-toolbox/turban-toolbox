@@ -34,11 +34,11 @@ def shear_cfg():
         segment_overlap=512,
         chunk_length=2048,
         chunk_overlap=1024,
-        freq_cutoff_antialias=999.0,
-        freq_cutoff_corrupt=999.0,
-        freq_highpass=0.15,
+        freq_cutoff_antialias=None,  # None means that this cutoff is not applied
+        freq_cutoff_corrupt=None,  # None means that this cutoff is not applied
+        freq_highpass=None,  # None means 1/(2T) = 0.5 * sampfreq / segment_length
         spatial_response_wavenum=50.0,
-        waveno_cutoff_spatial_corr=999.0,
+        waveno_cutoff_spatial_corr=None,  # None means that this cutoff is not applied
         spike_threshold=8.0,
         max_tries=10,
         spike_replace_before=256,

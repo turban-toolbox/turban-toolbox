@@ -459,12 +459,12 @@ class Level2[L: Level1](HasLevelBelow[L], AuxiliaryData):
 
 @dataclass(kw_only=True)
 class Level3[L: Level2](HasLevelBelow[L], AuxiliaryData):
-    waveno: Float[ndarray, "time waveno"]
-    freq: Float[ndarray, "waveno"]
+    waveno: Float[ndarray, "time nfreq"]
+    freq: Float[ndarray, "nfreq"]
     senspeed: Float[ndarray, "time"]
     section_number: Int[ndarray, "time"]
 
-    _coords = ["time", "freq"]
+    _coords = ["time", "freq", "waveno"]
 
     _level: ClassVar[Level] = Level.level3
     level_below_cls: ClassVar[type[TimeseriesLevel]] = Level2

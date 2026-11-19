@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from netCDF4 import Dataset
 import xarray as xr
 import numpy as np
@@ -6,6 +6,9 @@ import numpy as np
 
 class SegmentConfig(BaseModel):
     """Configures segment-wise processing of timeseries."""
+
+    # re-run validators (incl. model validators of subclasses) on attribute
+    model_config = ConfigDict(validate_assignment=True)
 
     sampfreq: float  # [Hz]
     segment_length: int

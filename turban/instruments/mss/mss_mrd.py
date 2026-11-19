@@ -575,7 +575,7 @@ def level0_to_level1(
                 shearsensors.append(k)
                 # print('Found shear sensor {:s}, calculating shear'.format(k))
                 SH = mss_utils.calc_shear(
-                    level0[k], vsink, dens, fs=mss_config.sampling_freq
+                    level0[k].values, vsink, dens, fs=mss_config.sampling_freq
                 )
                 shear.append(SH)
 

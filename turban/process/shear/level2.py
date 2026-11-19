@@ -21,7 +21,7 @@ def process_level2(
     shear: Float[ndarray, "nshear time"],
     section_numbers: Int[ndarray, "time"],
     sampfreq: float,
-    segment_length: int,
+    freq_highpass: float,
     cutoff_freq_lp: float,
     spike_threshold: float,
     max_tries: int,
@@ -43,8 +43,8 @@ def process_level2(
         Section marker array; zero marks invalid data.
     sampfreq : float
         Sampling frequency in Hz.
-    segment_length : int
-        Length of FFT segments (used to set the high-pass cutoff frequency).
+    freq_highpass : float
+        High-pass cutoff frequency in Hz.
     cutoff_freq_lp : float
         Low-pass cutoff frequency in Hz for spike detection envelope.
     spike_threshold : float
@@ -89,7 +89,7 @@ def process_level2(
             # Eq. 17
             sh_clean = butterfilt(
                 signal=shear,
-                cutoff_freq_Hz=0.5 / (segment_length / sampfreq),
+                cutoff_freq_Hz=freq_highpass,
                 sampfreq=sampfreq,
                 btype="high",
             )

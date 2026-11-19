@@ -8,6 +8,8 @@ from numpy import ndarray
 import numpy as np
 
 from turban.utils.util import agg_fast_to_slow
+from turban.variables import VARIABLES
+from turban.process.shear.variables import VARIABLES_SHEAR
 from turban.process.shear.level2 import process_level2
 from turban.process.shear.level3 import process_level3
 from turban.process.shear.level4 import (
@@ -31,6 +33,8 @@ from turban.utils.seawater import viscosity_kinematic
 
 logger = get_logger(__name__)
 
+_VOCABULARY = [VARIABLES, VARIABLES_SHEAR]
+
 
 @dataclass(kw_only=True)
 class ShearLevel1(Level1):
@@ -43,6 +47,8 @@ class ShearLevel1(Level1):
     shear: Float[ndarray, "nshear time"]
     section_number: Int[ndarray, "time"]
     cfg: ShearConfig
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     @classmethod
     def from_atomix_netcdf(cls, fname: str):
@@ -75,6 +81,8 @@ class ShearLevel2(Level2[ShearLevel1]):
     num_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
 
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
+
     level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel1
 
     @classmethod
@@ -101,7 +109,7 @@ class ShearLevel2(Level2[ShearLevel1]):
             level1.shear,
             level1.section_number,
             cfg.sampfreq,
-            cfg.segment_length,
+            cfg.freq_highpass,
             cfg.cutoff_freq_lp,
             cfg.spike_threshold,
             cfg.max_tries,
@@ -150,12 +158,14 @@ class ShearLevel3(Level3[ShearLevel2]):
     ``level_below``. See ``ShearProcessing`` for the whole pipeline.
     """
 
-    psi_k_sh: Float[ndarray, "nshear time waveno"]
-    psi_f_sh: Float[ndarray, "nshear time waveno"]
+    psi_k_sh: Float[ndarray, "nshear time nfreq"]
+    psi_f_sh: Float[ndarray, "nshear time nfreq"]
     # TODO load from atomix netcdf
     spike_fraction: Float[ndarray, "nshear time"]
     max_despike_iter: Int[ndarray, "nshear time"]
     cfg: ShearConfig
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel2
 
@@ -253,7 +263,7 @@ class ShearLevel3(Level3[ShearLevel2]):
     @property
     def psi_k_sh_confidence_interval(
         self,
-    ) -> Float[ndarray, "2 nshear time waveno"]:
+    ) -> Float[ndarray, "2 nshear time nfreq"]:
         """95% confidence interval (upper, lower) of power spectrum.
         Sec. 3.3.5 in the ATOMIX paper"""
         return np.stack(
@@ -291,6 +301,8 @@ class ShearLevel4(Level4[ShearLevel3]):
     quality_metric: Int[ndarray, "nshear time"]
     cfg: ShearConfig
     molvisc: Float[ndarray, "time"]
+
+    vocabulary: ClassVar[list[dict]] = _VOCABULARY
 
     level_below_cls: ClassVar[type[TimeseriesLevel]] = ShearLevel3
 

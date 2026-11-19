@@ -78,10 +78,15 @@ def test_level0_to_level1_missing(mss_conf_and_level0, missing):
             assert np.isnan(press).sum() == 2
             assert np.isnan(press[1000:1002]).all()
             # derived quantities are computed before masking, so the filters do
-            # not spread NaN beyond the inserted records
+            # not spread NaN beyond the inserted records. Compare against the
+            # gap-free profile, which already has NaN where the speed is ~0
+            # (profile bottom).
+            level1_full = level0_to_level1(mss_conf, level0)
             for name in ["PSPD_REL", "SHEAR"]:
                 isnan = np.isnan(level1[name].values).reshape(-1, nrecords)
-                assert np.flatnonzero(isnan.any(axis=0)).tolist() == [1000, 1001]
+                isnan_full = np.isnan(level1_full[name].values).reshape(-1, nrecords)
+                extra = isnan.any(axis=0) != isnan_full.any(axis=0)
+                assert np.flatnonzero(extra).tolist() == [1000, 1001]
                 assert isnan[:, 1000:1002].all()
         else:
             assert not np.isnan(press).any()

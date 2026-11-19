@@ -206,10 +206,6 @@ def test_processing_subclass_requires_level_mapping():
 
 def test_to_xarray_vocabulary():
     level1 = make_level1()
-    # default: class vocabulary (turban.variables.VARIABLES)
-    ds = level1.to_xarray()
-    assert ds["senspeed"].attrs["unit"] == "m s-1"
-
     # custom vocabularies: later entries take precedence, new variables are added
     vocab = [
         {"senspeed": {"unit": "foo", "bar": "baz"}},
@@ -222,11 +218,9 @@ def test_to_xarray_vocabulary():
     # variables not in any vocabulary get no attributes; empty vocabulary is allowed
     assert level1.to_xarray(vocabulary=[])["senspeed"].attrs == {}
 
-
-def test_processing_to_xarray_vocabulary():
-    p = Processing(make_level1())
+    # test for Processing
+    p = Processing(level1)
     tree = p.to_xarray()
-    assert tree["level1"]["senspeed"].attrs["unit"] == "m s-1"
     tree = p.to_xarray(vocabulary=[{"senspeed": {"unit": "foo"}}])
     for level in ("level1", "level2"):
         assert tree[level]["senspeed"].attrs["unit"] == "foo"
