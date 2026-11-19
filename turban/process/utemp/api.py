@@ -40,7 +40,7 @@ class UTempLevel1(Level1):
     section_number: Int[ndarray, "time"]
     # this assumes that spectral_correction was evaluated on the frequency grid defined
     # by cfg.sampfrq and cfg.segment_length
-    spectral_correction: Float[ndarray, "freq"] | None = None
+    spectral_correction: Float[ndarray, "nfreq"] | None = None
     cfg: UTempConfig
 
     vocabulary: ClassVar[list[dict]] = _VOCABULARY
@@ -98,9 +98,9 @@ class UTempLevel3(Level3[UTempLevel2]):
     from ``UTempLevel2``.
     """
 
-    psi_k_gradt: Float[ndarray, "ntemp time waveno"]
-    psi_noise: Float[ndarray, "ntemp waveno"]
-    psi_f_gradt: Float[ndarray, "ntemp time waveno"]
+    psi_k_gradt: Float[ndarray, "ntemp time nfreq"]
+    psi_noise: Float[ndarray, "ntemp nfreq"]
+    psi_f_gradt: Float[ndarray, "ntemp time nfreq"]
     cfg: UTempConfig
 
     vocabulary: ClassVar[list[dict]] = _VOCABULARY
