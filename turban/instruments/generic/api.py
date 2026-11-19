@@ -29,4 +29,6 @@ class Dropsonde(Instrument):
         """
         Convert raw data to shear level 1
         """
-        raise NotImplementedError("file_to_shear_level1 must be implemented in subclasses")
+        raise NotImplementedError(
+            "file_to_shear_level1 must be implemented in subclasses"
+        )
