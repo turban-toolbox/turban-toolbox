@@ -18,8 +18,9 @@ from turban.process.shear.api import ShearConfig
 _T0 = np.float64(1755598536.000539)
 _T1 = np.float64(1755599018.9676669)
 _SHEAR_STD = np.float64(0.14836711824834306)
-#_SHEAR_STD = np.float64(0.02201280177731781)
+# _SHEAR_STD = np.float64(0.02201280177731781)
 _EMC_SPEED_MEAN = np.float64(0.4292161395343412)
+
 
 @pytest.fixture(scope="session")
 def data_path():
@@ -62,18 +63,21 @@ def instrument():
 
 @pytest.fixture
 def instrumentPostConfigureSensitivity(channel_cfgs):
-    cfg = MicroriderConfig(channel_cfgs=channel_cfgs,
-                           sensor_speed_plugin='SensorSpeedConstant',
-                           sensor_speed_plugin_parameters={'constant_speed':1.0}
-                           )
+    cfg = MicroriderConfig(
+        channel_cfgs=channel_cfgs,
+        sensor_speed_plugin="SensorSpeedConstant",
+        sensor_speed_plugin_parameters={"constant_speed": 1.0},
+    )
     return MicroriderInstrument(cfg=cfg)
+
 
 @pytest.fixture
 def instrumentPreConfigured():
-    cfg = MicroriderConfig(sensor_speed_plugin='SensorSpeedConstant',
-                           sensor_speed_plugin_parameters={'constant_speed':1.0})
+    cfg = MicroriderConfig(
+        sensor_speed_plugin="SensorSpeedConstant",
+        sensor_speed_plugin_parameters={"constant_speed": 1.0},
+    )
     return MicroriderInstrument(cfg=cfg)
-
 
 
 # Tests that explicitly set the sensor speed plugin
@@ -125,14 +129,20 @@ def test_custom_plugin(instrument, data_path, shear_cfg):
 
 
 # Tests by configuration speed plugin
-def test_sensor_speed_constant_pre_configured(instrumentPreConfigured, data_path, shear_cfg):
+def test_sensor_speed_constant_pre_configured(
+    instrumentPreConfigured, data_path, shear_cfg
+):
     level1 = instrumentPreConfigured.file_to_shear_level1(str(data_path), cfg=shear_cfg)
     assert level1.shear[0].std() == _SHEAR_STD
 
-    
+
 def test_sensor_sensitivity(instrumentPostConfigureSensitivity, data_path, shear_cfg):
-    level1 = instrumentPostConfigureSensitivity.file_to_shear_level1(str(data_path), cfg=shear_cfg)
-    assert np.abs(level1.shear[0].mean()) < np.float64(1e-99) # should be very close to 0.
+    level1 = instrumentPostConfigureSensitivity.file_to_shear_level1(
+        str(data_path), cfg=shear_cfg
+    )
+    assert np.abs(level1.shear[0].mean()) < np.float64(
+        1e-99
+    )  # should be very close to 0.
     assert np.abs(level1.shear[1].mean()) < np.float64(1e-99)
 
 
@@ -170,6 +180,7 @@ def test_plugin_factory_unknown_plugin_raises_plugin_error():
     with pytest.raises(plugins.PluginError):
         plugins.plugin_factory("Nope", {})
 
+
 def test_overwriting_plugin_prints_log(instrumentPreConfigured, caplog):
     instrument = instrumentPreConfigured
     _t = np.linspace(_T0, _T1)
@@ -179,13 +190,16 @@ def test_overwriting_plugin_prints_log(instrumentPreConfigured, caplog):
     with caplog.at_level("WARNING"):
         instrument.set_sensor_speed_plugin(plugin)
     record = caplog.records[0]
-    assert record.levelname=="WARNING" and record.message.startswith("Overwriting sensor speed plugin:")
+    assert record.levelname == "WARNING" and record.message.startswith(
+        "Overwriting sensor speed plugin:"
+    )
 
 
 # Missing required plugin parameters must be named in the error log.
 def test_missing_plugin_parameter_is_logged(caplog):
-    cfg = MicroriderConfig(sensor_speed_plugin="SensorSpeedConstant",
-                           sensor_speed_plugin_parameters={})
+    cfg = MicroriderConfig(
+        sensor_speed_plugin="SensorSpeedConstant", sensor_speed_plugin_parameters={}
+    )
     with caplog.at_level("ERROR"), pytest.raises(MicroriderAPIError):
         MicroriderInstrument(cfg=cfg)
     messages = [r.message for r in caplog.records if r.levelname == "ERROR"]
@@ -202,8 +216,11 @@ def test_only_missing_plugin_parameters_are_logged(caplog):
 
         def get_sensor_speed(self, t):
             return np.ones_like(t)
-    cfg = MicroriderConfig(sensor_speed_plugin=plugins.plugin_name(SensorSpeedTestMissingParameters),
-                           sensor_speed_plugin_parameters={"p_b": 5.0})
+
+    cfg = MicroriderConfig(
+        sensor_speed_plugin=plugins.plugin_name(SensorSpeedTestMissingParameters),
+        sensor_speed_plugin_parameters={"p_b": 5.0},
+    )
     with caplog.at_level("ERROR"), pytest.raises(MicroriderAPIError):
         MicroriderInstrument(cfg=cfg)
     errors = " ".join(r.message for r in caplog.records if r.levelname == "ERROR")
@@ -290,20 +307,25 @@ def test_plugin_parameter_not_named_raises_plugin_error(cls, parameter):
 # Configured plugin parameters must reach the plugin. Use values other than 1.0,
 # so that a plugin that ignored the configuration would not pass unnoticed.
 def test_configured_constant_speed_is_used():
-    cfg = MicroriderConfig(sensor_speed_plugin="SensorSpeedConstant",
-                           sensor_speed_plugin_parameters={"constant_speed": 2.5})
+    cfg = MicroriderConfig(
+        sensor_speed_plugin="SensorSpeedConstant",
+        sensor_speed_plugin_parameters={"constant_speed": 2.5},
+    )
     instrument = MicroriderInstrument(cfg=cfg)
     t = np.linspace(_T0, _T1, 5)
-    np.testing.assert_array_equal(instrument.sensor_speed_plugin.get_sensor_speed(t),
-                                  np.full_like(t, 2.5))
+    np.testing.assert_array_equal(
+        instrument.sensor_speed_plugin.get_sensor_speed(t), np.full_like(t, 2.5)
+    )
 
 
 def test_configured_data_file_is_used(tmp_path):
     _t = np.linspace(_T0, _T1)
     speed_file = tmp_path / "speed.dat"
     np.savetxt(speed_file, np.array((_t, np.full_like(_t, 2.0))).T)
-    cfg = MicroriderConfig(sensor_speed_plugin="SensorSpeedDataFile",
-                           sensor_speed_plugin_parameters={"filename": str(speed_file)})
+    cfg = MicroriderConfig(
+        sensor_speed_plugin="SensorSpeedDataFile",
+        sensor_speed_plugin_parameters={"filename": str(speed_file)},
+    )
     instrument = MicroriderInstrument(cfg=cfg)
     np.testing.assert_allclose(instrument.sensor_speed_plugin.get_sensor_speed(_t), 2.0)
 
@@ -340,12 +362,17 @@ def test_lookup_table_follows_new_timeseries():
 
 
 def test_channel_cfgs_from_dict_are_applied(data_path, shear_cfg):
-    cfg = MicroriderConfig(channel_cfgs=[{"name": "sh1", "sens": 1e99},
-                                         {"name": "sh2", "sens": 1e99}],
-                           sensor_speed_plugin="SensorSpeedConstant",
-                           sensor_speed_plugin_parameters={"constant_speed": 1.0})
-    level1 = MicroriderInstrument(cfg=cfg).file_to_shear_level1(str(data_path), cfg=shear_cfg)
-    assert np.abs(level1.shear[0].mean()) < np.float64(1e-99)  # should be very close to 0.
+    cfg = MicroriderConfig(
+        channel_cfgs=[{"name": "sh1", "sens": 1e99}, {"name": "sh2", "sens": 1e99}],
+        sensor_speed_plugin="SensorSpeedConstant",
+        sensor_speed_plugin_parameters={"constant_speed": 1.0},
+    )
+    level1 = MicroriderInstrument(cfg=cfg).file_to_shear_level1(
+        str(data_path), cfg=shear_cfg
+    )
+    assert np.abs(level1.shear[0].mean()) < np.float64(
+        1e-99
+    )  # should be very close to 0.
     assert np.abs(level1.shear[1].mean()) < np.float64(1e-99)
 
 
@@ -353,4 +380,3 @@ def test_channel_cfgs_from_dict_are_applied(data_path, shear_cfg):
 def test_file_to_shear_level1_without_plugin_raises(instrument, data_path, shear_cfg):
     with pytest.raises(MicroriderAPIError, match="[Ss]ensor speed plugin"):
         instrument.file_to_shear_level1(str(data_path), cfg=shear_cfg)
-
