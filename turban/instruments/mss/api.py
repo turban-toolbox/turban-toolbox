@@ -6,6 +6,7 @@ from turban.process.utemp.api import UTempLevel1
 from turban.process.utemp.config import UTempConfig
 
 from turban.instruments.mss import mss_mrd
+from turban.instruments.mss.mss_utils import correction_frequency_response_bilinear
 
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.process.shear.config import ShearConfig
@@ -71,11 +72,16 @@ def mrd_to_level1(
         )
 
     elif target == "utemp":
+        # spectral correction for the digital deconvolution of the pre-emphasis
+        freq = np.fft.rfftfreq(proc_cfg.segment_length, d=1 / proc_cfg.sampfreq)
         level1 = UTempLevel1(
             time=time,
             senspeed=np.asarray(data_level1["PSPD_REL"]),
             dtempdt=np.asarray(data_level1["utemp"]),
             section_number=np.ones_like(data_level1["time_count"], dtype=int),
+            spectral_correction=correction_frequency_response_bilinear(
+                freq, proc_cfg.sampfreq, mss_cfg.gain_utemp
+            ),
             cfg=cast(UTempConfig, proc_cfg),
         )
 

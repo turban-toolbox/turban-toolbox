@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from pydantic import BaseModel, Field
 
+from turban.instruments.generic.config import ThermistorElectronics
 from turban.instruments.mss import mss_mrd
 from turban.variables import STANDARD_CTD_TYPE
 from turban.process.shear.config import ShearConfig
@@ -538,3 +539,21 @@ class MssDeviceConfig(BaseModel):
             This method is not yet implemented.
         """
         raise NotImplementedError
+
+class MssThermistorElectronics(ThermistorElectronics):
+    """Calibration and electronics of one FP07 thermistor channel (pre-emphasised).
+    """
+
+    diff_gain: float = 1.5 # [s] pre-emphasis gain
+
+    # # TODO add the following matlab code to MssThermistorElectronics, mark as draft
+    # However might not apply to every MSS?
+    #     % remove The MSS NTC channel frequency compensation, single pole
+    #     R8  = 12e3; % ohms
+    #     R9  = 12e3;
+    #     C2  = 1e-6; % Farads
+    #     C3  = 0.1e-6;
+    #     H_MSS = (1 + 1j*2*pi*F*R8*C2) ./ (1 + 1j*R9*C3);
+    #     H_MSS = abs(H_MSS).^2;
+    #     % remove MSS compensation:
+    # %    Pk_gradT_ = Pk_gradT_./H_MSS; # TODO def remove_ntc_channel_freq_compensation(self, psi_k_gradt) with type hints
