@@ -42,7 +42,7 @@ instrument = MicroriderInstrument(cfg=microrider_config)
 instrument.set_sensor_speed_plugin(plugins.SensorSpeedConstant(constant_speed=0.6))
 
 # Convert the .p file to ShearLevel1
-level1 = instrument.to_shear_level1("path/to/data.p", cfg=cfg)
+level1 = instrument.file_to_shear_level1("path/to/data.p", cfg=cfg)
 ```
 
 `level1` is a `ShearLevel1` instance containing:
@@ -95,7 +95,7 @@ instrument.set_sensor_speed_plugin(plugin)
 Derives sensor speed from the electromagnetic current meter channel (`U_EM`) recorded by
 the MicroRider itself. The slow-rate `U_EM` data are linearly interpolated onto the fast
 time grid. No constructor arguments are required; the MicroRider data are supplied
-automatically when `to_shear_level1` is called.
+automatically when `file_to_shear_level1` is called.
 
 ```python notest
 import turban.instruments.microrider.sensorspeedplugins as plugins
@@ -187,7 +187,7 @@ class SensorSpeedMyCustom(SensorSpeedABC):
         return np.ones_like(t) * self._scale
 ```
 
-Before `get_sensor_speed` is called, `to_shear_level1` hands the plugin the data read
+Before `get_sensor_speed` is called, `file_to_shear_level1` hands the plugin the data read
 from the `.p` file. They are available as `self.microstructure_raw_data`, so a plugin
 can compute speed from any recorded channel (pressure, inclinometers, ...).
 
@@ -294,7 +294,7 @@ cfg = ShearConfig(
 
 instrument = MicroriderInstrument(cfg=microrider_config)
 # No further call to set_sensor_speed_plugin needed.
-level1 = instrument.to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
+level1 = instrument.file_to_shear_level1("path/to/data.p", cfg=cfg) # doctest: +SKIP
 ```
 
 Calling `set_sensor_speed_plugin` after construction always works and overrides any
