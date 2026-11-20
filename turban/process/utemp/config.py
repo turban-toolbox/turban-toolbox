@@ -8,7 +8,7 @@ from turban.process.generic.config import SegmentConfig
 type SpectrumModel = Literal["batchelor", "kraichnan"]
 # keys of FP07_RESPONSE_MODELS, or "none" for no response correction
 type FP07ResponseModelName = Literal[
-    "nash99", "rsi", "gm", "kocsis", "nash02", "sommer"
+    "nash99", "rsi", "gm", "kocsis", "nash02", "sommer", "ijichi25"
 ]
 
 
@@ -34,6 +34,8 @@ FP07_RESPONSE_MODELS: dict[FP07ResponseModelName, FP07Response] = {
     "nash02": FP07Response(name="nash02", tau0=8.5e-3, gamma=0.0, npoles=2),
     # Sommer et al. (2013)
     "sommer": FP07Response(name="sommer", tau0=10e-3, gamma=0.0, npoles=2),
+    # Ijichi & St. Laurent (2025), as used in ATOMIX benchmark data
+    "ijichi25": FP07Response(name="ijichi25", tau0=5e-3, gamma=-0.5, npoles=1),
 }
 
 
