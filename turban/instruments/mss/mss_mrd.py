@@ -592,8 +592,8 @@ def level0_to_level1(
         level1_dataset["utemp"] = (
             ["n_temp", "index"],
             mss_utils.deconvolve_mss_ntchp(
-                level0["NTCHP"].values,
                 level0["NTC"].values,
+                level0["NTCHP"].values,
                 sampfreq=mss_config.sampling_freq,
                 gain=mss_config.gain_utemp,
             )[numpy.newaxis, :],
