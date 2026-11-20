@@ -238,9 +238,10 @@ def get_noise_empirical(
     if spectra.shape[-2] > 0:
         # a measure of the intensity of the spectrum
         spec_intens: Float[ndarray, "*any time"] = np.mean(spectra[..., :20], axis=-1)
-        # 5 % least intense spectra
+        # 5 % least intense spectra, separately for each sensor
+        threshold = np.nanpercentile(spec_intens, 5, axis=-1, keepdims=True)
         least_intense: Float[ndarray, "*any time frequency"] = np.where(
-            spec_intens[..., newaxis] < np.percentile(spec_intens, 5), spectra, np.nan
+            (spec_intens <= threshold)[..., newaxis], spectra, np.nan
         )
         noise = 10 ** np.nanmean(np.log10(least_intense), axis=-2)
         return noise
