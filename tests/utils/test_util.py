@@ -64,6 +64,41 @@ def test_fft_grad():
     assert 9 < np.mean(y) < 11
 
 
+def test_fft_grad_nd_matches_rowwise():
+    """Each row of an N-d input is differentiated along the last axis on its own,
+    i.e. exactly as if it were passed as 1-d. Rows differ and are not periodic, so
+    mirroring along the wrong axis changes the result."""
+    dt = 0.01
+    t = np.arange(500) * dt
+    x = np.stack([np.sin(2 * np.pi * 1.3 * t), t**2, np.exp(-t)])  # (3, time)
+    x3 = np.stack([x, 2 * x[::-1]])  # (2, 3, time)
+
+    for xn in (x, x3):
+        y = fft_grad(xn, dt)
+        assert y.shape == xn.shape
+        rows = xn.reshape(-1, xn.shape[-1])
+        y_rowwise = np.stack([fft_grad(row, dt) for row in rows])
+        np.testing.assert_allclose(y.reshape(rows.shape), y_rowwise, atol=1e-10)
+
+
+def test_fft_grad_ensure_not_nan():
+    dt = 0.01
+    t = np.arange(1000) * dt
+    x = np.stack([np.sin(2 * np.pi * 1.3 * t), np.cos(2 * np.pi * 0.7 * t)])
+    xnan = x.copy()
+    xnan[0, [0, 1, 400, 401, -1]] = np.nan
+    xnan_orig = xnan.copy()
+
+    assert np.isnan(fft_grad(xnan, dt)[0]).all()  # default: NaN spreads along row
+    y = fft_grad(xnan, dt, ensure_not_nan=True)
+    np.testing.assert_array_equal(xnan, xnan_orig)  # input not modified
+    assert not np.isnan(y).any()
+    # row without NaNs unaffected, other row close to NaN-free result away from gaps
+    y_ref = fft_grad(x, dt)
+    np.testing.assert_allclose(y[1], y_ref[1], atol=1e-10)
+    np.testing.assert_allclose(y[0, 500:900], y_ref[0, 500:900], atol=1e-2)
+
+
 def test_reshape():
 
     for N in range(25, 50):

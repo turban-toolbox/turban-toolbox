@@ -448,7 +448,7 @@ def fft_grad(
         )
     N = signal.shape[-1]
     x = np.concatenate(
-        (signal, signal[::-1]), axis=-1
+        (signal, signal[..., ::-1]), axis=-1
     )  # make periodic to avoid spectral leakage
     f = fftfreq(2 * N, dt)
     f_broadcast = atleast_nd_last(f, x.shape)
