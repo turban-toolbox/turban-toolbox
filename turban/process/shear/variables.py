@@ -42,6 +42,16 @@ _shear_vars = {
     "number_signals_vibration_removal/explanation": "Number of vibration signals used to remove vibration-coherent noise from the shear spectra",
     "number_signals_vibration_removal/latex": r"$N_V$",
     "number_signals_vibration_removal/units": "-",
+    "psi_f_sh/explanation": "Power density spectrum of shear variance w.r.t frequency",
+    "psi_f_sh/long_name": "Shear frequency spectrum",
+    "psi_f_sh/units": "s-2 Hz-1",
+    "psi_k_sh_confidence_interval/explanation": "Upper and lower bound of the 95% confidence interval of psi_k_sh",
+    "psi_k_sh_confidence_interval/latex": r"$\Psi(k)\exp(\pm 1.96\,\sigma_{\ln\Psi})$",
+    "psi_k_sh_confidence_interval/units": "s-2 cpm-1",
+    "psi_k_sh/explanation": "Power density spectrum of shear variance w.r.t wavenumber",
+    "psi_k_sh/latex": r"$\Psi(k)$",
+    "psi_k_sh/long_name": "Shear wavenumber spectrum",
+    "psi_k_sh/units": "s-2 cpm-1",
     "quality_metric/atomix_name": "EPSI_FLAGS",
     "quality_metric/explanation": "Binary-weighted quality flag, sum of failures: 1 figure of merit, 2 spike fraction, 4 disagreement between probes, 8 despiking passes, 16 resolved variance",
     "quality_metric/latex": r"$Q$",
@@ -64,6 +74,7 @@ _shear_vars = {
     "waveno_spectral_min/latex": r"$k_{min}$",
     "waveno_spectral_min/units": "cpm",
     # "eps_source_flag/atomix_name": "METHOD",  # METHOD = eps_source_flag - 1
+    # "psi_k_sh/atomix_name": "SH_SPEC" | "SH_SPEC_CLEAN",
     # "waveno_cutoff_spatial_corr/atomix_name": None,  # no counterpart in the ATOMIX benchmark netCDF files
     # "waveno_spectral_min/atomix_name": None,  # ATOMIX files store only the polynomial order (fit_order), not k_min
 }
