@@ -459,8 +459,9 @@ def get_waveno_upper(
     psi_noise: Float[ndarray, "n_temp waveno"],
     waveno_limit_upper: float,
 ) -> Float[ndarray, "n_temp time_slow"]:
-    """Upper wavenumber limit: last wavenumber where the spectrum exceeds twice the
-    noise, at most ``waveno_limit_upper``. ``waveno[:, 0]`` if nowhere above noise.
+    """Upper wavenumber limit: first wavenumber (above ``waveno[:, 0]``) where the
+    spectrum falls to twice the noise or below (line 85 in ``MLE_Fit_Kb.m``), at most
+    ``waveno_limit_upper``. ``waveno[:, -1]`` if nowhere below twice the noise.
 
     Parameters
     ----------
@@ -478,14 +479,15 @@ def get_waveno_upper(
     ndarray, shape (n_temp, time_slow)
         Upper wavenumber limit in cpm.
     """
-    is_above_noise = psi_k > 2 * psi_noise[..., newaxis, :]
-    waveno_above_noise = waveno[
-        range(waveno.shape[0]), -np.argmax(is_above_noise[..., ::-1], axis=-1) - 1
-    ]
-    waveno_above_noise = np.where(
-        is_above_noise.any(axis=-1), waveno_above_noise, waveno[:, 0]
+    # skip waveno[:, 0] (zero frequency), which is not used in the fit either
+    is_below_noise = psi_k[..., 1:] <= 2 * psi_noise[..., newaxis, 1:]
+    idx_upper = 1 + np.where(
+        is_below_noise.any(axis=-1),
+        np.argmax(is_below_noise, axis=-1),
+        waveno.shape[-1] - 2,
     )
-    return np.minimum(waveno_above_noise, waveno_limit_upper)
+    waveno_upper = waveno[range(waveno.shape[0]), idx_upper]
+    return np.minimum(waveno_upper, waveno_limit_upper)
 
 
 def integrate_chi(
