@@ -11,7 +11,7 @@ TURBAN can export to and import from xarray using `.to_xarray()` and `.from_xarr
 
 A level can also be parsed from such a DataTree, or a netCDF file written by `Processing.to_netcdf()`. This reads only that level's node (plus the auxiliary data it takes over from the level below), and `level_below` is again not reconstructed.
 
- -TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases. 
+TURBAN further defines convenience methods for importing ATOMIX files, which have been tested on a few of the available benchmark files. However, these tend to not follow a 100% strict format and so these methods may fail in untested cases. 
  
 The following round-trips a single level:
 ```python
@@ -39,7 +39,67 @@ with TemporaryDirectory() as tmpdir:
     p_reimport = ShearProcessing.from_netcdf(fname)  # same as above
     l4 = ShearLevel4.from_netcdf(fname)  # only the level4 node, without level_below
 ```
+
+### Variable names, vocabularies and metadata
+
+TURBAN uses standard variable names throughout (`eps`, `senspeed`, `psi_k_sh`, ...). Their metadata are kept in *vocabularies*, i.e. dictionaries of the form `{varname: {attribute: value}}`:
+
+| Vocabulary | Module | Content |
+|---|---|---|
+| `VARIABLES` | `turban.variables` | Variables shared by all processing types (`time`, `freq`, `waveno`, `eps`, `molvisc`, `temp`, ...) |
+| `VARIABLES_SHEAR` | `turban.process.shear.variables` | Shear-specific variables (`shear`, `fom`, `quality_metric`, `log_psi_std`, ...) |
+| `VARIABLES_UTEMP` | `turban.process.utemp.variables` | Microtemperature-specific variables (`kbatch`, `likelihood_ratio`, ...) |
+
+The attributes follow the CF conventions where possible: `units`, `standard_name` and `long_name`. TURBAN adds `explanation` (a plain-language description), `latex` (a symbol, used e.g. for plot labels) and `atomix_name` (the name of the corresponding variable in ATOMIX netCDF files).
+
+`to_xarray()` attaches these attributes to every exported variable. Each level class has a default list of vocabularies in its class attribute `vocabulary` (e.g. `[VARIABLES, VARIABLES_SHEAR]` for the shear levels). Pass a different list to `to_xarray()` (on a level or a pipeline) to add or override attributes; later vocabularies take precedence:
+
+```python
+from turban import ShearLevel3
+from turban.variables import VARIABLES
+from turban.process.shear.variables import VARIABLES_SHEAR
+
+l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
+assert l3.to_xarray()["waveno"].attrs["units"] == "cpm"
+
+my_vocabulary = {"psi_k_sh": {"long_name": "shear wavenumber spectrum"}}
+ds = l3.to_xarray([VARIABLES, VARIABLES_SHEAR, my_vocabulary])
+assert ds["psi_k_sh"].attrs["long_name"] == "shear wavenumber spectrum"
+```
+
+For instrument data, `turban.variables.STANDARD_CTD_TYPE` defines the standard names of CTD-type auxiliary variables (`cond`, `press`, `temp`) that instrument sensors are mapped to, see e.g. `MssDeviceConfig.sensornames_ctd` in the [MSS reference](mss.md).
+
 ## Shear processing
+
+### Configuration
+
+`ShearConfig` (like all processing configurations, a child class of `SegmentConfig`) is a pydantic model. Some of its parameters have derived defaults:
+
+- `freq_highpass=None` (the default) sets the high-pass cutoff frequency to $1/(2T)$, where $T$ = `segment_length / sampfreq` is the duration of an FFT segment. This value is computed once, when the configuration is created.
+- `log_psi_std` ($\sigma_{\ln\Psi}$, Eq. 17 in the ATOMIX paper) and `number_signals_vibration_removal` ($N_V$) are read-only properties derived from the segment parameters and `vibration_channels`.
+
+Assigning to an attribute of an existing configuration is validated, i.e. invalid values raise a `pydantic.ValidationError`:
+
+```python
+from turban import ShearConfig
+
+cfg = ShearConfig(
+    sampfreq=1024.0,
+    segment_length=2048,
+    segment_overlap=1024,
+    chunk_length=4 * 2048,
+    chunk_overlap=1024,
+)
+assert cfg.freq_highpass == 0.25  # 1 / (2 * 2048 / 1024 Hz)
+
+cfg.vibration_channels = "ACC1"  # validated and converted on assignment
+assert cfg.vibration_channels == ("ACC1",)
+assert cfg.number_signals_vibration_removal == 1
+print(f"sigma_lnPsi = {cfg.log_psi_std:.3f}")
+```
+
+!!! warning
+	Since the default `freq_highpass` is computed when the configuration is created, changing `segment_length` or `sampfreq` afterwards does not update it. Set `freq_highpass` explicitly in that case.
 
 ### Removal of coherent vibrations
 
@@ -58,33 +118,39 @@ l2.cfg.vibration_channels = ("ACC1", "ACC2")
 l3 = ShearLevel3.from_level_below(l2)
 ```
 
-### Molecular viscosity
+### Molecular properties of seawater
 
-Molecular viscosity can be set in two ways: Either by using a constant fallback value in the `ShearConfig`:
+Level 4 needs the kinematic molecular viscosity $\nu$ of seawater (and the chi pipeline also the molecular thermal diffusivity $\kappa$). TURBAN determines them as follows:
 
-```{.python notest}
-# Option 1
-from turban import ShearConfig
-cfg = ShearConfig(
-    molvisc_fallback=1.6e-6,
-    ...
-)
-```
+1. If the Level 3 object has an auxiliary variable `temp` (in-situ temperature in °C), $\nu$ (and $\kappa$) are computed from its chunk averages.
+2. Otherwise, the constant `molvisc_fallback` (default $1.6\cdot10^{-6}$ m² s⁻¹) of the configuration is used (and `moldiff_fallback` for $\kappa$ in `UTempConfig`).
 
-or by explicitly setting a `molvisc` auxiliary variable on the `ShearLevel3` object from which Level 4 is derived. This can for instance be achieved by setting an auxiliary variable on Level 1 with the appropriate aggregation instructions:
+In both cases, Level 4 stores the values used as `molvisc` (and `moldiff`), one per chunk.
 
 ```python
-# Option 2
 import numpy as np
-from turban import ShearLevel1
+from turban import ShearLevel3, ShearLevel4
+from turban.utils.seawater import viscosity_kinematic
 
-level1 = ShearLevel1.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
-molvisc_arr = np.linspace(1e-6, 2e-6, len(level1.time))
-# specify aggregated name `molvisc` 
-level1.add_aux_data(molvisc_arr, "molvisc", "mean", "molvisc")
-# level 3 will now contain a chunk-averaged variable called `molvisv`,
-# which level 4 will then use
+l3 = ShearLevel3.from_atomix_netcdf("data/process/shear/MSS_Baltic.nc")
+temp = np.linspace(5.0, 10.0, len(l3.time))  # [degC], one value per chunk
+l3.add_aux_data(temp, "temp")
+# on Level 1, this would be
+# level1.add_aux_data(temp_fast, "temp", "mean", "temp")
+
+l4 = ShearLevel4.from_level_below(l3)
+assert np.allclose(l4.molvisc, viscosity_kinematic(temp))
 ```
+
+The underlying functions are in `turban.utils.seawater`:
+
+| Function | Quantity | Notes |
+|---|---|---|
+| `viscosity_kinematic(temp)` | $\nu$ [m² s⁻¹] | Polynomial fit at salinity 35; this is what the pipelines use |
+| `viscosity_kinematic_full(temp, sal)` | $\nu$ [m² s⁻¹] | Sharqawy et al. (2010), at arbitrary salinity; for reference, not used by the pipelines |
+| `diffusivity_temp(temp, sal=35.0)` | $\kappa$ [m² s⁻¹] | Thermal conductivity / (density × specific heat); the pipelines use the default salinity |
+
+There is currently no option to pass salinity to the pipelines. To use a constant viscosity instead, do not provide `temp` and set `molvisc_fallback`.
 
 ### Figure of merit and its ingredients
 
@@ -188,9 +254,9 @@ set_turban_loglevel("DEBUG", "turban.instruments.mss")
 
 TURBAN operates with several kinds of high-level objects, each of which have their own settings:
 1. Instruments, child classes of `turban.instruments.generic.api.Instrument`, are configured through instances of (child classes of) `turban.instruments.generic.config.InstrumentConfig`
-2. Processing pipelines, defined in `turban/process`, e.g. `ShearProcessing` or one of its levels (e.g., `ShearLevel1` through `ShearLevel4`), are configured using `turban.process.generic.config.SegmentConfig`
+2. Processing pipelines, defined in `turban/process`, e.g. `ShearProcessing` or one of its levels (e.g., `ShearLevel1` through `ShearLevel4`), are configured using child classes of `turban.process.generic.config.SegmentConfig`, e.g. `ShearConfig` or `UTempConfig`
 
-Both allow/require the user to make various parameter choices.
+Both allow/require the user to make various parameter choices. All configuration objects are pydantic models, so they can be serialised to and from JSON (`model_dump_json()`, `model_validate()`). Processing configurations also validate assignments to their attributes, see [Configuration](#configuration).
 
 ### Changing algorithms
 

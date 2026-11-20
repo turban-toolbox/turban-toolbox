@@ -1,6 +1,6 @@
 ## Quickstart
 
-Currently, only shear processing is fully functional. The high-level API can be imported from `turban`.
+Shear processing is fully functional, and its high-level API can be imported from `turban`. Microtemperature (chi) processing is experimental, see [Microtemperature processing](utemp.md).
 
 ### Setup
 
@@ -16,11 +16,12 @@ Example data, also needed for the unit tests, can be downloaded using:
 ```bash
 turban_download_datafiles
 ```
-Alternatively the environment variable TURBAN_AUTO_DOWNLOAD_DATAFILES
+Alternatively the environment variable `TURBAN_AUTO_DOWNLOAD_TEST_FILES`
 can be set to 1, which has the effect that data are downloaded
 automatically when a test is run. The command
-```turban_download_datafiles``` accepts the option ```--force``` which
-downloads all data, even if they have been downloaded before.
+`turban_download_datafiles` accepts the option `--force` which
+downloads all data, even if they have been downloaded before. See
+[Test and benchmark data files](benchmark_files.md) for details.
 
 ### Using the high-level ShearProcessing pipeline
 
