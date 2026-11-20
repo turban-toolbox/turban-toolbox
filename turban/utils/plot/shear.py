@@ -4,7 +4,10 @@ import xarray as xr
 from typing import Any, cast, TypeAlias
 from functools import partial
 
-from turban.utils.plot.generic import plot_section_numbers, plot_quality_metric
+from turban.utils.plot.generic import (
+    plot_section_numbers,
+    plot_quality_metric,
+)
 from turban.process.shear.level4 import QUALITY_METRIC_CODES
 from turban.process.shear.api import (
     ShearProcessing,
@@ -15,7 +18,7 @@ from turban.process.shear.api import (
 )
 from turban.process.generic.api import Level
 from turban.process.shear.util import model_spectrum
-from turban.utils.util import define_sections
+from turban.utils.util import define_sections, time_mean_waveno_xarray
 from turban.utils.logging import get_logger
 
 ShearLevelType = ShearLevel1 | ShearLevel2 | ShearLevel3 | ShearLevel4
@@ -344,7 +347,8 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
 
     ds3 = _clip(_to_dataset(data_l3), subset)
     if average:
-        ds3 = ds3.mean("time", keepdims=True)
+        ds3 = time_mean_waveno_xarray(ds3)
+    psi_k = ds3["psi_k_sh"]
     if data_l4 is None:
         ds4 = None
     else:
@@ -369,11 +373,12 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
 
     for i, ax in enumerate(spectra_axes):
         # Plot Pk vs wavenumber with time overlaid
-        ds_sensor = ds3.isel(nshear=i)
-        ds_sensor["psi_k_sh"].plot(ax=ax, x="waveno", hue="time", add_legend=False)
+        psi_sensor = psi_k.isel(nshear=i)
+        hue = None if average else "time"
+        psi_sensor.plot(ax=ax, x="waveno", hue=hue, add_legend=False)
 
         if ds4 is not None:
-            waveno_sensor = np.asarray(ds_sensor["waveno"].values)
+            waveno_sensor = np.asarray(psi_sensor["waveno"].values)
             waveno_pos = waveno_sensor[np.isfinite(waveno_sensor) & (waveno_sensor > 0)]
             if waveno_pos.size > 0:
                 waveno = np.logspace(
@@ -389,7 +394,7 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
                 ax.plot(waveno, psi.T, color="k", alpha=0.3, linewidth=2, ls="-")
 
         ax.set_xscale("log")
-        ax.set_ylim(np.nanpercentile(ds3["psi_k_sh"], 0.1), None)
+        ax.set_ylim(np.nanpercentile(psi_k, 0.1), None)
         ax.set_yscale("log")
         ax.set_title(f"Shear {i+1}")
         ax.grid(True, alpha=0.3, which="both")
@@ -401,7 +406,7 @@ def plot_level3(*data: Any, subset: SubsetSpec | None = None, average=False):
 
     if not average:
         ts_axes[-1].set_xlabel("Time")
-    plot_section_numbers(ts_axes, ds3.time.values, ds3.section_number.values)
+        plot_section_numbers(ts_axes, ds3.time.values, ds3.section_number.values)
 
     axs = [*spectra_axes, *ts_axes]
 

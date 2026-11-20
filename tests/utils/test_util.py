@@ -13,6 +13,7 @@ from turban.utils.util import (
     diss_chunk_wise_reshape_index,
     get_chunking_index,
     boolarr_to_sections,
+    average_waveno_spectra,
 )
 
 
@@ -166,3 +167,36 @@ def test_agg_fast_to_slow():
         agg_method="max",
     )
     assert np.all(xm == np.array([9.0, 19.0]))
+
+
+def test_average_waveno_spectra_constant_speed():
+    """With identical wavenumbers at each time, binning equals a plain time mean."""
+    rng = np.random.default_rng(0)
+    psi = rng.random((2, 5, 8))  # nshear time nfreq
+    waveno = np.tile(np.arange(8.0), (5, 1))
+    bins = np.arange(9.0) - 0.5
+    psi_mean, waveno_mean = average_waveno_spectra(psi, waveno, bins=bins)
+    np.testing.assert_allclose(psi_mean, psi.mean(axis=1))
+    np.testing.assert_allclose(waveno_mean, np.arange(8.0))
+
+
+def test_average_waveno_spectra_varying_speed():
+    """Spectra that are a function of only waveno stay unchanged; NaNs ignored."""
+    freq = np.arange(1.0, 33.0)
+    senspeed = np.array([0.5, 0.6, 0.8, 1.0])
+    waveno = freq[np.newaxis, :] / senspeed[:, np.newaxis]
+    psi = np.full((3, *waveno.shape), 2.0)
+    psi[0, 0, 0] = np.nan
+    psi_mean, waveno_mean = average_waveno_spectra(psi, waveno)
+    assert psi_mean.shape == (3, len(freq))  # default: as many bins as nfreq
+    assert waveno_mean.shape == (len(freq),)
+    finite = np.isfinite(psi_mean)
+    assert finite.sum() > 0.8 * psi_mean.size
+    np.testing.assert_allclose(psi_mean[finite], 2.0)
+
+
+def test_average_waveno_spectra_bad_bins():
+    with pytest.raises(ValueError):
+        average_waveno_spectra(
+            np.ones((2, 3)), np.ones((2, 3)), bins=np.array([1.0, 0.0])
+        )

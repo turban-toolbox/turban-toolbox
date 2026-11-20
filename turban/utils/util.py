@@ -31,6 +31,111 @@ def kolmogorov_length(
     return (molvisc**3 / eps) ** 0.25
 
 
+def average_waveno_spectra(
+    psi: Float[ndarray, "*any time nfreq"],
+    waveno: Float[ndarray, "time nfreq"],
+    bins: Float[ndarray, "nedge"] | None = None,
+) -> tuple[Float[ndarray, "*any nbin"], Float[ndarray, "nbin"]]:
+    """Average wavenumber spectra over time by binning in wavenumber space.
+
+    Each time step has its own wavenumber axis (``waveno = freq / senspeed``),
+    so averaging along ``time`` at a fixed frequency index would mix different
+    wavenumbers. Instead, all spectral values are sorted into common wavenumber
+    bins and averaged per bin. Non-finite values are ignored.
+
+    Parameters
+    ----------
+    psi : Float[ndarray, "*any time nfreq"]
+        Wavenumber spectra.
+    waveno : Float[ndarray, "time nfreq"]
+        Wavenumber of each spectral value in ``psi``.
+    bins : Float[ndarray, "nedge"], optional
+        Monotonically increasing wavenumber bin edges. If None, ``nfreq`` equally
+        spaced bins spanning the finite range of ``waveno`` are used.
+
+    Returns
+    -------
+    psi_mean : Float[ndarray, "*any nbin"]
+        Bin-averaged spectra; NaN for empty bins.
+    waveno_mean : Float[ndarray, "nbin"]
+        Bin centers.
+    """
+    *lead, ntime, nfreq = psi.shape
+    if bins is None:
+        bins = np.linspace(np.nanmin(waveno), np.nanmax(waveno), nfreq + 1)
+    bins = cast(Float[ndarray, "nedge"], bins)
+    if np.any(np.diff(bins) <= 0):
+        raise ValueError("bins must be monotonically increasing")
+    nbin = len(bins) - 1
+
+    w = waveno.ravel()
+    p = psi.reshape(-1, ntime * nfreq)
+
+    idx = np.searchsorted(bins, w, side="right") - 1
+    idx[w == bins[-1]] = nbin - 1  # include the right edge in the last bin
+    valid = np.isfinite(w) & (idx >= 0) & (idx < nbin)
+    p, idx = p[:, valid], idx[valid]
+
+    good = np.isfinite(p)
+    sums = np.zeros((p.shape[0], nbin))
+    counts = np.zeros((p.shape[0], nbin))
+    np.add.at(sums, (slice(None), idx), np.where(good, p, 0.0))
+    np.add.at(counts, (slice(None), idx), good)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        psi_mean = np.where(counts > 0, sums / counts, np.nan)
+
+    return psi_mean.reshape(*lead, nbin), 0.5 * (bins[1:] + bins[:-1])
+
+
+def time_mean_waveno_xarray(ds: xr.Dataset, **kwargs) -> xr.Dataset:
+    """Average a dataset over time, bin-averaging spectra in wavenumber space.
+
+    xarray wrapper around `average_waveno_spectra` for Level 3 datasets as
+    produced by the ``api.py`` modules. Variables of dimension
+    ``nfreq`` only (e.g. ``freq``) are broadcast along ``time``, bin-averaged and
+    stored as ``<name>_mean``, replacing the original. Other variables on
+    ``time`` are averaged plainly.
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Level 3 dataset with a 2-D coordinate ``waveno(time, nfreq)``.
+    **kwargs
+        Forwarded to `average_waveno_spectra` (e.g. ``bins``).
+
+    Returns
+    -------
+    xr.Dataset
+        Dataset averaged over ``time`` with a 1-D ``waveno(nfreq)`` coordinate.
+    """
+    waveno = ds["waveno"]
+    k = waveno.values
+    binned = [v for v in ds.variables if "nfreq" in ds[v].dims and v != "waveno"]
+    out = ds.drop_vars([*binned, "waveno"]).mean("time")
+
+    waveno_mean = None
+    for v in binned:
+        da = ds[v]
+        arr = da.values
+        if "time" in da.dims:
+            name = v
+        else:
+            name = f"{v}_mean"
+            arr = np.broadcast_to(
+                arr[..., newaxis, :], (*arr.shape[:-1], len(k), arr.shape[-1])
+            )
+        arr_mean, waveno_mean = average_waveno_spectra(arr, k, **kwargs)
+        dims = tuple(d for d in da.dims if d != "time")
+        new = xr.DataArray(arr_mean, dims=dims, attrs=da.attrs)
+        if v in ds.coords:
+            out = out.assign_coords({name: new})
+        else:
+            out[name] = new
+    if waveno_mean is not None:
+        out = out.assign_coords(waveno=("nfreq", waveno_mean, waveno.attrs))
+    return out
+
+
 def ensure_reshape_index(func):
     """Decorate `func` to accept alternative chunking parameters.
 
