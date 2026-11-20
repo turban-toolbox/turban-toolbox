@@ -6,7 +6,7 @@ from turban.process.utemp.api import UTempLevel1
 from turban.process.utemp.config import UTempConfig
 
 from turban.instruments.mss import mss_mrd
-from turban.instruments.mss.mss_utils import correction_frequency_response_bilinear
+from turban.process.utemp.util import correction_frequency_response_bilinear
 
 from turban.instruments.mss.config import MssDeviceConfig
 from turban.process.shear.config import ShearConfig
