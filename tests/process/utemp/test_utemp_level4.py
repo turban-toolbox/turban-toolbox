@@ -14,9 +14,9 @@ def _synthetic(model, q, kbatch, chi, noise, ntime=3):
     freq = np.fft.rfftfreq(2048, 1 / 1024)
     senspeed = np.linspace(0.6, 1.0, ntime)
     waveno = freq[np.newaxis, :] / senspeed[:, np.newaxis]
-    psi_noise = np.full((1, len(freq)), noise)
+    psi_noise = np.full((1, *waveno.shape), noise)
     psi = theoretical_spectrum(model, waveno, kbatch, chi, MOLDIFF, q)
-    return waveno, psi[np.newaxis] + psi_noise[:, np.newaxis, :], psi_noise
+    return waveno, psi[np.newaxis] + psi_noise, psi_noise
 
 
 def _run(waveno, psi, psi_noise, model, q):
@@ -51,6 +51,6 @@ def test_temperature_dissipation_synthetic(model, q):
 
 def test_temperature_dissipation_noise_only():
     waveno, _, psi_noise = _synthetic("batchelor", 3.7, 150.0, 1e-8, 1e-7)
-    psi = np.broadcast_to(psi_noise[:, np.newaxis, :], (1, *waveno.shape)).copy()
+    psi = psi_noise.copy()
     out = _run(waveno, psi, psi_noise, "batchelor", 3.7)
     assert all(np.all(np.isnan(x)) for x in out)

@@ -99,7 +99,7 @@ class UTempLevel3(Level3[UTempLevel2]):
     """
 
     psi_k_gradt: Float[ndarray, "ntemp time nfreq"]
-    psi_noise: Float[ndarray, "ntemp nfreq"]
+    psi_noise: Float[ndarray, "ntemp time nfreq"]
     psi_f_gradt: Float[ndarray, "ntemp time nfreq"]
     cfg: UTempConfig
 

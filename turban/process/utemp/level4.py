@@ -25,7 +25,7 @@ _KBAT_SEARCH_POINTS: int = 100  # number of batchelor wave lengths
 def temperature_dissipation(
     psi_k_gradt: Float[ndarray, "ntemp time waveno"],
     waveno: Float[ndarray, "time waveno"],
-    psi_noise: Float[ndarray, "ntemp waveno"],
+    psi_noise: Float[ndarray, "ntemp time waveno"],
     waveno_limit_upper: float,
     molvisc: Float[ndarray, "time"],
     moldiff: Float[ndarray, "time"],
@@ -56,7 +56,7 @@ def temperature_dissipation(
         Temperature gradient power spectra in K2 m-2 cpm-1.
     waveno : ndarray, shape (time_slow, waveno)
         Wavenumber array in cpm.
-    psi_noise : ndarray, shape (n_temp, waveno)
+    psi_noise : ndarray, shape (n_temp, time_slow, waveno)
         Noise power spectrum in K2 m-2 cpm-1.
     waveno_limit_upper : float
         Hard upper wavenumber limit in cpm (``np.inf`` for none).
@@ -197,7 +197,7 @@ def kbat_mle_fine(
     kbatch_estimates: Float[ndarray, "n_temp time_slow"],
     search_halfwidth: Float[ndarray, "n_temp time_slow"],
     chi: Float[ndarray, "n_temp time_slow"],
-    psi_noise: Float[ndarray, "n_temp waveno"],
+    psi_noise: Float[ndarray, "n_temp time waveno"],
     waveno_lower: Float[ndarray, "n_temp time_slow"],
     waveno_upper: Float[ndarray, "n_temp time_slow"],
     moldiff: Float[ndarray, "time_slow"],
@@ -226,7 +226,7 @@ def kbat_mle_fine(
         Half width of the fine search in cpm (``kbatch_mle``).
     chi : ndarray, shape (n_temp, time_slow)
         Temperature variance dissipation corrected for unresolved variance [K2 s-1].
-    psi_noise : ndarray, shape (n_temp, waveno)
+    psi_noise : ndarray, shape (n_temp, time_slow, waveno)
         Noise spectrum in K2 m-2 cpm-1.
     waveno_lower, waveno_upper : ndarray, shape (n_temp, time_slow)
         Fit range in cpm.
@@ -262,7 +262,6 @@ def kbat_mle_fine(
     All values are NaN where the fine search fails.
     """
     fit_mask = _waveno_mask(waveno, waveno_lower, waveno_upper)
-    psi_noise_ = psi_noise[:, newaxis, :]
 
     # 1. fine search
     k_lo = np.maximum(0.0, kbatch_estimates - search_halfwidth)
@@ -349,7 +348,7 @@ def kbat_mle_fine(
         )
 
         # 7. MAD (lines 367-370)
-        mad_ratio = _mad_ratio(psi_k_gradt / (psi_fit + psi_noise_), fit_mask)
+        mad_ratio = _mad_ratio(psi_k_gradt / (psi_fit + psi_noise), fit_mask)
         mad_ratio_pow = _mad_ratio(psi_k_gradt / psi_powerlaw, fit_mask)
 
     out = (
@@ -367,7 +366,7 @@ def kbat_mle_coarse(
     chi: Float[ndarray, "n_temp time_slow"],
     waveno: Float[ndarray, "time_slow waveno"],
     psi_k: Float[ndarray, "n_temp time_slow waveno"],
-    psi_noise: Float[ndarray, "n_temp waveno"],
+    psi_noise: Float[ndarray, "n_temp time waveno"],
     waveno_lower: Float[ndarray, "n_temp time_slow"],
     waveno_upper: Float[ndarray, "n_temp time_slow"],
     moldiff: Float[ndarray, "time_slow"],
@@ -394,7 +393,7 @@ def kbat_mle_coarse(
         Wavenumber in cpm.
     psi_k : ndarray, shape (n_temp, time_slow, waveno)
         Observed temperature gradient spectra in K2 m-2 cpm-1.
-    psi_noise : ndarray, shape (n_temp, waveno)
+    psi_noise : ndarray, shape (n_temp, time_slow, waveno)
         Noise spectrum in K2 m-2 cpm-1.
     waveno_lower, waveno_upper : ndarray, shape (n_temp, time_slow)
         Fit range in cpm.
@@ -456,7 +455,7 @@ def kbat_mle_coarse(
 def get_waveno_upper(
     waveno: Float[ndarray, "time_slow waveno"],
     psi_k: Float[ndarray, "n_temp time_slow waveno"],
-    psi_noise: Float[ndarray, "n_temp waveno"],
+    psi_noise: Float[ndarray, "n_temp time waveno"],
     waveno_limit_upper: float,
 ) -> Float[ndarray, "n_temp time_slow"]:
     """Upper wavenumber limit: first wavenumber (above ``waveno[:, 0]``) where the
@@ -469,7 +468,7 @@ def get_waveno_upper(
         Wavenumber in cpm.
     psi_k : ndarray, shape (n_temp, time_slow, waveno)
         Temperature gradient spectra.
-    psi_noise : ndarray, shape (n_temp, waveno)
+    psi_noise : ndarray, shape (n_temp, time_slow, waveno)
         Noise spectrum.
     waveno_limit_upper : float
         Hard upper limit in cpm.
@@ -480,7 +479,7 @@ def get_waveno_upper(
         Upper wavenumber limit in cpm.
     """
     # skip waveno[:, 0] (zero frequency), which is not used in the fit either
-    is_below_noise = psi_k[..., 1:] <= 2 * psi_noise[..., newaxis, 1:]
+    is_below_noise = psi_k[..., 1:] <= 2 * psi_noise[..., 1:]
     idx_upper = 1 + np.where(
         is_below_noise.any(axis=-1),
         np.argmax(is_below_noise, axis=-1),
@@ -493,7 +492,7 @@ def get_waveno_upper(
 def integrate_chi(
     waveno: Float[ndarray, "time_slow waveno"],
     psi_k: Float[ndarray, "n_temp time_slow waveno"],
-    psi_noise: Float[ndarray, "n_temp waveno"],
+    psi_noise: Float[ndarray, "n_temp time waveno"],
     waveno_upper: Float[ndarray, "n_temp time_slow"],
     moldiff: Float[ndarray, "time_slow"],
 ) -> Float[ndarray, "n_temp time_slow"]:
@@ -505,7 +504,7 @@ def integrate_chi(
         Wavenumber in cpm.
     psi_k : ndarray, shape (n_temp, time_slow, waveno)
         Temperature gradient spectra in K2 m-2 cpm-1.
-    psi_noise : ndarray, shape (n_temp, waveno)
+    psi_noise : ndarray, shape (n_temp, time_slow, waveno)
         Noise spectrum, integrated instead where the integral of ``psi_k`` is
         negative.
     waveno_upper : ndarray, shape (n_temp, time_slow)
@@ -527,7 +526,7 @@ def integrate_chi(
     _spec_int = np.where(
         _spec_int >= 0,
         _spec_int,
-        integrate(psi_noise[:, newaxis, :], waveno, kl, waveno_upper),
+        integrate(psi_noise, waveno, kl, waveno_upper),
     )
     return 6 * moldiff * _spec_int
 
@@ -559,7 +558,7 @@ def get_kbatch_costfunc(
     chi: Float[ndarray, "n_temp time"],
     waveno: Float[ndarray, "time waveno"],
     psi: Float[ndarray, "n_temp time waveno"],
-    psi_noise: Float[ndarray, "n_temp waveno"],
+    psi_noise: Float[ndarray, "n_temp time waveno"],
     fit_mask: Bool[ndarray, "n_temp time waveno"],
     moldiff: Float[ndarray, "time"],
     spectrum_model: SpectrumModel,
@@ -580,7 +579,7 @@ def get_kbatch_costfunc(
                 moldiff[:, newaxis],
                 q,
             )
-            + psi_noise[:, newaxis, :]
+            + psi_noise
         )
         values = costfunction_c11(psi, psi_theoretical, dof, fit_mask)
     return np.where(np.isfinite(values), values, -np.inf)
