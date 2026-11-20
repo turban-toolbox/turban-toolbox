@@ -35,7 +35,7 @@ def temperature_gradient_spectra(
     Float[ndarray, "freq"],  # freq
     Float[ndarray, "time_slow"],  # senspeed
     Int[ndarray, "time_slow"],  # section_number_slow
-    Float[ndarray, "ntemp waveno"],  # psi_noise
+    Float[ndarray, "ntemp time_slow waveno"],  # psi_noise
     Int[ndarray, "time_slow chunk_length"],  # ii
 ]:
     """Compute temperature gradient power spectra and convert to wavenumber domain.
@@ -88,8 +88,9 @@ def temperature_gradient_spectra(
         Chunk-averaged platform speed.
     section_number_slow : ndarray of int, shape (time_slow,)
         Section markers aggregated to slow time.
-    psi_noise : ndarray, shape (ntemp, waveno)
-        Estimated noise spectrum from the least intense 5% of chunks.
+    psi_noise : ndarray, shape (ntemp, time_slow, waveno)
+        Noise spectrum in K2 m-2 cpm-1 from the least intense 5% of chunks, corrected
+        for the FP07 response like x``psi_k``.
     ii : ndarray of int, shape (time_slow, chunk_length)
         Chunking index used to aggregate fast-to-slow quantities.
     """
@@ -125,25 +126,30 @@ def temperature_gradient_spectra(
             )
         psi_f *= spectral_correction
 
-    # to waveno domain: dT/dx = (dT/dt) / U, and S(k) = U S(f), so psi_k = psi_f / U
-    # TODO LATER we currently deal with dT/dt; ATOMIX-chi draft as of now specifies dT/dx at Level 1
-    waveno: Float[ndarray, "time_slow waveno"] = (
-        freq[newaxis, :] / senspeeda[:, newaxis]
-    )
-    psi_k: Float[ndarray, "ntemp time_slow waveno"] = (
-        psi_f / senspeeda[newaxis, :, newaxis]
-    )
-    psi_k /= get_fp07_response(
+    # fp07-corrected factor commong for psi_noise and psi_k:
+    to_waveno = 1 / (senspeeda[newaxis, :, newaxis] * get_fp07_response(
         freq=freq,
         senspeed=senspeeda,
         tau0=tau0,
         gamma=gamma,
         npoles=npoles,
         model=response_model,
+    )[newaxis])
+    psi_k: Float[ndarray, "ntemp time_slow waveno"] = psi_f * to_waveno
+
+    # noise of dT/dt is estimated in the frequency domain (where the electronics
+    # noise is the same for every chunk), then converted to the wavenumber domain
+    # with the speed and FP07 response of each chunk, like psi_k
+    # TODO LATER explore supplying own noise level by input arguments
+    psi_noise: Float[ndarray, "ntemp time_slow waveno"] = (
+        get_noise_empirical(psi_f)[:, newaxis, :] * to_waveno
     )
 
-    # TODO LATER explore supplying own noise level by input arguments
-    psi_noise = get_noise_empirical(psi_k)
+    # to waveno domain: dT/dx = (dT/dt) / U, and S(k) = U S(f), so psi_k = psi_f / U
+    # TODO LATER we currently deal with dT/dt; ATOMIX-chi draft as of now specifies dT/dx at Level 1
+    waveno: Float[ndarray, "time_slow waveno"] = (
+        freq[newaxis, :] / senspeeda[:, newaxis]
+    )
 
     return waveno, psi_k, psi_f, freq, senspeeda, section_number_slow, psi_noise, ii
 
@@ -230,17 +236,18 @@ def _correction_frequency_response_vachon_lueck(
 
 
 def get_noise_empirical(
-    spectra: Float[ndarray, "*any time frequency"],
-) -> Float[ndarray, "*any frequency"]:
+    spectra: Float[ndarray, "*any time freq"],
+) -> Float[ndarray, "*any freq"]:
     """
     Define noise as average of least intense 5% of spectra
     """
     if spectra.shape[-2] > 0:
-        # a measure of the intensity of the spectrum
-        spec_intens: Float[ndarray, "*any time"] = np.mean(spectra[..., :20], axis=-1)
-        # 5 % least intense spectra
+        # a measure of the intensity of the spectrum: mean over all nonzero freqs
+        spec_intens: Float[ndarray, "*any time"] = np.nanmean(spectra[..., 1:], axis=-1)
+        # 5 % least intense spectra, separately for each sensor
+        threshold = np.nanpercentile(spec_intens, 5, axis=-1, keepdims=True)
         least_intense: Float[ndarray, "*any time frequency"] = np.where(
-            spec_intens[..., newaxis] < np.percentile(spec_intens, 5), spectra, np.nan
+            (spec_intens <= threshold)[..., newaxis], spectra, np.nan
         )
         noise = 10 ** np.nanmean(np.log10(least_intense), axis=-2)
         return noise

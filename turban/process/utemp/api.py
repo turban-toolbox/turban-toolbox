@@ -99,7 +99,7 @@ class UTempLevel3(Level3[UTempLevel2]):
     """
 
     psi_k_gradt: Float[ndarray, "ntemp time nfreq"]
-    psi_noise: Float[ndarray, "ntemp nfreq"]
+    psi_noise: Float[ndarray, "ntemp time nfreq"]
     psi_f_gradt: Float[ndarray, "ntemp time nfreq"]
     cfg: UTempConfig
 
@@ -151,7 +151,8 @@ class UTempLevel3(Level3[UTempLevel2]):
             tau0=None if fp07 is None else fp07.tau0,
             gamma=None if fp07 is None else fp07.gamma,
             npoles=None if fp07 is None else fp07.npoles,
-            response_model=None if fp07 is None else fp07.name,
+            # do not pass fp07.name: a preset name would override the (possibly
+            # custom) tau0, gamma, npoles of cfg.fp07_response
         )
 
         kwarg.update(
