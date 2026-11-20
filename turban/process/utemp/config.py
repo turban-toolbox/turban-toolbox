@@ -14,7 +14,8 @@ type FP07ResponseModelName = Literal[
 
 class FP07Response(BaseModel):
     # tau = tau0 * (W / 1 m s-1) ** exponent
-    name: FP07ResponseModelName
+    # name is informative only; tau0, gamma and npoles define the response
+    name: FP07ResponseModelName | Literal["custom"]
     tau0: float  # response time [s]
     gamma: float  # exponent of speed,
     npoles: int  # number of poles
