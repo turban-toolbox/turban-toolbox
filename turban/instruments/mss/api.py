@@ -77,7 +77,7 @@ def mrd_to_level1(
         level1 = UTempLevel1(
             time=time,
             senspeed=np.asarray(data_level1["PSPD_REL"]),
-            dtempdt=np.asarray(data_level1["utemp"]),
+            dtempdt=np.asarray(data_level1["dtempdt"]),
             section_number=np.ones_like(data_level1["time_count"], dtype=int),
             spectral_correction=correction_frequency_response_bilinear(
                 freq, proc_cfg.sampfreq, mss_cfg.gain_utemp

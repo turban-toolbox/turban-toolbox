@@ -10,6 +10,7 @@ import gsw
 import xarray as xr
 
 from turban.instruments.mss import mss_utils
+from turban.utils.util import fft_grad
 from turban.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -597,6 +598,15 @@ def level0_to_level1(
                 sampfreq=mss_config.sampling_freq,
                 gain=mss_config.gain_utemp,
             )[numpy.newaxis, :],
+        )
+        level1_dataset["dtempdt"] = (
+            ["n_temp", "index"],
+            fft_grad(
+                level1_dataset["utemp"].values,
+                1 / mss_config.sampling_freq,
+                ensure_not_nan=True,
+            ),
+            {"units": "K s-1"},
         )
 
         # Mask the inserted records only after the derived quantities are computed
