@@ -18,15 +18,15 @@ connection.
 The manual download is default and requires explicit user action to
 initiate the download. This can be achieved by
 ```bash
-turban_auto_download_data_files [--force]
+turban_download_datafiles [--force]
 ```
-The ```--force``` option enforces the data download, even if
+The `--force` option enforces the data download, even if
 apparently all data files were downloaded previously.
 
 The downloading procedure can be made automatically by setting the
-environment variable ```TURBAN_AUTO_DOWNLOAD_FILES```, like so
+environment variable `TURBAN_AUTO_DOWNLOAD_TEST_FILES`, like so
 ```bash
-export TURBAN_AUTO_DOWNLOAD_FILES=1
+export TURBAN_AUTO_DOWNLOAD_TEST_FILES=1
 ```
 Whenever a unit test is run, and one or more data files appear to be
 missing, the data files are downloaded automatically. This feature is

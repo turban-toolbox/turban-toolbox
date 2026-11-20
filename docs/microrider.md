@@ -192,9 +192,10 @@ from the `.p` file. They are available as `self.microstructure_raw_data`, so a p
 can compute speed from any recorded channel (pressure, inclinometers, ...).
 
 Decorating with `@register_plugin` makes the class available through the config-driven
-factory (see below) and lists it in the registry for introspection. The argument is a
-list of `(parameter_name, type)` pairs, one for each constructor argument. There are no
-default values: every parameter must be set in the configuration, so that a
+factory (see below) and lists it in the registry for introspection. The decorator takes
+no arguments: the plugin parameters are read from the signature of the constructor.
+They must be named parameters (no `*args` or `**kwargs`) without default values, otherwise
+`PluginError` is raised. Every parameter must thus be set in the configuration, so that a
 configuration always fully describes how the data were processed.
 
 A plugin defined in your own module is registered as `"module:ClassName"`. For

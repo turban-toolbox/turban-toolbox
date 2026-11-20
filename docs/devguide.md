@@ -34,9 +34,11 @@ CI runs two environments on every push and pull request:
 | Python | Dependencies | Purpose |
 |--------|-------------|---------|
 | 3.14 | latest | catch breakage on current Python |
-| 3.11 | minimum (`--resolution=lowest-direct`) | verify declared lower bounds in `pyproject.toml` are sufficient |
+| 3.12 | minimum (`--resolution=lowest-direct`) | verify declared lower bounds in `pyproject.toml` are sufficient |
 
-Python 3.11 is the minimum supported version (`requires-python = ">=3.11"`), enforced by use of `match` statements and `typing.Self`.
+Python 3.12 is the minimum supported version (`requires-python = ">=3.12"`), enforced by the use of PEP 695 syntax for generic classes (e.g. `class Level2[L: Level1](...)` in `turban/process/generic/api.py`).
+
+Both environments run `pytest tests/ docs/`, i.e. the code blocks in the documentation are tested as well (via `pytest-markdown-docs`). Add `notest` to the info string of a code fence that cannot run in CI (e.g. `python notest`), and `continuation` to one that continues the previous block.
 
 Coverage reports are uploaded to Codecov from the 3.14 run only.
 

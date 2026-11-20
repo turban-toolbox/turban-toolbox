@@ -122,13 +122,89 @@ with open(f"out/tests/instruments/mss/SH2_0330_config.json", "r") as f:
 assert mss_conf == mss_conf2
 ```
 
+## One-call loading with `mrd_to_level1`
+
+`turban.instruments.mss.api.mrd_to_level1` performs all of the above steps (reading, Level 0, Level 1) in one call and returns a TURBAN Level 1 object, either `ShearLevel1` (`target="shear"`) or `UTempLevel1` (`target="utemp"`):
+
+```python
+from turban import ShearConfig, ShearProcessing
+from turban.instruments.mss.api import mrd_to_level1
+from turban.utils.filepaths import atomix_benchmark_baltic_mrd_fpath
+
+cfg = ShearConfig(
+    sampfreq=1024.0,
+    segment_length=2048,
+    segment_overlap=1024,
+    chunk_length=4 * 2048,
+    chunk_overlap=1024,
+)
+level1 = mrd_to_level1(
+    atomix_benchmark_baltic_mrd_fpath,
+    "shear",
+    cfg,
+    shear_sensitivities={"SHE1": 3.90e-4, "SHE2": 4.05e-4},
+    sensornames_ctd={"cond": "COND", "temp": "TEMP", "press": "PRESS"},
+)
+assert "temp" in level1.aux_data
+```
+
+The device configuration is either read from the MRD header as with `MssDeviceConfig.from_mrd` (then `shear_sensitivities` is required and `sensornames_ctd` should be given), or passed as a `MssDeviceConfig` (fourth argument `mss_cfg`), which takes precedence.
+
+`mrd_to_level1`
+
+- uses the physical time if the MRD file contains a time packet, and otherwise the seconds since the first sample,
+- sets `section_number` to 1 for the whole file, i.e. all data are processed. To restrict processing to e.g. the downcast, set `level1.section_number` (0 means discard) before setting up the pipeline, see [Sections, segments, and chunks](manual.md#sections-segments-and-chunks),
+- adds the CTD sensors listed in `sensornames_ctd` as auxiliary data under their standard names `cond`, `temp` and `press`. Because `temp` is present, Level 4 computes the molecular viscosity from it (see [Molecular properties of seawater](manual.md#molecular-properties-of-seawater)),
+- adds the channels `ACC`, `Chl_A`, `ACCx` and `ACCy` as auxiliary data, if present.
+
+### Missing data records
+
+Records missing from an MRD file (e.g. due to transmission errors) are detected from gaps in the `COUNT` channel. The argument `missing` of `mrd_to_level1` (and `mss_mrd.level0_to_level1`) controls how they are handled:
+
+| `missing` | Effect |
+|---|---|
+| `None` (default) | Records are kept as they are, so the time axis is irregular at gaps |
+| `"interpolate"` | Missing records are inserted and linearly interpolated in the calibrated channels before the derived quantities (salinity, density, sinking speed, shear, microtemperature) are computed |
+| `"nan"` | As `"interpolate"`, but the inserted records are then set to NaN in all variables |
+
+With `"interpolate"` and `"nan"`, duplicate records are dropped, and a boolean variable `inserted` marks the inserted records in the Level 1 dataset of `level0_to_level1`. Gaps of 65536 records or more cannot be detected.
+
+### Microtemperature
+
+With `target="utemp"`, `mrd_to_level1` returns a `UTempLevel1` for the [microtemperature pipeline](utemp.md) (experimental). The fast thermistor channel of the MSS is pre-emphasised (`x + g dx/dt`), and the Level 1 conversion removes this pre-emphasis from the `NTC`/`NTCHP` channels with a digital first-order low-pass (`mss_utils.deconvolve_mss_ntchp`). The time constant $g$ of the pre-emphasis is set by `MssDeviceConfig.gain_utemp` (default 1.5 s). As the digital filter differs from the ideal analog one at high frequencies, `mrd_to_level1` sets `UTempLevel1.spectral_correction` accordingly (`turban.process.utemp.util.correction_frequency_response_bilinear`), on the frequency grid given by the `segment_length` and `sampfreq` of the `UTempConfig`.
+
+```python
+import json
+from turban.instruments.mss.api import mrd_to_level1
+from turban.instruments.mss.config import MssDeviceConfig
+from turban.process.utemp.api import UTempProcessing
+from turban.process.utemp.config import UTempConfig
+from turban.utils.filepaths import mss_probeconf_json_fpath, mss_utemp_mrd_fpath
+
+with open(mss_probeconf_json_fpath) as f:
+    mss_cfg = MssDeviceConfig.model_validate(json.load(f))
+
+cfg = UTempConfig(
+    sampfreq=1024.0,
+    segment_length=2048,
+    segment_overlap=1024,
+    chunk_length=4 * 2048,
+    chunk_overlap=1024,
+    waveno_limit_upper=500.0,
+)
+level1 = mrd_to_level1(mss_utemp_mrd_fpath, "utemp", cfg, mss_cfg)
+p = UTempProcessing(level1)  # p.level4 contains chi and eps
+```
+
 ## MSS API-Reference
 
-[MSS-Config](instruments/mss/config.md)
+See the [API reference](api.md) for the following modules:
 
-[MRD (MSS Raw Data)](instruments/mss/mss_mrd.md)
-
-[HHL (High-High-Low)](instruments/mss/mss_hhl.md)
+- `turban.instruments.mss.api`: `mrd_to_level1`
+- `turban.instruments.mss.config`: `MssDeviceConfig` and sensor configurations
+- `turban.instruments.mss.mss_mrd`: MRD (MSS Raw Data) file format
+- `turban.instruments.mss.mss_hhl`: HHL (High-High-Low) raw data format
+- `turban.instruments.mss.mss_utils`: shear, sinking speed and deconvolution helpers
 
 
 

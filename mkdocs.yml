@@ -27,6 +27,15 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Quickstart: quickstart.md    
+  - Quickstart: quickstart.md
+  - User Manual:
+      - Infrastructure and shear processing: manual.md
+      - Microtemperature processing: utemp.md
+  - Instruments:
+      - MSS: mss.md
+      - MicroRider: microrider.md
+  - Developers:
+      - Developer's guide: devguide.md
+      - Test and benchmark data files: benchmark_files.md
   - API Reference: api.md
   - GitHub Repository: https://github.com/turban-toolbox/turban-toolbox
