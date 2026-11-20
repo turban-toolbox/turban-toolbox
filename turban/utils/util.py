@@ -9,6 +9,10 @@ from jaxtyping import Float, Int, Num, Bool, Shaped
 from netCDF4 import Dataset
 import xarray as xr
 
+from turban.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def kolmogorov_length(
     eps: Float[ndarray, "*any"],
@@ -407,6 +411,7 @@ def split_data(
 def fft_grad(
     signal: Float[ndarray, "... time"],
     dt: float,
+    ensure_not_nan: bool = False,
 ) -> Float[ndarray, "... time"]:
     """Compute gradient via FFT along last axis.
 
@@ -416,12 +421,31 @@ def fft_grad(
         Input signal.
     dt : float
         Time step in seconds.
+    ensure_not_nan : bool, optional
+        If True, NaNs in ``signal`` are filled before the FFT (which would
+        otherwise turn the whole output NaN), by linear interpolation along the
+        last axis and nearest-neighbour extrapolation at the ends. ``signal``
+        itself is not modified. Default is False.
 
     Returns
     -------
     Float[ndarray, "... time"]
         Gradient computed via FFT.
     """
+    if ensure_not_nan and np.isnan(signal).any():
+        signal = np.array(signal, dtype=float)  # copy, leave input untouched
+        rows = signal.reshape(-1, signal.shape[-1])  # view into the copy
+        idx = np.arange(signal.shape[-1])
+        nnan = 0
+        for row in rows:
+            isnan = np.isnan(row)
+            if isnan.any() and not isnan.all():
+                # np.interp holds the first/last valid value outside the data range
+                row[isnan] = np.interp(idx[isnan], idx[~isnan], row[~isnan])
+                nnan += isnan.sum()
+        logger.warning(
+            f"fft_grad: filled {nnan} NaN(s) by linear interpolation"
+        )
     N = signal.shape[-1]
     x = np.concatenate(
         (signal, signal[::-1]), axis=-1
