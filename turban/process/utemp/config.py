@@ -43,11 +43,11 @@ class UTempConfig(SegmentConfig):
     """Configures processing of timeseries using temperature gradient spectra.
 
     OBS: fp07_response can also be instantiated as string (one of keys of
-    FP07_RESPONSE_MODELS)
+    FP07_RESPONSE_MODELS); it is required, None means no response correction.
     """
 
     # --- Level 3: frequency response of the FP07 thermistor
-    fp07_response: FP07Response | None = FP07_RESPONSE_MODELS["nash99"]
+    fp07_response: FP07Response | None
 
     # --- Level 4: physical properties (if no auxiliary data `temp`)
     molvisc_fallback: float = 1.6e-6  # [m2 s-1]

@@ -1,7 +1,14 @@
+import json
+import types
+from typing import Union, get_args, get_origin
+
 from pydantic import BaseModel, ConfigDict
 from netCDF4 import Dataset
 import xarray as xr
 import numpy as np
+
+# netCDF attributes cannot hold None
+NONE_FOR_NETCDF = "_NONE"
 
 
 class SegmentConfig(BaseModel):
@@ -70,16 +77,28 @@ class SegmentConfig(BaseModel):
     def add_to_xarray(self, ds: xr.Dataset):
         """Write configuration fields as global attributes of an xarray Dataset.
 
+        Every field is written as one attribute. NetCDF attributes do not allow ``None``
+        or nested models.
+
         Parameters
         ----------
         ds : xr.Dataset
             Dataset whose ``attrs`` will be updated in-place.
         """
-        ds.attrs.update(self.model_dump(exclude_none=True))
+        for k in type(self).model_fields:
+            v = getattr(self, k)
+            if v is None:
+                v = NONE_FOR_NETCDF
+            elif isinstance(v, BaseModel):
+                v = v.model_dump_json()
+            ds.attrs[k] = v
 
     @classmethod
     def from_xarray(cls, ds: xr.Dataset):
         """Create from xarray Dataset global attributes.
+
+        Inverse of ``add_to_xarray``.
+        Nested models are parsed from JSON.
 
         Parameters
         ----------
@@ -91,4 +110,22 @@ class SegmentConfig(BaseModel):
         SegmentConfig
             Validated instance constructed from the dataset attributes.
         """
-        return cls.model_validate(ds.attrs)
+        attrs = {
+            k: None if isinstance(v, str) and v == NONE_FOR_NETCDF else v
+            for k, v in ds.attrs.items()
+        }
+        for k, field in cls.model_fields.items():
+            if _nested_model(field.annotation) and isinstance(attrs.get(k), str):
+                attrs[k] = json.loads(attrs[k])
+        return cls.model_validate(attrs)
+
+
+def _nested_model(annotation) -> type[BaseModel] | None:
+    """Return the BaseModel class in ``annotation`` (e.g. ``Model | None``)."""
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    if get_origin(annotation) in (Union, types.UnionType):
+        for arg in get_args(annotation):
+            if isinstance(arg, type) and issubclass(arg, BaseModel):
+                return arg
+    return None

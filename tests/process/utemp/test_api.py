@@ -20,6 +20,7 @@ def test_default_vocabulary_in_xarray(check_vocabulary_in_xarray):
             segment_overlap=128,
             chunk_length=1024,
             chunk_overlap=512,
+            fp07_response="nash99",
         ),
     )
     check_vocabulary_in_xarray(UTempProcessing(level1), [VARIABLES, VARIABLES_UTEMP])

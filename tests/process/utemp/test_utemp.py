@@ -29,6 +29,7 @@ def test_mss():
         chunk_length=4 * 2048,
         chunk_overlap=1024,
         waveno_limit_upper=500.0,
+        fp07_response="nash99",
     )
     ut1 = mrd_to_level1(mss_utemp_mrd_fpath, "utemp", cfg, mss_cfg_053)
     p = UTempProcessing(ut1)

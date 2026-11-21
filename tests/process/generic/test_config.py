@@ -1,6 +1,6 @@
 import xarray as xr
 
-from turban.process.generic.config import SegmentConfig
+from turban.process.generic.config import NONE_FOR_NETCDF, SegmentConfig
 
 
 class MockConfig(SegmentConfig):
@@ -11,7 +11,7 @@ class MockConfig(SegmentConfig):
 
 
 def test_netcdf_roundtrip(tmp_path):
-    """None cannot be stored as a netCDF attribute, so it must not be written, but be recovered upon loading."""
+    """None cannot be stored as a netCDF attribute, so it is written as a sentinel and recovered upon loading."""
     cfg = MockConfig(
         sampfreq=512.0,
         segment_length=1024,
@@ -23,13 +23,12 @@ def test_netcdf_roundtrip(tmp_path):
     )
     ds = xr.Dataset()
     cfg.add_to_xarray(ds)
-    assert "optional_arg" not in ds.attrs
+    assert ds.attrs["optional_arg"] == NONE_FOR_NETCDF
     assert ds.attrs["optional_arg_set"] == 98.0
-    assert all(v is not None for v in ds.attrs.values())
+    assert set(ds.attrs) == set(MockConfig.model_fields)
     fpath = tmp_path / "config.nc"
     ds.to_netcdf(fpath)
     with xr.open_dataset(fpath) as ds_read:
         cfg_read = MockConfig.from_xarray(ds_read)
-    assert "optional_arg" not in ds_read.attrs
     assert cfg_read.optional_arg is None
     assert cfg_read == cfg
