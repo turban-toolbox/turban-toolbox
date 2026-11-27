@@ -35,7 +35,7 @@ cfg = ShearConfig(
 )
 
 # Instrument configuration
-microrider_config = MicroriderConfig(sampfreq=512.0, sensors={})
+microrider_config = MicroriderConfig()
 
 # Create the instrument and attach a sensor speed plugin
 instrument = MicroriderInstrument(cfg=microrider_config)
@@ -79,7 +79,7 @@ deployments where the platform speed is well-known and stable.
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
-cfg = MicroriderConfig(sampfreq=512.0, sensors={})
+cfg = MicroriderConfig()
 instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedConstant(constant_speed=0.6)  # 0.6 m/s
@@ -101,7 +101,7 @@ automatically when `file_to_shear_level1` is called.
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
-cfg = MicroriderConfig(sampfreq=512.0, sensors={})
+cfg = MicroriderConfig()
 instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedEMC()
@@ -117,7 +117,7 @@ externally (e.g. from a navigation system or DVL) and is available as numpy arra
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
-cfg = MicroriderConfig(sampfreq=512.0, sensors={})
+cfg = MicroriderConfig()
 instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedLookupTable()
@@ -140,7 +140,7 @@ one row per sample. Internally uses `SensorSpeedLookupTable`.
 import turban.instruments.microrider.sensorspeedplugins as plugins
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
-cfg = MicroriderConfig(sampfreq=512.0, sensors={})
+cfg = MicroriderConfig()
 instrument = MicroriderInstrument(cfg)
 
 plugin = plugins.SensorSpeedDataFile(filename="path/to/speed.txt")
@@ -223,8 +223,6 @@ passing a list of dictionaries, each with the channel `name`, in
 from turban.instruments.microrider.api import MicroriderInstrument, MicroriderConfig
 
 microrider_config = MicroriderConfig(
-    sampfreq=512.0,
-    sensors={},
     channel_cfgs=[
         {"name": "sh1", "sens": 0.0700},  # V / (rad s⁻¹)
         {"name": "sh2", "sens": 0.0970},
@@ -266,8 +264,6 @@ from turban.process.shear.api import ShearConfig
 
 # Microrider configuration
 microrider_config = MicroriderConfig(
-    sampfreq=512.0,
-    sensors={},
     sensor_speed_plugin="SensorSpeedConstant",
     sensor_speed_plugin_parameters={"constant_speed": 0.6},
 )
