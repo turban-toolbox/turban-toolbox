@@ -1,5 +1,5 @@
+import datetime
 import enum
-
 from functools import partial
 import io
 import os.path
@@ -7,7 +7,6 @@ import re
 import struct
 from typing import Any, Literal
 
-import arrow
 import numpy as np
 from scipy.interpolate import CubicSpline as si_CubicSpline
 
@@ -487,7 +486,7 @@ class HeaderParser:
         and time string
 
         """
-        date = arrow.get(
+        date = datetime.datetime(
             byte_header.year,
             byte_header.month,
             byte_header.day,
@@ -495,6 +494,7 @@ class HeaderParser:
             byte_header.minute,
             byte_header.second,
             byte_header.millisecond * 1000,  # this field is for microseconds.
+            tzinfo=datetime.timezone.utc
         )
         timestamp = date.timestamp()
         datestr = date.strftime("%Y-%m-%d")
