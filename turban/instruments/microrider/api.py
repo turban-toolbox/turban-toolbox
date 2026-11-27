@@ -70,12 +70,14 @@ class MicroriderInstrument(Instrument):
         channel_configs = self.cfg.channel_cfgs
         microstructure_raw_data = rsIO.read_p_file(filename, channel_configs)
         try:
-            self.sensor_speed_plugin.set_microstructure_raw_data(
-                microstructure_raw_data
-            )
+            self.sensor_speed_plugin
         except AttributeError:
             raise MicroriderAPIError(
                 "MicroriderInstrument instance has no sensor speed plugin defined."
+            )
+        else:
+            self.sensor_speed_plugin.set_microstructure_raw_data(
+                microstructure_raw_data
             )
         time = (
             microstructure_raw_data.header.t_fast
@@ -131,7 +133,7 @@ class MicroriderInstrument(Instrument):
             )
             if not argument_list_check:
                 for n in unconfigured_args:
-                    mesg = f"Required parameter {n} for {requested_plugin} is not configured."
+                    mesg = f"Required parameter '{n}' for {requested_plugin} is not configured."
                     logger.error(mesg)
                 raise MicroriderAPIError("Configuration error. (See logs).")
             unused_args = self._check_for_unused_parameters(args)
