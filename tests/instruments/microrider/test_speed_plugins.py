@@ -204,7 +204,7 @@ def test_missing_plugin_parameter_is_logged(caplog):
         MicroriderInstrument(cfg=cfg)
     messages = [r.message for r in caplog.records if r.levelname == "ERROR"]
     assert messages == [
-        "Required parameter constant_speed for SensorSpeedConstant is not configured."
+        "Required parameter 'constant_speed' for SensorSpeedConstant is not configured."
     ]
 
 
