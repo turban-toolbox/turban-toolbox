@@ -37,7 +37,7 @@ classifiers = [
 
 [project.optional-dependencies]
 mss = ["pytz>=2020.1", "dateparser>=1.2.0"]
-microrider = ["arrow>=1.4.0"]
+microrider = []
 
 [dependency-groups]
 dev = [
